@@ -4,7 +4,7 @@
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Version: $Id$
 ;; Keywords: 
-;; Last edited: 1998-08-16 15:04:31 lenst
+;; Last edited: 1998-12-07 00:09:57 lenst
 
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -69,6 +69,11 @@
 (defun fs-char (p)
   (cdr (assq p fs-char)))
 
+(defun fs-set-char (p val)
+  (setcdr (assq p fs-char) val))
+
+(defsetf fs-char fs-set-char)
+
 (defvar fs-para-acc ""
   "Accumulate text of paragraph")
 
@@ -88,7 +93,7 @@
 	   
 
 (defun fs-para ()
-  (when (if (fs-char 'ignore-epmty-para)
+  (when (if (fs-char 'ignore-empty-para)
 	    (string-match "[^\t\n ]" fs-para-acc)
 	  fs-left-indent)
     (assert fs-left-indent)
