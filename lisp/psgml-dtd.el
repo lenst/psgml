@@ -441,10 +441,11 @@ Syntax: var dfa-expr &body forms"
       (sgml-skip-ts)
       (let ((gi (sgml-check-name)))
 	(sgml-skip-ts) (sgml-check-char ?,) ;*** SEQ
-	(sgml-check-data-tag-pattern)
+	(sgml-skip-ts) (sgml-check-data-tag-pattern)
 	(sgml-skip-ts) (sgml-check-dtgc)
 	(setq el (sgml-make-conc (sgml-make-primitive-content-token gi)
-				 (sgml-make-pcdata)))))
+				 (sgml-make-pcdata)))
+	(setq sgml-used-pcdata t)))
      (t
       (setq el (sgml-make-primitive-content-token (sgml-check-name)))))
     (setq mod (sgml-parse-modifier))
