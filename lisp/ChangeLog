@@ -43,5 +43,45 @@ Wed Mar 11 22:11:01 1998  Lennart Staflin  <lenst@lysator.liu.se>
 Tue Mar 10 20:13:11 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el: Merged David Megginson's latest xml modifications.
-	
 
+Sat Nov 15 20:50:35 1997  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-parse-attribute-value-specification): New func.
+	(sgml-parse-attribute-specification-list): use new func. This
+	changes an error to a warning to make better error recovery when
+	illegal characters occurs in starttag.
+
+Sun Aug 17 20:22:28 1997  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-cache-catalog): remove file-truename. This
+	made relative filenames refer to the wrong directory if the
+	catalog file was a symlink.
+
+Thu Jul 24 22:36:15 1997  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-modify-dtd): fixed bug in handling
+	sgml-parent-document.
+
+Mon May 19 18:43:32 1997  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-expand-entity-reference): changed to allow
+	point to be within entity referens, not only at start of ref. As
+	suggested by Matthias Clasen.
+	(sgml-edit-external-entity): new command contributed by Matthias
+	Clasen <clasen@netzservice.de>
+
+	* psgml-charent.el (sgml-charent-to-display-char): fix bug in regexp.
+
+Sat Mar 15 19:20:57 1997  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-check-tag-close): change sgml-error to
+ 	sgml-log-warning
+
+Sun Jan 12 19:15:32 1997  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (psgml-version): bump version
+
+Fri Nov 22 20:29:44 1996  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-parse-colon-path): use path-separator if
+	available.

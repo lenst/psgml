@@ -1743,16 +1743,19 @@ a RNI must be followed by NAME."
 
 (defun sgml-check-token (name)
   (or (equal (sgml-check-case (sgml-check-name)) name)
-      (sgml-parse-error "Reserved name not expected")))
+      (sgml-parse-error "Reserved name not expected (expecting %s)"
+                        name)))
 
 (defun sgml-check-case (name)
-  "Convert the argument to lower case.
+  "Convert the argument to upper case.
 If sgml-namecase-general is nil, then signal an error if the argument
-is not in upper case."
+is not already in upper case."
+  ;; FIXME: Is this function needed when the internal representation
+  ;; of keywords has changed to upper case?
   (or sgml-current-namecase-general
       (equal name (upcase name))
       (sgml-parse-error "Uppercase keyword expected."))
-  (downcase name))
+  (upcase name))
 
 (defun sgml-parse-literal ()
   "Parse a literal and return a string, if no literal return nil."
@@ -1814,9 +1817,9 @@ is not in upper case."
     (cond
      (token
       (sgml-skip-ps)
-      (cond ((member (sgml-check-case token) '("public" "system"))
+      (cond ((member (sgml-check-case token) '("PUBLIC" "SYSTEM"))
 	     (let* ((pubid		; the public id
-		     (if (string-equal (downcase token) "public")
+		     (if (string-equal token "PUBLIC")
 			 (or (sgml-parse-minimum-literal)
 			     (sgml-parse-error "Public identifier expected"))))
 		    (sysid		; the system id

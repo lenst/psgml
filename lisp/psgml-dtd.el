@@ -474,7 +474,7 @@ Case transformed for general names."
 	(setq el (if con1
 		     (funcall con1 subs)
 		   (car subs)))))
-     ((sgml-parse-rni "pcdata")         ; #PCDATA (FIXME: when changing case)
+     ((sgml-parse-rni "PCDATA")         ; #PCDATA (FIXME: when changing case)
       (setq sgml-used-pcdata t)
       (setq el (sgml-make-pcdata)))
      ((sgml-parse-delim "DTGO")			; data tag group
@@ -521,7 +521,7 @@ Case transformed for general names."
 	 (sgml-check-content-model))
 	(t
 	 ;; ANY, CDATA, RCDATA or EMPTY
-	 (let ((dc (intern (upcase (sgml-check-name))))) 
+	 (let ((dc (intern (sgml-check-name)))) 
 	   (cond ((eq dc 'ANY)
 		  (setq sgml-used-pcdata t))
 		 ((eq dc 'CDATA)
@@ -529,7 +529,13 @@ Case transformed for general names."
 		    (sgml-error "XML forbids CDATA declared content.")))
 		 ((eq dc 'RCDATA)
 		  (when sgml-xml-p
-		    (sgml-error "XML forbids RCDATA declared content"))))
+		    (sgml-error "XML forbids RCDATA declared content")))
+                 ((eq dc 'EMPTY))
+                 (t
+                  (sgml-error "Exptected content model group or one of %s"
+                              (if sgml-xml-p
+                                  "ANY or EMPTY"
+                                  "ANY, CDATA, RCDATA or EMPTY"))))
 	   dc))))
 
 (defun sgml-parse-exeption (type)
@@ -587,7 +593,7 @@ Case transformed for general names."
       (setq name (sgml-check-name t))
       (setq dest (sgml-dtd-parameters sgml-dtd-info)))
      (t					; normal entity declaration
-      (or (sgml-parse-rni "default")
+      (or (sgml-parse-rni "DEFAULT")
 	  (setq name (sgml-check-name t)))
       (setq dest (sgml-dtd-entities sgml-dtd-info))))
     (sgml-skip-ps)
@@ -605,7 +611,8 @@ Case transformed for general names."
 	    (setq type (or (sgml-parse-entity-type) 'text))
 	    extid)
 	   ((sgml-startnm-char-next)
-	    (let ((token (intern (sgml-check-case (sgml-check-name)))))
+	    (let ((token (intern (downcase (sgml-check-case (sgml-check-name))))))
+              ;; FIXME: to much case fiddling. 
 	      (sgml-skip-ps)
 	      (when (and sgml-xml-p
 			 (memq token '(cdata sdata pi starttag endtag ms md)))
@@ -638,7 +645,7 @@ Case transformed for general names."
   ;;                             149.2+ data attribute specification?)
   (let ((type (sgml-parse-name)))
     (when type
-      (setq type (intern (sgml-check-case type)))
+      (setq type (intern (downcase (sgml-check-case type))))
       (when (and sgml-xml-p (memq type '(subdoc cdata sdata)))
 	(sgml-error "XML forbids %s entities."
 		    (upcase (symbol-name type))))
@@ -662,7 +669,7 @@ Case transformed for general names."
 ;;;; Parse doctype: Attlist
 
 (defun sgml-declare-attlist ()
-  (let* ((assnot (cond ((sgml-parse-rni "notation")
+  (let* ((assnot (cond ((sgml-parse-rni "NOTATION")
 			(when sgml-xml-p
 			  (sgml-error "XML forbids data attribute declarations"))
 			(sgml-skip-ps)
@@ -704,7 +711,7 @@ Case transformed for general names."
   (let ((type 'name-token-group)
 	(names nil))
     (unless (eq (following-char) ?\()
-      (setq type (intern (sgml-check-case (sgml-check-name))))
+      (setq type (intern (downcase (sgml-check-case (sgml-check-name)))))
       (sgml-validate-declared-value type)
       (sgml-skip-ps))
     (when (memq type '(name-token-group notation))
@@ -736,7 +743,7 @@ Case transformed for general names."
 (defun sgml-check-default-value ()
   (sgml-skip-ps)
   (let* ((rni (sgml-parse-rni))
-	 (key (if rni (intern (sgml-check-case (sgml-check-name))))))
+	 (key (if rni (intern (downcase (sgml-check-case (sgml-check-name)))))))
     (if rni (sgml-validate-default-value-rn key))
     (sgml-skip-ps)
     (sgml-make-default-value

@@ -354,24 +354,16 @@ is determined."
 	(setq element
 	      (let ((sgml-throw-on-error 'parse-error))
 		(catch sgml-throw-on-error
-		  (if (eobp)
-		      (sgml-find-context-of (point))
-		    (sgml-find-element-of (point)))))))
-      (when (eq element sgml-top-tree)	; not in a element at all
-	(setq element nil)		; forget element
-	(goto-char here))		; insert normal tab insted)
+                  (sgml-find-context-of (point))))))
       (when element
 	(sgml-with-parser-syntax
-	 (let ((stag (sgml-is-start-tag))
-	       (etag (sgml-is-end-tag)))
+	 (let ((etag (sgml-is-end-tag)))
 	   (when (or sgml-indent-data
-		     (not (sgml-element-data-p
-			   (if stag
-			       (sgml-element-parent element)
-			     element))))
+		     (not (sgml-element-data-p element)))
 	     (setq col
 		   (* sgml-indent-step
-		      (+ (if (or stag etag) -1 0)
+		      (+ (if etag -1 0)
+                         (if sgml-markup-type 1 0)
 			 (sgml-element-level element))))))))
       (when (and col (/= col (current-column)))
 	(beginning-of-line 1)    
