@@ -13,6 +13,7 @@
     ("tc04.sgml")
     ("tc05.sgml")
     ("tc07.sgml")
+    ("tc08.xml")
     ("tc13.el")))
 
 (defun testsuit-run-test-case (case-description)
@@ -48,5 +49,7 @@
       (error "The expected result %s didn't" expected))))
 
 (defun testsuit-run ()
+  (interactive)
   (loop for tc in psgml-test-cases
-        do (testsuit-run-test-case tc)))
+        do (testsuit-run-test-case tc))
+  (message "Done"))
