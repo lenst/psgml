@@ -30,8 +30,7 @@
 
 ;;;; Code:
 
-(eval-when-compile
-  (require 'psgml))
+(require 'psgml)
 
 
 ;;;; SGML mode: keys and menus
@@ -50,11 +49,11 @@
 (define-key sgml-mode-map [menu-bar sgml-markup]
   '("Markup" . sgml-markup-menu ))
 
-(define-key sgml-mode-map [menu-bar sgml-entities]
-  '("Entities" . sgml-entities-menu))
+;;(define-key sgml-mode-map [menu-bar sgml-entities]
+;;  '("Entities" . sgml-entities-menu))
 
-(define-key sgml-mode-map [menu-bar sgml-tags]
-  '("Tags" . sgml-tags-menu))
+;;(define-key sgml-mode-map [menu-bar sgml-tags]
+;;  '("Tags" . sgml-tags-menu))
 
 (define-key sgml-mode-map [menu-bar sgml]
   (cons "SGML" (make-sparse-keymap "SGML")))
@@ -75,7 +74,7 @@
 (define-key sgml-mode-map [menu-bar sgml show-tags]
   '("List valid tags     [C-c C-t]" . sgml-list-valid-tags))
 (define-key sgml-mode-map [menu-bar sgml change-name]
-  '("Change element name [C-c =]" . sgml-change-element-name))
+  '("Change element name  [C-c =]" . sgml-change-element-name))
 (define-key sgml-mode-map [menu-bar sgml edit-attributes]
   '("Edit attributes     [C-c C-a]" . sgml-edit-attributes))
 (define-key sgml-mode-map [menu-bar sgml next-trouble]
@@ -92,6 +91,8 @@
 
 ;;; DTD menu
 
+(define-key sgml-mode-map [menu-bar sgml-dtd blank-c]
+  '("" . nil))
 (define-key sgml-mode-map [menu-bar sgml-dtd save]
   '("Save parsed DTD" . sgml-save-dtd))
 (define-key sgml-mode-map [menu-bar sgml-dtd load]
@@ -103,22 +104,25 @@
 ;;; Fold menu
 
 (define-key sgml-mode-map [menu-bar sgml-fold unfold-all]
-  '("Unfold all      [C-c C-u C-a]" . sgml-unfold-all))
+  '("Unfold all       [C-c C-u C-a]" . sgml-unfold-all))
 (define-key sgml-mode-map [menu-bar sgml-fold fold-region]
-  '("Fold region     [C-c C-f C-r]" . sgml-fold-region))
+  '("Fold region      [C-c C-f C-r]" . sgml-fold-region))
 (define-key sgml-mode-map [menu-bar sgml-fold expand]
-  '("Expand          [C-c C-f C-x]" . sgml-expand-element))
+  '("Expand           [C-c C-f C-x]" . sgml-expand-element))
 (define-key sgml-mode-map [menu-bar sgml-fold unfold-element]
-  '("Unfold element  [C-c C-u C-e]" . sgml-unfold-element))
+  '("Unfold element   [C-c C-u C-e]" . sgml-unfold-element))
 (define-key sgml-mode-map [menu-bar sgml-fold unfold]
-  '("Unfold line     [C-c C-s]" . sgml-unfold-line))
+  '("Unfold line      [C-c C-s]" . sgml-unfold-line))
 (define-key sgml-mode-map [menu-bar sgml-fold subfold]
-  '("Fold subelement [C-c C-f C-s]"   . sgml-fold-subelement))
+  '("Fold subelement  [C-c C-f C-s]"   . sgml-fold-subelement))
 (define-key sgml-mode-map [menu-bar sgml-fold fold]
-  '("Fold element    [C-c C-f C-e]"   . sgml-fold-element))
+  '("Fold element     [C-c C-f C-e]"   . sgml-fold-element))
 
 
 ;;; Markup menu
+
+(define-key sgml-markup-menu [blank-c]
+  '("" . nil))
 
 (define-key sgml-markup-menu [ entity]
   (sgml-markup "<!entity ... >" "<!entity \r>\n"))
@@ -151,38 +155,66 @@
 (define-key sgml-markup-menu [ ms]
   (sgml-markup "Marked section" "<![ [\r]]>\n"))
 
+(define-key sgml-markup-menu [blank3]
+  '("" . nil))
+
+(define-key sgml-markup-menu [entities]
+  '("Insert entity" . sgml-entities-menu))
+(define-key sgml-markup-menu [tags]
+  '("Insert tag" . sgml-tags-menu))
+
 
 ;;; Key commands
 
 ;; Doesn't this work in Lucid? ***
 (define-key sgml-mode-map [?\M-\C-\ ] 'sgml-mark-element)
 
+(define-key sgml-mode-map [S-mouse-1] 'sgml-tags-menu)
+
 
 ;;; Build custom menus
 (defun sgml-build-custom-menus ()
   ;; Build custom menus
-  (when sgml-custom-markup
-    (define-key sgml-mode-map [menu-bar sgml-markup blank-c] '("" . nil)))
-  (loop for e in (reverse sgml-custom-markup)
-	for i from 0
-	do (define-key sgml-mode-map
-	     (vector 'menu-bar 'sgml-markup (intern (concat "custom" i)))
-	     (sgml-markup (car e) (cadr e))))
-  (when sgml-custom-dtd
-    (define-key sgml-mode-map [menu-bar sgml-dtd blank-c] '("" . nil)))
-  (loop for e in (reverse sgml-custom-dtd)
-	for i from 0
-	do (define-key sgml-mode-map
-	     (vector 'menu-bar 'sgml-dtd (intern (concat "custom" i)))
-	     (cons
-	      (first e)
-	      (` (lambda ()
-		   (interactive)
-		   (sgml-doctype-insert (, (second e)) (, (third e)))))))))
+  (sgml-add-custom-entries
+   sgml-markup-menu
+   (mapcar (function (lambda (e)
+		       (sgml-markup (car e) (cadr e))))
+	   sgml-custom-markup))
+  (sgml-add-custom-entries
+   (lookup-key sgml-mode-map [menu-bar sgml-dtd])
+   (mapcar (function
+	    (lambda (e)
+	      (cons (first e)
+		    (` (lambda ()
+			 (interactive)
+			 (sgml-doctype-insert (,@ (cdr e))))))))
+	   sgml-custom-dtd)))
+
+
+(defun sgml-add-custom-entries (keymap entries)
+  "Add to KEYMAP the ENTRIES, a list of (name . command) pairs.
+The entries are added last in keymap and a blank line precede it."
+  (let ((l keymap)
+	(last (last keymap)))		; cons with keymap name
+    ;; Find the cons before 'blank-c' event, or last cons.
+    (while (and (cdr l)
+		(consp (cadr l))
+		(not (eq 'blank-c (caadr l))))
+      (setq l (cdr l)))
+    ;; Delete entries after
+    (setcdr l nil)
+    (when entries			; now add the entries
+      (setcdr l
+	      (cons
+	       '(blank-c "")		; a blank line before custom entries
+	       (loop for i from 0 as e in entries
+		     collect (cons (intern (concat "custom" i)) e)))))
+    ;; add keymap name to keymap
+    (setcdr (last keymap) last)))
 
 
 ;;;; Provide
 
 (provide 'psgml-other)
 
-;;; psgml-ohter.el ends here
+;;; psgml-other.el ends here
