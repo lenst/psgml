@@ -1642,7 +1642,7 @@ a RNI must be followed by NAME."
 
 ;;;; Parse marked section
 
-(defun sgml-parse-marked-section ()
+(defun sgml-check-marked-section ()
   (let ((status nil))
     (while (progn (sgml-skip-ps)
 		  (not (sgml-parse-char ?\[)))
@@ -1680,7 +1680,7 @@ Returns a list of attspec (attribute specification)."
 			     (sgml-parse-nametoken-string)))
       (sgml-skip-s)
       (cond ((sgml-parse-vi)
-	     (setq val (sgml-parse-attribute-value-specification)))
+	     (setq val (sgml-check-attribute-value-specification)))
 	    ((null element)
 	     (sgml-parse-error "Expecting a ="))
 	    ((progn
@@ -1698,7 +1698,7 @@ Returns a list of attspec (attribute specification)."
 	(push (sgml-make-attspec (sgml-gname-symbol name) val) asl)))
     asl))
 
-(defun sgml-parse-attribute-value-specification ()
+(defun sgml-check-attribute-value-specification ()
   (or (sgml-parse-string)
       (sgml-parse-nametoken-string)
       (sgml-parse-error "Expecting an attribute value: literal or token")))
@@ -2016,7 +2016,7 @@ or if nil, until end of buffer."
 ;;;                      | 62 character reference  ***
 ;;;                      | 59+ general entity reference
 	((sgml-parse-marked-section-start) ; | 93 marked section declaration
-	 (sgml-parse-marked-section)
+	 (sgml-check-marked-section)
 	 t)
 ;;;                      | EE
 	(t (sgml-parse-error "Unrecognized markup"))))
