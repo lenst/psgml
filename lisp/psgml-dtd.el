@@ -157,6 +157,7 @@ Syntax: var dfa-expr &body forms"
 		 nil
 	       (push dest considered))
 	     (sgml-states-equal s dest))
+	(sgml-debug "OPT other start: sucess")
 	(setq res dest
 	      l nil))
        (t (setq l (cdr l)))))
@@ -206,10 +207,12 @@ Syntax: var dfa-expr &body forms"
   s1)
 
 (defun sgml-make-alt (s1 s2)
-  (let ((f (or (sgml-state-final-p s1)
-	       (sgml-state-final-p s2))))
-    (sgml-copy-moves s2 s1)
-    (when f (sgml-make-opt s1)))
+  (cond ((or (sgml-state-final-p s1)	; is result optional
+	     (sgml-state-final-p s2))
+	 (sgml-make-opt s1)
+	 (sgml-copy-moves-to-opt s2 s1))
+	(t
+	 (sgml-copy-moves s2 s1)))
   s1)
 
 (defun sgml-make-pcdata ()
@@ -652,6 +655,13 @@ Syntax: var dfa-expr &body forms"
   ;;(let ((x (cdr (assq node sgml-code-xlate)))) (assert x) x)
   (cdr (assq node sgml-code-xlate)))
 
+(defun sgml-code-number (num)
+  (if (> num sgml-max-singel-octet-number)
+      (insert (+ (lsh (- num sgml-max-singel-octet-number) -8)
+		 sgml-max-singel-octet-number 1)
+	      (logand (- num sgml-max-singel-octet-number) 255))
+    (insert num)))
+
 (defsubst sgml-code-token (token)
   (let ((bp (assq token sgml-code-token-numbers)))
     (unless bp
@@ -659,7 +669,7 @@ Syntax: var dfa-expr &body forms"
 	    (nconc sgml-code-token-numbers
 		   (list (setq bp (cons token
 					(length sgml-code-token-numbers)))))))
-    (insert (cdr bp))))
+    (sgml-code-number (cdr bp))))
 
 (defmacro sgml-code-sequence (loop-c &rest body)
   "Produce the binary coding of a counted sequence from a list.
@@ -668,7 +678,7 @@ FORMS should produce the binary coding of element in VAR."
   (let ((var (car loop-c))
 	(seq (cadr loop-c)))
     (` (let ((seq (, seq)))
-	 (insert (length seq))       
+	 (sgml-code-number (length seq))       
 	 (loop for (, var) in seq 
 	       do (,@ body))))))
 
@@ -727,7 +737,6 @@ FORMS should produce the binary coding of element in VAR."
 
 (defun sgml-code-dtd (target)
   "Produce the binary coding of the current DTD into the TARGET buffer."
-  (assert (< (length sgml-buffer-element-map) 256))
   (let ((elems sgml-buffer-element-map)
 	(params sgml-buffer-param-entities)
 	(entities sgml-buffer-entities)
@@ -737,15 +746,15 @@ FORMS should produce the binary coding of element in VAR."
     (erase-buffer)
     (insert
      ";;; This file was created by psgml on " (current-time-string) "\n"
-     "(sgml-saved-dtd-version 1)\n")
+     "(sgml-saved-dtd-version 2)\n")
     (let ((tv-point (point))		; insert token vector here
-	  (done 0.0)			; count written elements
+	  (done 0)			; count written elements
 	  (tot (length elems)))
       (setq sgml-code-token-numbers nil)
       (sgml-code-sequence (pair elems)
 	(setq done (1+ done))
 	(sgml-code-element (cdr pair))
-	(message "Coding %d%% done" (* 100 (/ done tot))))
+	(message "Coding %d%% done" (/ (* 100 done) tot)))
       (sgml-code-sexp params)
       (sgml-code-sexp entities)
       (sgml-code-sexp doctype)
