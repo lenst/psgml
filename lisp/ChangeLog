@@ -1,3 +1,10 @@
+2005-02-24  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-do-processing-instruction): call
+	sgml--pi-psgml-handler with end point of PI.
+	(sgml--pi-psgml-handler): Take end point, and narrow buffer before
+	parsing.
+
 2005-02-17  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-parse-prolog): apply sgml-general-case to
