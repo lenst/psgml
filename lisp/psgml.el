@@ -1,7 +1,7 @@
 ;;; psgml.el --- SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1993, 1994, 1995, 1996 Lennart Staflin
+;; Copyright (C) 1993, 1994, 1995, 1996, 1997 Lennart Staflin
 ;; Copyright (C) 1992 Free Software Foundation, Inc.
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
@@ -1407,6 +1407,7 @@ If it is something else complete with ispell-complete-word." t)
 
 
 ;;;; Last provisions
+
 (provide 'psgml)
 (provide 'sgml-mode)
 
@@ -1417,4 +1418,3 @@ If it is something else complete with ispell-complete-word." t)
   (require 'psgml-other)))
 
 ;;; psgml.el ends here
-
