@@ -528,10 +528,11 @@ Case transformed for general names."
 (defun sgml-before-eltype-modification ()
   (let ((merged (sgml-dtd-merged sgml-dtd-info)))
     (when (and merged
-	     (eq (sgml-dtd-eltypes sgml-dtd-info)
-		 (sgml-dtd-eltypes (cdr merged))))
+	       (eq (sgml-dtd-eltypes sgml-dtd-info)
+		   (sgml-dtd-eltypes (cdr merged))))
       (setf (sgml-dtd-eltypes sgml-dtd-info)
-	    (sgml-copy-eltypes (sgml-dtd-eltypes sgml-dtd-info))))))
+	    (sgml-merge-eltypes (sgml-make-eltypes-table)
+				(sgml-dtd-eltypes sgml-dtd-info))))))
 
 (defun sgml-declare-element ()
   (let* ((names (sgml-check-element-type))
@@ -713,6 +714,7 @@ Case transformed for general names."
 
 (defun sgml-do-usemap-element (mapname)
   ;; This is called from sgml-do-usemap with the mapname
+  (sgml-before-eltype-modification)
   (loop for e in (sgml-parse-name-group) do
 	(setf (sgml-eltype-shortmap (sgml-lookup-eltype e sgml-dtd-info))
 	      (if (null mapname)
