@@ -348,11 +348,10 @@ Syntax: var dfa-expr &body forms"
 	 (token (sgml-parse-nametoken)))
     (cond
      (token
-      (setq token (sgml-gname-symbol token))
       (sgml-skip-ps)
-      (cond ((memq token '(public system))
+      (cond ((member token '("public" "system"))
 	     (cons
-	      (if (eq token 'public)
+	      (if (string-equal token "public")
 		  (or (sgml-parse-minimum-literal) ; the public id
 		      (sgml-parse-error "Public identifier expected")))	;
 	      (progn (sgml-skip-ps)
@@ -568,8 +567,8 @@ Case transformed for general names."
 			  exclusions inclusions
 			  sgml-used-pcdata)
       (setq names (cdr names)))
-    (message "Parsing doctype (%s elements)..."
-	     (incf sgml-no-elements))
+    (sgml-lazy-message "Parsing doctype (%s elements)..."
+		       (incf sgml-no-elements))
     ))
 
 
@@ -683,7 +682,7 @@ Case transformed for general names."
   (let ((type 'name-token-group)
 	(names nil))
     (unless (eq (following-char) ?\()
-      (setq type (sgml-gname-symbol (sgml-check-name)))
+      (setq type (intern (sgml-check-name)))
       (sgml-skip-ps))
     (when (memq type '(name-token-group notation))
       (setq names (sgml-check-nametoken-group)))
@@ -692,7 +691,7 @@ Case transformed for general names."
 (defun sgml-check-default-value ()
   (sgml-skip-ps)
   (let* ((rni (sgml-parse-rni))
-	 (key (if rni (sgml-gname-symbol (sgml-check-name)))))
+	 (key (if rni (intern (sgml-check-name)))))
     (sgml-skip-ps)
     (sgml-make-default-value
      key
@@ -942,7 +941,7 @@ FORMS should produce the binary coding of element in VAR."
       (sgml-code-sequence (pair (cdr sgml-code-token-numbers))
 	(setq done (1+ done))
 	(sgml-code-element (car pair))
-	(message "Coding %d%% done" (/ (* 100 done) tot)))
+	(sgml-lazy-message "Coding %d%% done" (/ (* 100 done) tot)))
       (sgml-code-sexp (sgml-dtd-parameters dtd))
       (sgml-code-sexp (sgml-dtd-entities dtd))
       (sgml-code-sexp (sgml-dtd-shortmaps dtd))
