@@ -269,17 +269,23 @@ Syntax: var dfa-expr &body forms"
 	((sgml-parse-char ?&)
 	 (function sgml-make-&))))
 
+(defun sgml-check-grpc ()
+  (sgml-check-char ?\)))
+
+(defun sgml-parse-grpo ()
+  (sgml-parse-char ?\())
+
 (defun sgml-parse-name-group ()
   (sgml-skip-ps)
   (let (names)
     (cond
-     ((sgml-parse-char ?\()
+     ((sgml-parse-grpo)
       (sgml-skip-ps)
       (setq names (list (sgml-check-name)))
       (while (sgml-parse-connector)
 	(sgml-skip-ps)
 	(push (sgml-check-name) names))
-      (sgml-check-char ?\))
+      (sgml-check-grpc)
       names)
      (t
       (list (sgml-check-name))))))
@@ -288,15 +294,38 @@ Syntax: var dfa-expr &body forms"
   (sgml-skip-ps)
   (let ((names nil))
     (cond
-     ((sgml-parse-char ?\()
+     ((sgml-parse-grpo)
       (while (progn
 	       (sgml-skip-ps)
 	       (push (sgml-check-nametoken) names)
 	       (sgml-parse-connector)))
-      (sgml-check-char ?\))
+      (sgml-check-grpc)
       names)
      (t
       (list (sgml-check-nametoken))))))
+
+(defun sgml-check-element-type ()
+  "Parse and check an element type (name)."
+  (cond
+   ((sgml-parse-grpo)
+    (sgml-skip-ps)			; *** should be ts*
+    (let ((names (sgml-check-element-type)))
+      (while (progn (sgml-skip-ps)
+		    (sgml-parse-connector))
+	(sgml-skip-ps)			; *** should be ts*
+	(nconc names (sgml-check-element-type)))
+      (sgml-check-grpc)
+      names))
+   (t					; gi/ranked element
+    (let ((name (sgml-check-name)))
+      (sgml-skip-ps)
+      (list (if (and (>= (following-char) ?0)
+		     (<= (following-char) ?9))
+		(sgml-gname-symbol
+		 (concat (symbol-name name)
+			 (sgml-parse-nametoken-string)))
+	      name))))))
+
 
 (defun sgml-parse-notation-dcl ()
   ;;148  notation declaration = MDO, "NOTATION",
@@ -335,7 +364,7 @@ Syntax: var dfa-expr &body forms"
   (sgml-skip-ps)
   (let (el mod)
     (cond
-     ((sgml-parse-char ?\()
+     ((sgml-parse-grpo)
       (let ((subs (list (sgml-parse-model-group)))
 	    (con1 nil)
 	    (con2 nil))
@@ -345,7 +374,7 @@ Syntax: var dfa-expr &body forms"
 		 (sgml-error "Mixed connectors")))
 	  (setq con1 con2)
 	  (setq subs (nconc subs (list (sgml-parse-model-group)))))
-	(sgml-check-char ?\))
+	(sgml-check-grpc)
 	(setq el (if con1
 		     (funcall con1 subs)
 		   (car subs)))))
@@ -377,7 +406,7 @@ Syntax: var dfa-expr &body forms"
 
 (defun sgml-parse-element-dcl ()
   (sgml-skip-ps)
-  (let* ((names (sgml-parse-name-group))
+  (let* ((names (sgml-check-element-type))
 	 (stag-opt (sgml-parse-opt))
 	 (etag-opt (sgml-parse-opt))
 	 (sgml-used-pcdata nil)
@@ -514,28 +543,30 @@ Syntax: var dfa-expr &body forms"
   (sgml-skip-ps)
   (if (eq (following-char) ?>)		; End of attlist?
       nil
-    (sgml-make-attribute (sgml-check-name)
-			 (sgml-parse-declared-value)
-			 (sgml-parse-default-value))))
+    (sgml-make-attdecl (sgml-check-name)
+		       (sgml-parse-declared-value)
+		       (sgml-parse-default-value))))
 
 (defun sgml-parse-declared-value ()
   (sgml-skip-ps)
-  (cond ((eq (following-char) ?\()	; A name token group
-	 (list 'name-token-group
-	       (sgml-parse-nametoken-group)))
-	(t
-	 (let ((key (sgml-check-name)))	; a key word
-	   (if (eq key 'notation)
-	       (list key (sgml-parse-name-group))
-	     key)))))
+  (let ((type 'name-token-group)
+	(names nil))
+    (unless (eq (following-char) ?\()
+      (setq type (sgml-check-name))
+      (sgml-skip-ps))
+    (when (memq type '(name-token-group notation))
+      (setq names (sgml-parse-nametoken-group)))
+    (sgml-make-declared-value type names)))
 
 (defun sgml-parse-default-value ()
   (sgml-skip-ps)
   (let* ((rni (sgml-parse-rni))
 	 (key (if rni (sgml-check-name))))
-    (if (or (not rni) (eq key 'fixed))
-	(list key (sgml-parse-attribute-value-specification))
-      key)))
+    (sgml-make-default-value
+     key
+     (if (or (not rni) (eq key 'fixed))
+	 (sgml-parse-attribute-value-specification)))))
+
 
 ;;;; Parse doctype
 
