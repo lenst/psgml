@@ -1,0 +1,7 @@
+Sat Mar 14 21:31:09 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-do-processing-instruction): Added
+	recognition of PSGML NOFILL.
+	(sgml-parse-catalog-buffer): add catalog as a noname entry
+	(sgml-catalog-lookup): handle catalog entries
+
