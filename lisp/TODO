@@ -1,4 +1,12 @@
-TODO      [Time-stamp: "1998-11-28 12:10:37 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "1999-01-25 21:33:18 lenst"]           -*- outline -*- 
+
+* Fix documentation of sgml-display-char-list-filename
+
+File format is not properly descibed.
+
+* sgml-parse-prolog
+
+Should perhaps respect sgml-parent-document
 
 * Konstigt beteende när DOCTYPE specar en odefinierad elementtyp,
 speciellt om det är nästan samma som topelementet i instansen men
