@@ -265,7 +265,7 @@ Setting this variable automatically makes it local to the current buffer.")
 of an inserted element.")
 
 (defvar sgml-balanced-tag-edit t
-  "*If non-nil, always insert start-end tag pairs.")
+  "*If non-nil, context menu inserts start-end tag pairs.")
 
 (defvar sgml-omittag-transparent (not sgml-balanced-tag-edit)
   "*If non-nil, will show legal tags inside elements with omitable start tags
@@ -1129,7 +1129,6 @@ sgml-shorttag  Set this to reflect SHORTTAG in the SGML declaration.
 sgml-namecase-general  Set this to reflect NAMECASE GENERAL in the SGML declaration.
 sgml-auto-insert-required-elements  If non-nil, automatically insert required 
 	elements in the content of an inserted element.
-sgml-balanced-tag-edit  If non-nil, always insert start-end tag pairs.
 sgml-omittag-transparent  If non-nil, will show legal tags inside elements
 	with omitable start tags and legal tags beyond omitable end tags.
 sgml-leave-point-after-insert  If non-nil, the point will remain after 
@@ -1491,11 +1490,10 @@ This uses the selective display feature." t)
 (autoload 'sgml-show-context "psgml-edit" "Display where the cursor is in the element hierarchy." t)
 (autoload 'sgml-what-element "psgml-edit" "Display what element is under the cursor." t)
 (autoload 'sgml-insert-tag "psgml-edit" "Insert a tag, reading tag name in minibuffer with completion.
-If the variable sgml-balanced-tag-edit is t, also inserts the
-corresponding end tag. If sgml-leave-point-after-insert is t, the point
-is left after the inserted tag(s), unless the element has some required
-content.  If sgml-leave-point-after-insert is nil the point is left
-after the first tag inserted." t)
+ If sgml-leave-point-after-insert is t, the point is left after the
+inserted tag(s), unless the element has some required content. If
+sgml-leave-point-after-insert is nil the point is left after the first
+tag inserted." t)
 (autoload 'sgml-insert-element "psgml-edit" "Reads element name from minibuffer and inserts start and end tags." t)
 (autoload 'sgml-tag-region "psgml-edit" "Reads element name from minibuffer and inserts start and end tags." t)
 (autoload 'sgml-insert-end-tag "psgml-edit" "Insert end-tag for the current open element." t)
