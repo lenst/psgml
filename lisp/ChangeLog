@@ -1,3 +1,10 @@
+2000-03-22  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-edit.el (sgml-change-element-name): Add end-tag event if
+	original element is empty. (hmm this isn't quite right). Also use
+	sgml-find-context-of to find element, because -element-of gives
+	the element of the following char.
+
 Tue Jan  4 19:51:03 2000  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-with-parser-syntax): Restore current buffer
