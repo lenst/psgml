@@ -111,6 +111,9 @@ short reference is `sgml-markup-start' and point.")
 
 ;;; Global variables active during parsing
 
+(defvar sgml-last-start-pos nil
+  "Set to position of last parsing start in current buffer.")
+
 (defvar sgml-dtd-info nil
   "Holds the `sgml-dtd' structure describing the current DTD.")
 
@@ -733,6 +736,8 @@ If ATTSPEC is nil, nil is returned."
 
 (defun sgml-eltype-mixed (et)
   (< 3 (sgml-eltype-flags et)))
+(define-compiler-macro sgml-eltype-mixed (et)
+  (`(< 3 (sgml-eltype-flags (, et)))))
 
 (defsetf sgml-eltype-stag-optional (et) (f)
   (list 'sgml-set-eltype-flag et 1 f)) 
@@ -1299,8 +1304,18 @@ PTYPE can be 'param if this is a parameter entity."
 ;;; Parameter entities and files
 
 (defvar sgml-scratch-buffer nil)
+(defvar sgml-last-entity-buffer nil)
 
 (defun sgml-push-to-entity (entity &optional ref-start type)
+  (when (and sgml-last-entity-buffer
+	     (not (eq (current-buffer)
+		      sgml-last-entity-buffer))
+	     (buffer-name sgml-last-entity-buffer)
+	     (not (eq sgml-last-entity-buffer sgml-scratch-buffer)))
+    (let ((cb (current-buffer)))
+      (set-buffer sgml-last-entity-buffer)
+      (assert (null sgml-previous-buffer))
+      (set-buffer cb)))
   (unless (and sgml-scratch-buffer
 	       (buffer-name sgml-scratch-buffer))
     (setq sgml-scratch-buffer (generate-new-buffer " *entity*")))
@@ -1316,8 +1331,8 @@ PTYPE can be 'param if this is a parameter entity."
 		entity
 		(sgml-epos (or ref-start (point)))
 		(sgml-epos (point))))
-    (sgml-debug "Enter entity ref %S" eref)
     (set-buffer buf)
+    (setq sgml-last-entity-buffer buf)
     (erase-buffer)
     (setq default-directory dd)
     (make-local-variable 'sgml-current-eref)
@@ -1327,18 +1342,25 @@ PTYPE can be 'param if this is a parameter entity."
     (setq sgml-previous-buffer cb)
     (make-local-variable 'sgml-parameter-name)
     (setq sgml-parameter-name entity)
-    (sgml-entity-insert-text entity type)
-    (goto-char (point-min))))
+    (setq sgml-last-start-pos
+	  (if (stringp (sgml-entity-text entity))
+	      (point)
+	    0))
+    (sgml-debug "Enter entity ref %S, last-start=%s"
+		eref sgml-last-start-pos)
+    (save-excursion (sgml-entity-insert-text entity type))))
 
 (defun sgml-pop-entity ()
   (cond ((and (boundp 'sgml-previous-buffer)
 	      (bufferp sgml-previous-buffer))
 	 (sgml-debug "Exit entity")
+	 (setq sgml-last-entity-buffer sgml-previous-buffer)
 	 (cond ((eq (current-buffer) sgml-scratch-buffer)
 		(set-buffer sgml-previous-buffer))
 	       (t
 		(kill-buffer (prog1 (current-buffer)
 			       (set-buffer sgml-previous-buffer)))))
+	 (setq sgml-last-start-pos (point))
 	 t)))
 
 (defun sgml-goto-epos (epos)
@@ -1348,6 +1370,7 @@ PTYPE can be 'param if this is a parameter entity."
 	 (goto-char epos))
 	(t
 	 (let ((eref (sgml-epos-eref epos)))
+	   (sgml-cleanup-entities)
 	   (sgml-goto-epos (sgml-eref-end eref))
 	   (sgml-push-to-entity (sgml-eref-entity eref)
 				(sgml-epos-pos (sgml-eref-start eref))))
@@ -1355,6 +1378,14 @@ PTYPE can be 'param if this is a parameter entity."
 
 (defun sgml-pop-all-entities ()
   (while (sgml-pop-entity)))
+
+(defun sgml-cleanup-entities ()
+  (let ((cb (current-buffer)))
+    (when (and (bufferp sgml-last-entity-buffer)
+	       (buffer-name sgml-last-entity-buffer))
+      (set-buffer sgml-last-entity-buffer)
+      (sgml-pop-all-entities))
+    (set-buffer cb)))
 
 (defun sgml-any-open-param/file ()
   "Return true if there currently is a parameter or file open."
@@ -1634,8 +1665,7 @@ or from after TREE if WHERE is after."
 			  (sgml-bpos-p (sgml-tree-stag-epos tree)))
 		     'start-tag)
 		 sgml-markup-start (sgml-element-start sgml-current-tree))
-	   (goto-char (+ sgml-markup-start
-			 (sgml-tree-stag-len sgml-current-tree))))
+	   (goto-char (sgml-element-stag-end sgml-current-tree)))
 	  (t
 	   (setq sgml-current-state (sgml-tree-pstate sgml-current-tree)
 		 sgml-current-shortmap (sgml-tree-pshortmap sgml-current-tree)
@@ -2187,7 +2217,7 @@ in any of them."
 (defmacro sgml-general-case (string)  (`(downcase (, string))))
 (defmacro sgml-entity-case (string)   string)
 
-(defun sgml-parse-name (&optional entity-name)
+(defsubst sgml-parse-name (&optional entity-name)
   (if (sgml-startnm-char-next)
       (let ((name (buffer-substring (point)
 				    (progn (skip-syntax-forward "w_")
@@ -2447,7 +2477,10 @@ Where PAIRS is a list of (delim . ename)."
     map))
 
 (defun sgml-shortmap-skipstring (map)
-  (aref map (eval-when-compile (length sgml-shortref-list))))
+  (if (bolp)
+      ""
+      (aref map (eval-when-compile (length sgml-shortref-list)))))
+
 
 (defconst sgml-shortref-oneassq
   (loop for d in sgml-shortref-list
@@ -2465,7 +2498,7 @@ Also move point.  Return nil, either if no shortref or undefined."
 
   (macrolet
       ((delim (x) (` (aref map (, (sgml-shortref-index x))))))
-    (let ((i 0))
+    (let ((i (if nobol 1 0)))
       (while (numberp i)
 	(setq i
 	      (cond
@@ -2737,6 +2770,7 @@ VALUE is a string.  Returns nil or an attdecl."
 
 (defun sgml-need-dtd ()
   "Make sure that an eventual DTD is parsed or loaded."
+  (sgml-cleanup-entities)
   (when (null sgml-buffer-parse-state)	; first parse in this buffer
     (sgml-set-initial-state)		; fall back DTD
     (add-hook 'pre-command-hook 'sgml-reset-log)
@@ -2797,6 +2831,7 @@ If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
   (sgml-need-dtd)
   (sgml-find-start-point (min sgml-goal (point-max)))
   (assert sgml-current-tree)
+  (setq sgml-last-start-pos (point))
   (let ((bigparse (and (not quiet) (> (- sgml-goal (point)) 10000))))
     (when bigparse
       (sgml-message "Parsing..."))
@@ -2854,14 +2889,13 @@ pointing to start of short ref and point pointing to the end."
 	    sgml-markup-type nil)
       (cond
        ((eobp) (sgml-pop-entity))
-       ((or (sgml-parse-delim "ETAGO" gi)
-	    (sgml-is-enabled-net))
-	(sgml-do-end-tag))
        ((and (or (eq sgml-current-state sgml-cdata)
 		 (eq sgml-current-state sgml-rcdata)))
 	(sgml-skip-cdata))
        ((and sgml-current-shortmap
-	     (or (setq tem (sgml-deref-shortmap sgml-current-shortmap))
+	     (or (setq tem (sgml-deref-shortmap sgml-current-shortmap
+						(eq (point)
+						    sgml-last-start-pos)))
 		 ;; Restore position, to consider the delim for S+ or data
 		 (progn (goto-char sgml-markup-start)
 			nil)))
@@ -2871,6 +2905,9 @@ pointing to start of short ref and point pointing to the end."
 				 tem))))
        ((and (not (sgml-current-mixed-p))
 	     (sgml-parse-s sgml-current-shortmap)))
+       ((or (sgml-parse-delim "ETAGO" gi)
+	    (sgml-is-enabled-net))
+	(sgml-do-end-tag))
        ((sgml-parse-delim "STAGO" gi)
 	(sgml-do-start-tag))
        ((sgml-parse-general-entity-ref))
