@@ -1,5 +1,7 @@
 1998-10-31  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* Version 1.1.5 released
+
 	* psgml-parse.el (sgml-declared-value-notation): change 'notation
 	to 'NOTATION
 	
