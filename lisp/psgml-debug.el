@@ -411,7 +411,8 @@
   (beginning-of-line)
   (let ((pos-pair (assoc (point) show-structure-positions)))
     (when pos-pair
-      (switch-to-buffer show-structure-source-buffer)
+      (select-window
+       (display-buffer show-structure-source-buffer))
       (goto-char (cdr pos-pair)))))
 
 
