@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: Thu Aug 25 00:23:55 1994 by lenst@dell (Lennart Staflin)
+;;;\Last edited: Thu Sep  8 23:55:05 1994 by lenst@lysita (Lennart Staflin)
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -91,10 +91,11 @@
 
 
 (defun sgml-dp-element (el)
-  (princ (format "Element %s %s %s:\n"
+  (princ (format "Element %s %s %s%s:\n"
 		 (sgml-eltype-name el)
 		 (if (sgml-eltype-stag-optional el) "O" "-")
-		 (if (sgml-eltype-etag-optional el) "O" "-")))
+		 (if (sgml-eltype-etag-optional el) "O" "-")
+		 (if (sgml-eltype-mixed el) " mixed" "")))
   (cond
    ((sgml-model-group-p (sgml-eltype-model el))
     (sgml-dp-model (sgml-eltype-model el)))
@@ -162,5 +163,44 @@
 	       (princ (format
 		       "(autoload '%s \"%s\" %s t)\n"
 		       name file doc))))))))
+
+;;;; Profiling
 
+(defun sgml-instrument-parser ()
+  (interactive)
+  (require 'elp)
+  (setq elp-function-list
+	'(
+	  sgml-parse-to
+	  sgml-parser-loop
+	  sgml-parse-s
+	  sgml-parse-markup-declaration
+	  sgml-parse-processing-instruction
+	  sgml-pop-entity
+	  sgml-is-enabled-net
+	  sgml-do-end-tag
+	  sgml-deref-shortmap
+	  sgml-element-mixed
+	  sgml-do-start-tag
+	  sgml-parse-general-entity-ref
+	  sgml-set-markup-type
+	  sgml-pcdata-move
+	  sgml-parse-pcdata
+	  ;; In sgml-set-markup-type
+	  sgml-set-face-for
+	  ;; In sgml-do-end-tag
+	  sgml-lookup-eltype
+	  sgml-check-tag-close
+	  sgml-implied-end-tag
+	  sgml-close-element
+	  sgml-check-name
+	  sgml-eltype-name
+	  sgml-final
+	  sgml-element-gi
+	  sgml-required-tokens
+	  ))
+  (elp-restore-all)
+  (elp-instrument-list))
+
+
 ;¤¤\end{codeseg}
