@@ -33,9 +33,7 @@
 (require 'psgml)
 
 
-;;;; SGML mode: keys and menus
-
-;;; Menu bar
+;;;; Menu bar
 
 (defvar sgml-markup-menu (make-sparse-keymap "Markup"))
 (fset 'sgml-markup-menu sgml-markup-menu)
@@ -59,7 +57,7 @@
   (cons "SGML" (make-sparse-keymap "SGML")))
 
 
-;;; Sgml menu
+;;;; SGML menu
 
 (define-key sgml-mode-map [menu-bar sgml report-buf]
   '("Submit bug report" . sgml-submit-bug-report))
@@ -71,6 +69,8 @@
   '("Fill element        [C-c C-q]" . sgml-fill-element))
 (define-key sgml-mode-map [menu-bar sgml normalize]
   '("Normalize                " . sgml-normalize))
+(define-key sgml-mode-map [menu-bar sgml validate]
+  '("Validate            [C-c C-l]" . sgml-validate))
 (define-key sgml-mode-map [menu-bar sgml show-log]
   '("Show/hide warning log  [C-c C-l]" . sgml-show-or-clear-log))
 (define-key sgml-mode-map [menu-bar sgml show-tags]
@@ -91,7 +91,7 @@
   '("Next data field     [C-c C-d]" . sgml-next-data-field))
 
 
-;;; DTD menu
+;;;; DTD menu
 
 (define-key sgml-mode-map [menu-bar sgml-dtd blank-c]
   '("" . nil))
@@ -103,7 +103,7 @@
   '("Parse DTD" . sgml-parse-prolog))
 
 
-;;; Fold menu
+;;;; Fold menu
 
 (define-key sgml-mode-map [menu-bar sgml-fold unfold-all]
   '("Unfold all       [C-c C-u C-a]" . sgml-unfold-all))
@@ -121,7 +121,7 @@
   '("Fold element     [C-c C-f C-e]"   . sgml-fold-element))
 
 
-;;; Markup menu
+;;;; Markup menu
 
 (define-key sgml-markup-menu [blank-c]
   '("" . nil))
@@ -132,6 +132,9 @@
   (sgml-markup "<!attlist ... >" "<!attlist \r>\n"))
 (define-key sgml-markup-menu [ element]
   (sgml-markup "<!element ... >" "<!element \r>\n"))
+(define-key sgml-markup-menu [ doctype]
+  (sgml-markup "<!doctype ...>"
+	       "<!doctype \r -- public or system --\n[\n]>\n"))
 
 (define-key sgml-markup-menu [blank1]
   '("" . nil))
@@ -141,9 +144,7 @@
 	       "<!--\nLocal variables:\n\rEnd:\n-->\n"))
 (define-key sgml-markup-menu [ comment]
   (sgml-markup "Comment" "<!-- \r -->\n"))
-(define-key sgml-markup-menu [ doctype]
-  (sgml-markup "Doctype"
-	       "<!doctype \r -- public or system -- [\n]>\n"))
+
 
 (define-key sgml-markup-menu [blank2]
   '("" . nil))
@@ -162,11 +163,21 @@
 
 (define-key sgml-markup-menu [entities]
   '("Insert entity" . sgml-entities-menu))
-(define-key sgml-markup-menu [tags]
-  '("Insert tag" . sgml-tags-menu))
+
+(define-key sgml-markup-menu [tag-region]
+  '("Tag region" . sgml-tag-region-menu))
+
+(define-key sgml-markup-menu [insert-end-tag]
+  '("Insert end-tag" . sgml-end-tag-menu))
+
+(define-key sgml-markup-menu [insert-start-tag]
+  '("Insert start-tag" . sgml-start-tag-menu))
+
+(define-key sgml-markup-menu [insert-element]
+  '("Insert element" . sgml-element-menu))
 
 
-;;; Key commands
+;;;; Key commands
 
 ;; Doesn't this work in Lucid? ***
 (define-key sgml-mode-map [?\M-\C-\ ] 'sgml-mark-element)
@@ -174,7 +185,7 @@
 (define-key sgml-mode-map [S-mouse-1] 'sgml-tags-menu)
 
 
-;;; Build custom menus
+;;;; Build custom menus
 (defun sgml-build-custom-menus ()
   ;; Build custom menus
   (sgml-add-custom-entries
