@@ -160,8 +160,9 @@ e.g. a data entity reference.")
 (defvar sgml-parsing-dtd nil
   "This variable is bound to `t' while parsing a DTD (subset).")
 
-(defvar sgml-last-start-pos nil
+(defvar sgml-rs-ignore-pos nil
   "Set to position of last parsing start in current buffer.")
+(make-variable-buffer-local 'sgml-rs-ignore-pos)
 
 (defvar sgml-dtd-info nil
   "Holds the `sgml-dtd' structure describing the current DTD.")
@@ -2288,6 +2289,8 @@ Skips any leading spaces/comments."
 ENTITY can also be a file name.  Optional argument REF-START should be
 the start point of the entity reference.  Optional argument TYPE,
 overrides the entity type in entity look up."
+  (when ref-start
+    (setq sgml-rs-ignore-pos ref-start))
   (unless (and sgml-scratch-buffer
 	       (buffer-name sgml-scratch-buffer))
     (setq sgml-scratch-buffer (generate-new-buffer " *entity*")))
@@ -2311,7 +2314,8 @@ overrides the entity type in entity look up."
     (set-syntax-table sgml-parser-syntax)
     (make-local-variable 'sgml-previous-buffer)
     (setq sgml-previous-buffer cb)
-    (setq sgml-last-start-pos
+    (setq sgml-rs-ignore-pos		; don't interpret beginning of buffer
+					; as #RS if internal entity.
 	  (if (or (stringp entity)
 		  (stringp (sgml-entity-text entity)))
 	      (point)
@@ -2348,7 +2352,6 @@ overrides the entity type in entity look up."
 	 (sgml-debug "Exit entity")
 	 (setq sgml-last-entity-buffer sgml-previous-buffer)
 	 (set-buffer sgml-previous-buffer)
-	 (setq sgml-last-start-pos (point))
 	 t)))
 
 (defun sgml-goto-epos (epos)
@@ -3584,7 +3587,6 @@ If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
   (sgml-need-dtd)
   (sgml-find-start-point (min sgml-goal (point-max)))
   (assert sgml-current-tree)
-  (setq sgml-last-start-pos (point))
   (let ((bigparse (and (not quiet) (> (- sgml-goal (point)) 10000))))
     (when bigparse
       (sgml-message "Parsing..."))
@@ -3596,7 +3598,6 @@ If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
 (defun sgml-parse-continue (sgml-goal)
   "Parse until (at least) SGML-GOAL."
   (assert sgml-current-tree)
-  (setq sgml-last-start-pos (point))
   (sgml-message "Parsing...")
   (sgml-with-parser-syntax
      (sgml-parser-loop nil))
@@ -3684,10 +3685,11 @@ pointing to start of short ref and point pointing to the end."
        ((and sgml-current-shortmap
 	     (or (setq tem (sgml-deref-shortmap sgml-current-shortmap
 						(eq (point)
-						    sgml-last-start-pos)))
+						    sgml-rs-ignore-pos)))
 		 ;; Restore position, to consider the delim for S+ or data
 		 (progn (goto-char sgml-markup-start)
 			nil)))
+	(setq sgml-rs-ignore-pos (point))
 	(funcall sgml-shortref-handler tem))
        ((and (not (sgml-current-mixed-p))
 	     (sgml-parse-s sgml-current-shortmap)))
@@ -3841,7 +3843,10 @@ pointing to start of short ref and point pointing to the end."
 	  (setq u (sgml-tree-content u)))
 	 (t
 	  (sgml-set-parse-state u 'start)
-	  nil)))))
+	  nil)))
+    )
+  )
+
 
 (defun sgml-check-tag-close ()
   (or
