@@ -106,15 +106,21 @@ if the item is selected."
 
 (defvar sgml-use-text-properties nil)
 
+(defmacro sgml-without-change-hooks (&rest body)
+  `(let ((inhibit-read-only t)
+         ,@(if (or (not (boundp 'emacs-major-version))
+                   (< emacs-major-version 20))
+               `((after-change-function nil)
+                 (before-change-function nil)))
+         (after-change-functions nil)
+         (before-change-functions nil))
+     ,@body))
+
 (defun sgml-set-face-for (start end type)
   (let ((face (cdr (assq type sgml-markup-faces))))
     (cond
      (sgml-use-text-properties
-      (let ((inhibit-read-only t)
-	    (after-change-function nil)	; obsolete variable
-	    (before-change-function nil) ; obsolete variable
-	    (after-change-functions nil)
-	    (before-change-functions nil))
+      (sgml-without-change-hooks
 	(put-text-property start end 'face face)
         (when (< start end)
           (put-text-property (1- end) end 'rear-nonsticky '(face)))))
