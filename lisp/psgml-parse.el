@@ -2079,16 +2079,19 @@ is determined."
 	(setq element nil)		; forget element
 	(goto-char here)		; insert normal tab insted
 	(insert-tab))
-      (when (and element
-		 (or sgml-indent-data
-		     (not (sgml-element-data-p element))))
-	(setq col
-	      (* sgml-indent-step
-		 (+ (if (sgml-with-parser-syntax
-			 (or (sgml-is-end-tag)
-			     (sgml-is-start-tag)))
-			-1 0)
-		    (sgml-element-level element)))))
+      (when element
+	(sgml-with-parser-syntax
+	 (let ((stag (sgml-is-start-tag))
+	       (etag (sgml-is-end-tag)))
+	   (when (or sgml-indent-data
+		     (not (sgml-element-data-p
+			   (if stag
+			       (sgml-element-parent element)
+			     element))))
+	     (setq col
+		   (* sgml-indent-step
+		      (+ (if (or stag etag) -1 0)
+			 (sgml-element-level element))))))))
       (when (and col (/= col (current-column)))
 	(beginning-of-line 1)    
 	(delete-horizontal-space)
