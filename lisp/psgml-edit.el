@@ -2397,5 +2397,78 @@ otherwise it will be added at the first legal position."
       (princ ")")
       (when (sgml-final state)
         (princ "?"))))))
+
+
+;;;; Structure Viewing and Navigating
+
+
+(defun sgml-show-structure ()
+  "Show the document structure in a separate buffer."
+  (interactive)
+  (let ((source (current-buffer))
+        (result (get-buffer-create "*Document structure*")))
+    (set-buffer result)
+    (occur-mode)
+    (erase-buffer)
+    (let ((structure
+           (save-excursion
+             (set-buffer source)
+             (sgml-structure-elements (sgml-top-element)))))
+      (sgml-show-structure-insert structure))
+    (goto-char (point-min))
+    (display-buffer result)))
+
+
+(defun sgml-show-structure-insert (structure)
+  (loop for (gi level marker title) in structure do
+       (let ((start (point)))
+         (insert (make-string (* 2 level) ? ))
+         (sgml-insert `(face match mouse-face highlight) gi)
+         (sgml-insert `(mouse-face highlight) " %s" title)
+         (insert "\n")
+         (add-text-properties
+          start (point)
+          `(occur-target ,marker help-echo "mouse-2: go to this occurrence")))))
+  
+
+(defun sgml-show-struct-element-p (element)
+  (let ((configured (sgml-element-appdata element 'structure)))
+    (unless (eql configured 'ignore)
+      (or configured
+          (and (not (sgml-element-data-p element))
+               (not (sgml-element-empty element)))))))
+
+
+(defun sgml-structure-elements (element)
+  (when (sgml-show-struct-element-p element)
+    (let ((gi (sgml-element-gi element))
+          (level (sgml-element-level element))
+          (child1 (sgml-element-content element))
+          (marker nil)
+          (title ""))
+      (goto-char (sgml-element-start element))
+      (setq marker (copy-marker (point-marker)))
+      (when (and child1
+                 (not (sgml-show-struct-element-p child1))
+                 (sgml-element-data-p child1))
+        (let ((start-epos (sgml-element-stag-epos child1))
+              (end-epos (sgml-element-etag-epos child1)))
+          (when (and (sgml-bpos-p start-epos)
+                     (sgml-bpos-p end-epos))
+            (goto-char start-epos)
+            (forward-char (sgml-element-stag-len child1))
+            (when (looking-at "\\s-*$")
+              (forward-line 1))
+            (when (< (point) end-epos))
+            (setq title
+                  (buffer-substring (point)
+                                    (min (line-end-position)
+                                         end-epos))))))
+      (cons (list (sgml-general-insert-case gi)
+                  level marker title)
+            (loop for child = child1 then (sgml-element-next child)
+               while child
+               nconc (sgml-structure-elements child))))))
+
 
 ;;; psgml-edit.el ends here
