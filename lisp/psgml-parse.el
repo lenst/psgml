@@ -31,17 +31,13 @@
 
 ;;; Interface to psgml-dtd
 (eval-and-compile
-  (autoload 'sgml-make-primitive-content-token "psgml-dtd")
-  (autoload 'sgml-check-doctype-body "psgml-dtd")
   (autoload 'sgml-do-usemap-element  "psgml-dtd")
+  (autoload 'sgml-write-dtd  "psgml-dtd")
+  (autoload 'sgml-check-dtd-subset  "psgml-dtd")
   )
+
 
 ;;;; Variables
-
-(defvar sgml-ecat-files '("ECAT" "~/sgml/ECAT" "/usr/local/lib/sgml/ECAT"))
-
-(defvar sgml-local-ecat-files nil)
-(make-variable-buffer-local 'sgml-local-ecat-files)
 
 ;;; Hooks
 
@@ -111,8 +107,8 @@ commands.")
 (defvar sgml-throw-on-warning nil
   "Set to a symbol other than nil to make sgml-log-warning throw to that symbol.")
 
-(defvar sgml-suppress-warning nil
-  "Set to t to suppress warnings.")
+(defvar sgml-show-warnings nil
+  "Set to t to show warnings.")
 
 (defvar sgml-close-element-trap nil
   "Can be nil for no trap, an element or t for any element.
@@ -206,8 +202,10 @@ Only valid after `sgml-parse-to'.")
 (defvar sgml-markup-start nil
   "Start point of markup beeing parsed.")
 
+(defvar sgml-no-elements nil
+  "Number of declared elements.")
 
-;; Vars used in *param* buffers
+;;; Vars used in *param* buffers
 
 (defvar sgml-previous-buffer nil)
 
@@ -225,10 +223,8 @@ to point to the next scratch buffer.")
 ;;; For loading DTD
 
 (eval-and-compile
-  (defconst sgml-max-single-octet-number 250))
-
-(defvar sgml-single-octet-threshold 255
-  "Octets greater than this is the first of a two octet coding.")
+  (defconst sgml-max-single-octet-number 250
+    "Octets greater than this is the first of a two octet coding."))
 
 (defvar sgml-read-token-vector nil)	; Vector of symbols used to decode
 					; token numbers.
@@ -382,6 +378,11 @@ to point to the next scratch buffer.")
       (setf (sgml-state-reqs s)
 	    (sgml-add-move-to-set token dest (sgml-state-reqs s)))))
 
+(defsubst sgml-make-primitive-content-token (token)
+  (let ((s1 (sgml-make-state))
+	(s2 (sgml-make-state)))
+    (sgml-add-req-move s1 token s2)
+    s1))
 
 ;;&-state: (state next . dfas)
 
@@ -729,19 +730,23 @@ If ATTSPEC is nil, nil is returned."
 
 ;;;; Element type objects
 
-;;; Oblist for eltype
+;; An element type object contains the information about an element type
+;; obtained from parsing the DTD.
 
-(defun sgml-make-eltypes-table ()
-  (make-vector 17 0))
+;; An element type object is represented by a symbol in a special oblist.
+;; A table of element type objects is represented by a oblist.
 
-(defun sgml-eltypes-empty (eltypes)
-  (loop for x in eltypes always (eq x 0)))
+
+;;; Element type objects
 
 (defun sgml-eltype-name (et)
   (symbol-name et))
 
 (define-compiler-macro sgml-eltype-name (et)
   (`(symbol-name (, et))))
+
+(defun sgml-eltype-defined (et)
+  (fboundp et))
 
 (defun sgml-eltype-token (et)
   "Return a token for the element type"
@@ -776,15 +781,16 @@ If ATTSPEC is nil, nil is returned."
 					; nil if none and 'empty if #empty
  )
 
-
-;;(macroexpand '(sgml-eltype-model x))
-;;(symbol-function 'sgml-eltype-model)
-
 (defmacro sgml-eltype-flags (et)
   (` (symbol-value (, et))))
 
-(defmacro sgml-eltype-model (et)
-  (` (symbol-function (, et))))
+(defun sgml-eltype-model (et)
+  (if (fboundp et)
+      (symbol-function et)
+    sgml-any))
+
+(defsetf sgml-eltype-model fset)
+
 
 (defun sgml-eltype-stag-optional (et)
   (oddp (sgml-eltype-flags et)))
@@ -806,8 +812,20 @@ If ATTSPEC is nil, nil is returned."
 
 (defun sgml-set-eltype-flag (et mask f)
   (setf (sgml-eltype-flags et)
-	(logior (logand (sgml-eltype-flags et) (lognot mask))
+	(logior (logand (if (boundp et)
+			    (sgml-eltype-flags et)
+			  0)
+			(lognot mask))
 	       (if f mask 0))))
+
+(defun sgml-maybe-put (sym prop val)
+  (when val (put sym prop val)))
+
+(defsetf sgml-eltype-includes (et) (l)
+  (list 'sgml-maybe-put et ''includes l))
+
+(defsetf sgml-eltype-excludes (et) (l)
+  (list 'sgml-maybe-put et ''excludes l))
 
 (defmacro sgml-eltype-appdata (et prop)
   "Get application data from element type ET with name PROP.
@@ -815,63 +833,100 @@ PROP should be a symbol, reserved names are: flags, model, attlist,
 includes, excludes, conref-regexp, mixed, stag-optional, etag-optional."
   (` (get (, et) (, prop))))
 
-(defun sgml-eltype-all-appdata (et)
+(defun sgml-eltype-all-miscdata (et)
   (loop for p on (symbol-plist et) by (function cddr)
-	unless (memq (car p) '(model flags attlist includes excludes))
+	unless (memq (car p) '(model flags includes excludes))
 	nconc (list (car p) (cadr p))))
 
-(defun sgml-define-eltype (et stag-opt etag-opt
-			      content excludes includes mixed
-			      &optional attlist appdata)
-  "Define the element type ET.
-ET is the result of a sgml-lookup-eltype."
-  (setf (sgml-eltype-stag-optional et) stag-opt
-	(sgml-eltype-etag-optional et) etag-opt
-	(sgml-eltype-model et) 	content
-	(sgml-eltype-mixed et) 	mixed)
-  (when excludes
-    (setf (sgml-eltype-excludes et) excludes))
-  (when includes
-    (setf (sgml-eltype-includes et) includes))
-  (when attlist
-    (setf (sgml-eltype-attlist et) attlist))
+(defun sgml-eltype-set-all-miscdata (et miscdata)
   (setf (symbol-plist et)
-	(nconc (symbol-plist et) appdata)))
-
-(defun sgml-define-eltype-attlist (et attlist)
-  "Define the ATTLIST for eltype ET."
-  (setf (sgml-eltype-attlist et) attlist))
-
-(defun sgml-lookup-eltype (name &optional dtd)
-  "Lookup the element defintion for NAME (string)."
-  (assert (stringp name))
-  (let ((et (intern name
-		    (sgml-dtd-eltypes (or dtd sgml-dtd-info)))))
-    (unless (boundp et)			; first reference
-      (setf (sgml-eltype-flags et) 0)
-      (setf (sgml-eltype-model et) nil))
-    et))
+	(nconc (symbol-plist et) miscdata)))
 
 (defun sgml-make-eltype (name)
   (let ((et (make-symbol name)))
     (setf (sgml-eltype-flags et) 0)
     et))
 
+
+;;; Element type tables
+
+(defun sgml-make-eltypes-table ()
+  (make-vector 73 0))
+
+(defun sgml-eltypes-empty (eltypes)
+  (loop for x across eltypes always (eq x 0)))
+
+(defun sgml-merge-eltypes (eltypes1 eltypes2)
+  "Return the merge of two element type tables ELTYPES1 and ELTYPES2.
+This may change ELTYPES1, ELTYPES2 is unchanged. Returns the new table."
+  (if (sgml-eltypes-empty eltypes1)
+      eltypes2
+    (progn
+      (mapatoms
+       (function (lambda (sym)
+		   (let ((et (intern (symbol-name sym) eltypes1)))
+		     (when (fboundp sym)
+		       (fset et (symbol-function sym)))
+		     (when (boundp sym)
+		       (set et (symbol-value sym)))
+		     (setf (symbol-plist et)
+			   (copy-list (symbol-plist sym))))))
+       eltypes2)      
+      eltypes1)))
+
+(defun sgml-copy-eltypes (eltypes)
+  (let ((new (sgml-make-eltypes-table)))
+    (mapatoms
+     (function (lambda (sym)
+		 (let ((et (intern (symbol-name sym) new)))
+		   (when (fboundp sym)
+		     (fset et (symbol-function sym)))
+		   (when (boundp sym)
+		     (set et (symbol-value sym)))
+		   (setf (symbol-plist et)
+			 (copy-list (symbol-plist sym))))))
+     eltypes)
+    new))
+
+(defun sgml-lookup-eltype (name &optional dtd)
+  "Lookup the element defintion for NAME (string)."
+  (intern name (sgml-dtd-eltypes (or dtd sgml-dtd-info))))
+
 (defun sgml-eltype-completion-table (eltypes)
   "Make a completion table from a list, ELTYPES, of element types."
   (loop for et in eltypes as name = (sgml-eltype-name et)
+	if (boundp et)
 	collect (cons name name)))
 
-(defun sgml-map-eltypes (fn dtd &optional collect)
-  (mapatoms (if collect
-		(progn
-		  (setq collect nil)
-		  (function (lambda (a)
-			    (push (funcall fn a) collect))))
-		fn)
-	    (sgml-dtd-eltypes dtd))
-  (if collect (nreverse collect)))
+(defun sgml-read-element-type (prompt dtd)
+  "Read an element type name.
+PROMPT is displayed as a prompt and DTD should be the dtd to get the
+element types from."
+  (let ((name
+	 (completing-read prompt
+			  (sgml-dtd-eltypes dtd)
+			  (function fboundp)
+			  t
+			  nil
+			  nil)))
+    (if (equal name "")
+	(error "Aborted")
+      (sgml-lookup-eltype name dtd))))
 
+(defun sgml-map-eltypes (fn dtd &optional collect all)
+  (let ((*res* nil))
+    (mapatoms
+     (cond ((and collect all)
+	    (function (lambda (a) (push (funcall fn a) *res*))))
+	   (collect
+	    (function (lambda (a) (when (boundp a)
+				    (push (funcall fn a) *res*)))))
+	   (all
+	    (function (lambda (a) (funcall fn a))))
+	   (t
+	    (function (lambda (a) (when (boundp a) (funcall fn a))))))
+     (sgml-dtd-eltypes dtd))
+    (nreverse *res*)))
 
 ;;;; Load a saved dtd
 
@@ -881,9 +936,9 @@ ET is the result of a sgml-lookup-eltype."
 
 (defsubst sgml-read-number ()
   "Read a number.
-A number is 1: an octet [0--sgml-singel-octet-threshold]
+A number is 1: an octet [0--sgml-max-singel-octet-number]
 or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
-  (if (> (following-char) sgml-single-octet-threshold)
+  (if (> (following-char) sgml-max-single-octet-number)
       (+ (* (- (following-char) (eval-when-compile
 				 (1+ sgml-max-single-octet-number)))
 	    256)
@@ -945,31 +1000,21 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-read-decode-flag (flag mask)
   (not (zerop (logand flag mask))))
 
-(defun sgml-read-element (eltype)
-  (let* ((flags (sgml-read-octet))
-	 (content (sgml-read-content))
-	 (incl (sgml-read-token-seq))
-	 (excl (sgml-read-token-seq))
-	 (attlist (sgml-read-sexp))
-	 (appdata (sgml-read-sexp)))
-    (sgml-define-eltype
-     eltype
-     (sgml-read-decode-flag flags 1)		; stag optional
-     (sgml-read-decode-flag flags 2)		; etag optional
-     content
-     excl
-     incl
-     (sgml-read-decode-flag flags 4)		; mixed
-     attlist
-     appdata)))
+(defun sgml-read-element (et)
+  (sgml-eltype-set-all-miscdata et (sgml-read-sexp))
+  (let ((flags (sgml-read-octet)))
+    (unless (= flags 128)
+      (setf (sgml-eltype-flags et) flags
+	    (sgml-eltype-model et) (sgml-read-content)
+	    (sgml-eltype-includes et) (sgml-read-token-seq)
+	    (sgml-eltype-excludes et) (sgml-read-token-seq)))))
 
 (defun sgml-read-dtd ()
   "Decode the saved DTD in current buffer, return the DTD."
   (let ((gc-cons-threshold (max gc-cons-threshold 500000))
 	temp dtd)
     (setq temp (sgml-read-sexp))	; file-version
-    (cond ((equal temp '(sgml-saved-dtd-version 4))
-	   (setq sgml-single-octet-threshold sgml-max-single-octet-number))
+    (cond ((equal temp '(sgml-saved-dtd-version 5)))
 	  (t
 	   (error "Unknown file format for saved DTD: %s" temp)))
     ;; Doctype -- create dtd structure
@@ -987,6 +1032,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (setf (sgml-dtd-parameters dtd) (sgml-read-sexp))
     (setf (sgml-dtd-entities dtd) (sgml-read-sexp))
     (setf (sgml-dtd-shortmaps dtd) (sgml-read-sexp))
+    (setf (sgml-dtd-notations dtd) (sgml-read-sexp))
+    (setf (sgml-dtd-dependencies dtd) (sgml-read-sexp))
     dtd))
 
 (defun sgml-load-dtd (file)
@@ -1493,6 +1540,25 @@ a RNI must be followed by NAME."
   (or (sgml-parse-minimum-literal)
       (sgml-parse-error "A minimum literal expected")))
 
+(defun sgml-parse-external ()
+  "Leaves nil if no external id, or (pubid . sysid)"
+  (sgml-skip-ps)
+  (let* ((p (point))
+	 (token (sgml-parse-nametoken)))
+    (cond
+     (token
+      (sgml-skip-ps)
+      (cond ((member token '("public" "system"))
+	     (cons
+	      (if (string-equal token "public")
+		  (or (sgml-parse-minimum-literal) ; the public id
+		      (sgml-parse-error "Public identifier expected")))	;
+	      (progn (sgml-skip-ps)
+		     (sgml-parse-literal)))) ; the system id
+	    (t
+	     (goto-char p)
+	     nil))))))
+
 (defun sgml-skip-tag ()
   (when (sgml-parse-char ?<)
     (sgml-parse-char ?/)
@@ -1537,18 +1603,31 @@ PTYPE can be 'param if this is a parameter entity."
 		      (sgml-entity-name entity)))
 
 ;;; Entity tables
+;; Represented by a cons-cell whose car is the default entity (or nil)
+;; and whose cdr is as an association list.
 
 (defun sgml-make-entity-table ()
   (list nil))
 
 (defun sgml-lookup-entity (name entity-table)
-  (assoc name (cdr entity-table)))
+  (or (assoc name (cdr entity-table))
+      (car entity-table)))
 
 (defun sgml-entity-declare (name entity-table type text)
-  (unless (sgml-lookup-entity name entity-table)
-    (sgml-debug "Declare entity %s %s as %S" name type text)
-    (nconc entity-table
-	   (list (sgml-make-entity name type text)))))
+  "Declare an entity with name NAME in table ENTITY-TABLE.
+TYPE should be the type of the entity (text|cdata|ndata|sdata...).
+TEXT is the text of the entity, a string or an external identifier.
+If NAME is nil, this defines the default entity."
+  (cond
+   (name
+    (unless (sgml-lookup-entity name entity-table)
+      (sgml-debug "Declare entity %s %s as %S" name type text)
+      (nconc entity-table
+	     (list (sgml-make-entity name type text)))))
+   (t
+    (unless (car entity-table)
+      (sgml-debug "Declare default entity %s as %S" type text)
+      (setcar entity-table (sgml-make-entity name type text))))))
 
 (defun sgml-entity-completion-table (entity-table)
   "Make a completion table from the ENTITY-TABLE."
@@ -1561,7 +1640,8 @@ PTYPE can be 'param if this is a parameter entity."
 
 (defun sgml-merge-entity-tables (tab1 tab2)
   "Merge entity table TAB2 into TAB1.  TAB1 is modified."
-  (nconc tab1 (cdr tab2)))
+  (nconc tab1 (cdr tab2))
+  (setcar tab1 (or (car tab1) (car tab2))))
 
 
 ;;;; External identifyer resolve
@@ -1581,11 +1661,13 @@ repreaentation of the catalog."
 	 (cddr c)
        (when c (set cache-var (delq c (symbol-value cache-var))))
        (let (new)
+	 (message "Loading %s ..." file)
 	 (sgml-push-to-entity file)
 	 (setq default-directory (file-name-directory file))
 	 (setq new (funcall parser-fun))
 	 (sgml-pop-entity)
 	 (push (cons file (cons modtime new)) (symbol-value cache-var))
+	 (message "Loading %s ... done" file)
 	 new)))))
 
 (defun sgml-catalog-lookup (files pubid type name)
@@ -1831,14 +1913,14 @@ is the entity type and NAME is the entity name, used to find the entity."
 ;;  ecat ::= (cs | ecat-entry)*
 ;;  cs ::= (s | comment)
 ;;  ecat-entry ::= (pub-entry | file-entry)
-;;  pub-entry ::= ("PUBLIC.CDTD", minimal literal, ent-spec?, cat literal)
-;;  pub-entry ::= ("FILE.CDTD", literal, ent-spec?, cat literal)
+;;  pub-entry ::= ("PUBLIC", minimal literal, ent-spec?, cat literal)
+;;  pub-entry ::= ("FILE", literal, ent-spec?, cat literal)
 ;;  ent-spec ::= ("[", (name, literal)*, "]")
 
 ;; Parsed ecat = (eent*)
 ;; eent = (type ...)
-;;      = ('public.cdtd pubid cfile . ents)
-;;      = ('file.cdtd file cfile . ents)
+;;      = ('public pubid cfile . ents)
+;;      = ('file file cfile . ents)
 
 (defun sgml-load-ecat (file)
   "Return ecat for FILE."
@@ -1853,9 +1935,9 @@ is the entity type and NAME is the entity name, used to find the entity."
 	  (setq ents nil from nil)
 	  (sgml-skip-cs)
 	  (cond
-	   ((eq type 'public.cdtd)
+	   ((eq type 'public)
 	    (setq from (sgml-canonize-pubid (sgml-check-minimum-literal))))
-	   ((eq type 'file.cdtd)
+	   ((eq type 'file)
 	    (setq from (expand-file-name (sgml-check-cat-literal)))))
 	  (cond
 	   ((null from)
@@ -1879,18 +1961,19 @@ is the entity type and NAME is the entity name, used to find the entity."
   "Return (file . ents) or nil."
   (let ((params (sgml-dtd-parameters sgml-dtd-info)))
     (loop
-     named ecat-lookup
-     for f in files do
-     (loop for (type name cfile . ents) in (sgml-load-ecat f) do
-	   (when (and (cond ((eq type 'public.cdtd)
-			     (equal name pubid))
-			    ((eq type 'file.cdtd)
-			     (equal name file)))
-		      (loop for (name . val) in ents
-			    for entity = (sgml-lookup-entity name params)
-			    always (and entity
-					(equal val (sgml-entity-text entity)))))
-	     (return-from ecat-lookup (cons cfile ents)))))))
+     for f in files
+     do (sgml-debug "Search ECAT %s" f)
+     thereis
+     (loop
+      for (type name cfile . ents) in (sgml-load-ecat f)
+      thereis
+      (if (and (cond ((eq type 'public) (equal name pubid))
+		     ((eq type 'file)   (equal name file)))
+	       (loop for (name . val) in ents
+		     for entity = (sgml-lookup-entity name params)
+		     always (and entity
+				 (equal val (sgml-entity-text entity)))))
+	  (cons cfile ents))))))
 
 ;;(let ((sgml-dtd-info (sgml-make-dtd nil)))
 ;;  (sgml-ecat-lookup sgml-ecat-files
@@ -1901,37 +1984,62 @@ is the entity type and NAME is the entity name, used to find the entity."
   "Return the complied DTD for extid or nil."
   (when pubid (setq pubid (sgml-canonize-pubid pubid)))
   (when file (setq file (expand-file-name file)))
+  (sgml-debug "Find compiled dtd for %s %s" pubid file)
   (let ((ce (or (sgml-ecat-lookup sgml-current-local-ecat pubid file)
 		(sgml-ecat-lookup sgml-ecat-files pubid file)))
 	cfile dtd)
     (when ce
       (setq cfile (car ce))  
-      (when (file-readable-p cfile)
-	(condition-case nil
+      (sgml-debug "Found %s" cfile)
+      (setq dtd (sgml-cached-cdtd cfile))
+      (when (and (null dtd)
+		 (file-readable-p cfile))
+	(condition-case err
 	    (progn
 	      (sgml-push-to-entity cfile)
 	      (message "Loading compiled DTD from %s..." cfile)
+	      (sgml-debug "Loading compiled DTD from %s..." cfile)
 	      (setq dtd (sgml-read-dtd))
 	      (sgml-pop-entity))
-	  (error nil)))
+	  (error 
+	   (sgml-log-message "Load fail: %S" err))))
       (when (and (not (and dtd (sgml-up-to-date-p
 				cfile
 				(sgml-dtd-dependencies dtd))))
 		 (file-writable-p cfile))
+	(sgml-log-message "Recompiling DTD %s" cfile)
 	(setq dtd (sgml-compile-cdtd file cfile (cdr ce)))))
     (if dtd (cons cfile dtd))))
+
+(defun sgml-cached-cdtd (cfile)
+  (let ((cb (current-buffer))
+	(dtd
+	 (loop for b in (buffer-list)
+	       thereis
+	       (progn (set-buffer b)
+		      (if sgml-buffer-parse-state
+			  (let ((merged (sgml-dtd-merged
+					 (sgml-pstate-dtd
+					  sgml-buffer-parse-state))))
+			    (if (and merged
+				     (string-equal cfile (car merged)))
+				(cdr merged))))))))
+    (set-buffer cb)
+    dtd))
 
 (defun sgml-compile-cdtd (dtd-file to-file ents)
   ;; Do compile
   (let* ((sgml-dtd-info (sgml-make-dtd nil))
 	 (parameters (sgml-dtd-parameters sgml-dtd-info))
 	 (sgml-parsing-dtd t))
+    (push dtd-file
+	  (sgml-dtd-dependencies sgml-dtd-info))
     (loop for (name . val) in ents
 	  do (sgml-entity-declare name parameters 'text val))
     (sgml-push-to-entity dtd-file)
     (sgml-check-dtd-subset)
     (sgml-pop-entity)
-    (sgml-save-dtd to-file sgml-dtd-info)
+    (sgml-write-dtd sgml-dtd-info to-file)
     sgml-dtd-info))
 
 
@@ -1947,30 +2055,36 @@ If DEPENDENCIES contains the symbol `t', FILE is not considered newer."
 ;;;; Merge compiled dtd
 
 (defun sgml-try-merge-compiled-dtd (pubid file)
-  (let (merged)
-    (when (and (sgml-eltypes-empty (sgml-dtd-eltypes sgml-dtd-info))
-	       (setq merged (sgml-compiled-dtd pubid file)))
-      (sgml-map-entities
-       (function (lambda (entity)
-		   (let ((other
-			  (sgml-lookup-entity
-			   (sgml-entity-name entity)
-			   (sgml-dtd-parameters (cdr merged)))))
-		     (unless (or (null other)
-				 (equal entity other))
-		       (setq merged nil)))))
-       (sgml-dtd-parameters sgml-dtd-info))
+  (if (sgml-dtd-merged sgml-dtd-info)
+      nil				; Will not merge twice
+    (let ((merged (sgml-compiled-dtd pubid file)))
       (when merged
-	;; Do the merger
-	(setf (sgml-dtd-merged sgml-dtd-info) merged)
-	(setf (sgml-dtd-eltypes sgml-dtd-info) (sgml-dtd-eltypes (cdr merged)))
-	(sgml-merge-entity-tables (sgml-dtd-entities sgml-dtd-info)
-				  (sgml-dtd-entities (cdr merged)))
-	(sgml-merge-entity-tables (sgml-dtd-parameters sgml-dtd-info)
-				  (sgml-dtd-parameters (cdr merged)))
-	(sgml-merge-shortmaps (sgml-dtd-shortmaps sgml-dtd-info)
-			      (sgml-dtd-shortmaps (cdr merged)))))
-    merged))
+	(sgml-map-entities
+	 (function (lambda (entity)
+		     (let ((other
+			    (sgml-lookup-entity
+			     (sgml-entity-name entity)
+			     (sgml-dtd-parameters (cdr merged)))))
+		       (unless (or (null other)
+				   (equal entity other))
+			 (setq merged nil)))))
+	 (sgml-dtd-parameters sgml-dtd-info))
+	(when merged
+	  ;; Do the merger
+	  (setf (sgml-dtd-merged sgml-dtd-info) merged)
+	  (setf (sgml-dtd-eltypes sgml-dtd-info)
+		(sgml-merge-eltypes (sgml-dtd-eltypes sgml-dtd-info)
+				    (sgml-dtd-eltypes (cdr merged))))
+	  (sgml-merge-entity-tables (sgml-dtd-entities sgml-dtd-info)
+				    (sgml-dtd-entities (cdr merged)))
+	  (sgml-merge-entity-tables (sgml-dtd-parameters sgml-dtd-info)
+				    (sgml-dtd-parameters (cdr merged)))
+	  (sgml-merge-shortmaps (sgml-dtd-shortmaps sgml-dtd-info)
+				(sgml-dtd-shortmaps (cdr merged)))
+	  (setf (sgml-dtd-dependencies sgml-dtd-info)
+		(nconc (sgml-dtd-dependencies sgml-dtd-info)
+		       (sgml-dtd-dependencies (cdr merged))))))
+      merged)))
 
 
 ;;;; Pushing and poping entities
@@ -2594,10 +2708,10 @@ The symbols are the tokens used in the DFAs."
 					       (point-max))))))
 
 (defun sgml-log-warning (format &rest things)
-  (unless sgml-suppress-warning
-    (when sgml-throw-on-warning
-      (apply 'message format things)
-      (throw sgml-throw-on-warning t))
+  (when sgml-throw-on-warning
+    (apply 'message format things)
+    (throw sgml-throw-on-warning t))
+  (when (or sgml-show-warnings sgml-parsing-dtd)
     (apply 'sgml-message format things)
     (apply 'sgml-log-message format things)))
 
@@ -2839,14 +2953,41 @@ Assumes starts with point inside a markup declaration."
   (setq sgml-markup-type 'sgml))
 
 (defun sgml-do-doctype ()
-  (let (sgml-markup-start)
-    (cond ((or (null sgml-dtd-info)
-	       (equal (sgml-dtd-doctype sgml-dtd-info) "ANY"))
-					; Parse the DOCTYPE
-	   (sgml-check-doctype-body))
-	  (t				; Has doctype already been defined
-	   (sgml-skip-upto-mdc))))
+  (cond
+   (sgml-dtd-info			; Has doctype already been defined
+    (sgml-skip-upto-mdc))
+   (t				
+    (let (sgml-markup-start)
+      (message "Parsing doctype...")
+      (sgml-setup-doctype (sgml-check-name)
+			  (sgml-parse-external))
+      (message "Parsing doctype...done"))))
   (setq sgml-markup-type 'doctype))
+
+(defun sgml-setup-doctype (docname external)
+  (let ((sgml-parsing-dtd t))
+    (setq sgml-no-elements 0)
+    (setq sgml-dtd-info (sgml-make-dtd docname))
+    ;;(setq sgml-dtd-shortmaps nil)
+    (sgml-skip-ps)
+    (cond
+     ((sgml-parse-delim "DSO")
+      (sgml-check-dtd-subset)
+      (sgml-check-delim "DSC")))
+    (cond (external
+	   (sgml-push-to-entity (sgml-make-entity docname 'dtd external))
+	   (unless (eobp)
+	     (sgml-check-dtd-subset)
+	     (unless (eobp)
+	       (sgml-parse-error "DTD subset ended")))
+	   (sgml-pop-entity)))
+;;;    (loop for map in sgml-dtd-shortmaps do
+;;;	  (sgml-add-shortref-map
+;;;	   (sgml-dtd-shortmaps sgml-dtd-info)
+;;;	   (car map)
+;;;	   (sgml-make-shortmap (cdr map))))
+    (sgml-set-initial-state sgml-dtd-info)
+    (run-hooks 'sgml-doctype-parsed-hook)))
 
 (defun sgml-do-data (type &optional marked-section)
   "Move point forward until there is an end-tag open after point."
@@ -3081,7 +3222,7 @@ VALUE is a string.  Returns nil or an attdecl."
   "Make sure that an eventual DTD is parsed or loaded."
   (sgml-cleanup-entities)
   (when (null sgml-buffer-parse-state)	; first parse in this buffer
-    (sgml-set-initial-state)		; fall back DTD
+    ;;(sgml-set-initial-state)		; fall back DTD
     (add-hook 'pre-command-hook 'sgml-reset-log)
     (if sgml-default-dtd-file
 	(sgml-load-dtd sgml-default-dtd-file)
@@ -3116,11 +3257,37 @@ VALUE is a string.  Returns nil or an attdecl."
 	sgml-current-localcat sgml-local-catalogs
 	sgml-current-local-ecat sgml-local-ecat-files))
 
-(defun sgml-parse-until-end-of (sgml-close-element-trap &optional extra-cond)
+(defun sgml-parse-prolog ()
+  "Parse the document prolog to learn the DTD."
+  (interactive)
+  (sgml-clear-log)
+  (message "Parsing prolog...")
+  (sgml-cleanup-entities)
+  (sgml-set-global)
+  (setq	sgml-dtd-info nil)
+  (goto-char (point-min))
+  (sgml-with-parser-syntax
+   (while (progn (sgml-skip-ds)
+		 (setq sgml-markup-start (point))
+		 (and (sgml-parse-markup-declaration 'prolog)
+		      (null sgml-dtd-info))))
+   (unless sgml-dtd-info		; Set up a default doctype
+     (let ((docname (or sgml-default-doctype-name
+			(if (sgml-parse-delim "STAGO" gi)
+			    (sgml-parse-name)))))
+       (when docname
+	 (sgml-setup-doctype docname '(nil))))))
+  (unless sgml-dtd-info
+    (error "No document type defined by prolog"))
+  (sgml-message "Parsing prolog...done"))
+
+(defun sgml-parse-until-end-of (sgml-close-element-trap &optional cont)
   "Parse until the SGML-CLOSE-ELEMENT-TRAP has ended,
 or if it is t, any additional element has ended,
 or if nil, until end of buffer."
-  (sgml-parse-to (point-max) extra-cond)
+  (cond
+   (cont (sgml-parse-continue (point-max)))
+   (t   (sgml-parse-to (point-max) nil)))
   (when (eobp)				; End of buffer, can imply
 					; end of any open element.
     (while (prog1 (not
@@ -3145,6 +3312,15 @@ If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
      (sgml-parser-loop extra-cond))
     (when bigparse
       (sgml-message ""))))
+
+(defun sgml-parse-continue (sgml-goal)
+  "Parse until (at least) SGML-GOAL."
+  (assert sgml-current-tree)
+  (setq sgml-last-start-pos (point))
+  (sgml-message "Parsing...")
+  (sgml-with-parser-syntax
+     (sgml-parser-loop nil))
+  (sgml-message ""))
 
 (defun sgml-reparse-buffer (shortref-fun)
   "Reparse the buffer and let SHORTREF-FUN take care of short references.
@@ -3243,10 +3419,6 @@ pointing to start of short ref and point pointing to the end."
     (setq et (if (sgml-is-delim "TAGC")	; empty start-tag
 		 (sgml-do-empty-start-tag)
 	       (sgml-lookup-eltype (sgml-check-name))))
-    (unless (sgml-eltype-model et)
-      (and sgml-warn-about-undefined-elements
-	   (sgml-log-warning "Undefined element %s" (sgml-eltype-name et)))
-      (setf (sgml-eltype-model et) sgml-any))
     (unless (sgml-parse-delim "TAGC")	; optimize common case
       (setq asl (sgml-parse-attribute-specification-list et))
       (or
@@ -3258,6 +3430,7 @@ pointing to start of short ref and point pointing to the end."
        (sgml-check-tag-close)))
     (while				; Until token accepted
 	(cond
+	 ((not (sgml-eltype-defined et)) nil)
 	 ((eq sgml-current-state sgml-any) nil)
 	 ((and (not (memq et (sgml-excludes)))
 	       (setq temp (sgml-get-move sgml-current-state et)))
@@ -3269,9 +3442,23 @@ pointing to start of short ref and point pointing to the end."
 	 ((sgml-do-implied
 	   (format "%s start-tag" (sgml-eltype-name et))))))
     (sgml-set-markup-type 'start-tag)
-    (sgml-open-element et sgml-conref-flag sgml-markup-start (point) asl)
-    (when net-enabled
-      (setf (sgml-tree-net-enabled sgml-current-tree) t))))
+    (cond ((and sgml-ignore-undefined-elements
+		(not (sgml-eltype-defined et)))
+	   (when sgml-warn-about-undefined-elements
+	     (sgml-log-warning
+	      "Start-tag of undefined element %s; ignored"
+	      (sgml-eltype-name et))))
+	  (t
+	   (unless (sgml-eltype-defined et)
+	     (setf (sgml-eltype-mixed et) t)
+	     (setf (sgml-eltype-etag-optional et) t)
+	     (when sgml-warn-about-undefined-elements
+	     (sgml-log-warning
+	      "Start-tag of undefined element %s; assume O O ANY"
+	      (sgml-eltype-name et))))
+      (sgml-open-element et sgml-conref-flag sgml-markup-start (point) asl)
+      (when net-enabled
+	(setf (sgml-tree-net-enabled sgml-current-tree) t))))))
 
 (defun sgml-do-empty-start-tag ()
   "Return eltype to use if empty start tag"
@@ -3306,35 +3493,48 @@ pointing to start of short ref and point pointing to the end."
   "Assume point after </ or at / in a NET"
   (let ((gi "Null")			; Name of element to end or "NET"
 	et				; Element type of end tag
-	found)				; Set to true when found element to end
-    (cond ((sgml-parse-delim "TAGC")		; empty end-tag
+	(found				; Set to true when found element to end
+	 t))
+    (cond ((sgml-parse-delim "TAGC")	; empty end-tag
 	   (setq et (sgml-tree-eltype sgml-current-tree)))
 	  ((sgml-parse-delim "NET"))
 	  (t
 	   (setq et (sgml-lookup-eltype (sgml-check-name)))
 	   (sgml-parse-s)
 	   (sgml-check-tag-close)))
-    (when et (setq gi (sgml-eltype-name et)))
-    ;; Room for improvment:  Check if eltype is defined and that it
-    ;; is in the tree.  Otherwise ignore with warning.
-    (while (not found)			; Loop until correct element to
-					; end is found
-      (unless (sgml-final-p sgml-current-state)
-	(sgml-log-warning
-	 "%s element can't end here, need one of %s; %s end-tag out of context"
-	 (sgml-element-gi sgml-current-tree)
-	 (sgml-required-tokens sgml-current-state)
-	 gi))
-      (when (eq sgml-current-tree sgml-top-tree)
-	(sgml-error "%s end-tag ended document and parse" gi))
-      (setq found (or (eq et (sgml-tree-eltype sgml-current-tree))
-		      (and (null et)	; Null end-tag
-			   (eq t (sgml-tree-net-enabled sgml-current-tree)))))
+    (when et
+      (setq gi (sgml-eltype-name et))
+      (setq found			; check if there is an open element
+					; with the right eltype
+	    (loop for u = sgml-current-tree then (sgml-tree-parent u)
+		  while u
+		  thereis (eq et (sgml-tree-eltype u))))
       (unless found
-	(sgml-implied-end-tag (format "%s end-tag" gi)
-			      sgml-markup-start sgml-markup-start))))
-  (sgml-set-markup-type 'end-tag)
-  (sgml-close-element sgml-markup-start (point)))
+	(sgml-log-warning
+	 "End-tag %s does not end any open element; ignored"
+	 gi)))
+    (when found
+      (setq found nil)
+      (while (not found)		; Loop until correct element to
+					; end is found
+	(unless (sgml-final-p sgml-current-state)
+	  (sgml-log-warning
+	   "%s element can't end here, need one of %s; %s end-tag out of context"
+	   (sgml-element-gi sgml-current-tree)
+	   (sgml-required-tokens sgml-current-state)
+	   gi))
+	(when (eq sgml-current-tree sgml-top-tree)
+	  (sgml-error "%s end-tag ended document and parse" gi))
+	(setq found
+	      (or (eq et (sgml-tree-eltype sgml-current-tree))
+		  (and (null et)	; Null end-tag
+		       (eq t (sgml-tree-net-enabled sgml-current-tree)))))
+	(unless found
+	  (sgml-implied-end-tag (format "%s end-tag" gi)
+				sgml-markup-start sgml-markup-start)))
+      (sgml-close-element sgml-markup-start (point))))
+  (sgml-set-markup-type 'end-tag))
+
 
 (defun sgml-is-goal-after-start (goal tree)
   (and tree
