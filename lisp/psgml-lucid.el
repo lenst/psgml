@@ -148,4 +148,11 @@
   
 (define-key sgml-mode-map [button3] 'sgml-tags-menu)
 
+
+
+;;;; Provide
+
 (provide 'psgml-lucid)
+
+
+;;; psgml-lucid.el ends here

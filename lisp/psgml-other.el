@@ -30,6 +30,9 @@
 
 ;;;; Code:
 
+(eval-when-compile
+  (require 'psgml))
+
 
 ;;;; SGML mode: keys and menus
 
