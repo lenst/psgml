@@ -1,3 +1,9 @@
+2005-03-11  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.texi: add dircategory Emacs (from Karl Eichwalder)
+
+	* psgml-api.texi: add dircategory Emacs (from Karl Eichwalder)
+
 2001-12-14  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.texi (sgml-add-element-to-element): added info about..
