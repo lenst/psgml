@@ -1,38 +1,37 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
-
-<!ENTITY last.ed  'Time-stamp: "2001-02-10 08:18:21 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "2001-05-31 22:52:49 lenst"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
 
 <!ENTITY mail.url "mailto:">
-<!ENTITY my.email cdata "lenst@lysator.liu.se">
+<!ENTITY my.email CDATA "lenst@lysator.liu.se">
 <!ENTITY mme.url "&mail.url;&my.email">
 
 <!ENTITY % TEST  "IGNORE">
-<![ %TEST [ <!entity base.url "."> ]]>
+<![ %TEST [ <!ENTITY base.url "."> ]]>
 
 <!ENTITY base.url
    "http://www.lysator.liu.se/~lenst/about_psgml">
 
-<!entity logo.url "&base.url;/newpsgml2.gif">
+<!ENTITY logo.url "&base.url;/newpsgml2.gif">
 
-<!entity ftp.url "ftp://ftp.lysator.liu.se/">
-<!entity psgml.dir "&ftp.url;pub/sgml/">
+<!ENTITY ftp.url "ftp://ftp.lysator.liu.se/">
+<!ENTITY psgml.dir "&ftp.url;pub/sgml/">
 <!ENTITY alpha.dir "&psgml.dir;ALPHA/">
-<!entity psgml1.0.3 "&psgml.dir;psgml-1.0.3.tar.gz">
-<!entity psgml1.2.0 "&psgml.dir;psgml-1.2.0.tar.gz">
-<!entity psgml1.2.1 "psgml-1.2.1.tar.gz">
-<!entity psgml1.2.2 "psgml-1.2.2.tar.gz">
-<!entity ftp-dir    "&psgml.dir;">
+<!ENTITY psgml1.0.3 "&psgml.dir;psgml-1.0.3.tar.gz">
+<!ENTITY psgml1.2.0 "&psgml.dir;psgml-1.2.0.tar.gz">
+<!ENTITY psgml1.2.1 "psgml-1.2.1.tar.gz">
+<!ENTITY psgml1.2.2 "psgml-1.2.2.tar.gz">
+<!ENTITY ftp-dir    "&psgml.dir;">
 
-<!entity olddoc.url "&base.url;/psgml_toc.html">
-<!entity newdoc.url "&base.url;/psgml_toc.html">
-<!entity source "&base.url;/about_psgml.sgml" >
+<!ENTITY olddoc.url "&base.url;/psgml_toc.html">
+<!ENTITY newdoc.url "&base.url;/psgml_toc.html">
+<!ENTITY source "&base.url;/about_psgml.sgml" >
 
-<!entity nl     "<br>" >
-<!entity SGML   "<acronym>SGML</acronym>" >
-<!entity XML    "<acronym>XML</acronym>" >
+<!ENTITY nl     "<br>" >
+<!ENTITY SGML   "<acronym>SGML</acronym>" >
+<!ENTITY XML    "<acronym>XML</acronym>" >
 
 <?PSGML NOFILL body div pre>
 ]>
@@ -44,7 +43,7 @@
   <meta name="template-type" content="software">
   <meta name="category" content="Emacs mode">
   <meta name="author-name" content="Lennart Staflin">
-  <meta name="version" content="1.2.1">
+  <meta name="version" content="1.2.2">
   <meta name="description"
     content="PSGML is a GNU Emacs Major Mode for editing SGML coded documents.">
   <meta name="keywords" content="sgml, emacs, syntax directed editing">
@@ -168,16 +167,23 @@ HR.divider { width: 50%; align: center; }
      directory <samp>pub/sgml</samp>.</p>
 
     <dl>
+      <dt>1.2.2</dt>
+      <dd><p>Latest stable release, available from <a
+        href="&psgml.dir">lystor ftp</a>, <a
+        href="&base.url;/&psgml1.2.2;">http</a> or from <a
+        href="http://www.sourceforge.net/projects/psgml">source
+        forge</a></p>
+
      <dt><a>1.2.1</a></dt>
      <dd>
-      <p>This is the latest release. Available via as &psgml1.2.1;
-       <a href="&ftp-dir;&psgml1.2.1;">ftp</a> or via <a
+      <p>Previous release. Available as &psgml1.2.1; via
+       <a href="&ftp-dir;&psgml1.2.1;">ftp</a> or <a
        href="&psgml1.2.1">http</a>.
      </dd>
 
      <DT><A NAME="V1.2.0">1.2.0</A></dt>
      <dd>
-      <p>This is the previous beta release. Available via ftp as 
+      <p>Old beta release. Available via ftp as 
        <a href="&psgml1.2.0;">psgml-1.2.0.tar.gz</a>
      </dd>
 

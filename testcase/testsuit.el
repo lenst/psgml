@@ -41,7 +41,7 @@
          (error "Unexptectd %s" errcode))))
     (while (and expected (eq (caar expected) 'warning))
       (let ((warning-pattern (cadar expected)))
-        (set-buffer sgml-log-buffer-name)
+        (set-buffer (get-buffer-create sgml-log-buffer-name))
         (goto-char (point-min))
         (cond ((re-search-forward warning-pattern nil t)
                (setq expected (cdr expected)))

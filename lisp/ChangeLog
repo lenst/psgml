@@ -1,3 +1,9 @@
+2001-11-04  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-other.el, psgml-parse.el, psgml-debug.el, psgml-edit.el:
+	Fix the obsolete variable `before-change-function' and
+	`after-change-function', which are no longer used by Emacs.
+
 2001-02-10  Adrian Aichner  <adrian@xemacs.org>
 
 	* psgml-dtd.el: Fix typos.
@@ -6,7 +12,7 @@
 	* psgml-info.el: Ditto.
 	* psgml-parse.el: Ditto.
 	* psgml.el: Ditto.
-	
+
 Wed Feb 28 00:02:45 2001  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-fs.el (fs-split-tokens): new helper function for use in
@@ -57,9 +63,9 @@ Thu Feb  8 20:08:47 2001  Lennart Staflin  <lenst@lysator.liu.se>
 	* psgml-info.el: Add provide psgml-info
 
 Sun Oct 22 17:29:53 2000  Marc-Antoine Parent
-	
+
 	* patch from Marc-Antoine Parent
-	
+
 	* psgml-edit.el (sgml-read-attribute-value): include the element name, thus:
 	Value for {attribute name} in {element name} ({type} {Default}):
 
@@ -232,18 +238,18 @@ Thu Nov  4 19:07:09 1999  Lennart Staflin  <lenst@lysator.liu.se>
 1999-10-21  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml-parse.el (sgml-push-to-entity): restore the (erase-buffer)
-	that had been commented out. This is needed for the case when 
+	that had been commented out. This is needed for the case when
 	sgml-try-merge-compiled-dtd fails and leaves junk in the buffer.
-	
+
 1999-10-19  Lennart Staflin  <lennarts@infotek.no>
-	
+
 	* Version 1.2.1 released
-	
+
 1999-10-14  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml-parse.el (sgml-log-entity-stack): don't use
 	sgml-pop-entity, just loop thru the entity stack and print out the
-	files. 
+	files.
 	(sgml-load-ecat): bind sgml-xml-p while parsing catalog
 
 1999-10-13  Lennart Staflin  <lennarts@infotek.no>
@@ -256,19 +262,19 @@ Thu Nov  4 19:07:09 1999  Lennart Staflin  <lenst@lysator.liu.se>
 	(sgml-log-entity-stack): new factored function.
 	(*) Replaces some sgml-parse-error and sgml-log-warning with
 	sgml-parse-warning.
-	(sgml-parse-catalog-buffer): bind sgml-xml-p while parsing catalog 
-	
+	(sgml-parse-catalog-buffer): bind sgml-xml-p while parsing catalog
+
 Sun Oct 10 15:53:12 1999  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.2 released
 
 Wed Oct  6 00:43:37 1999  Lennart Staflin  <lenst@lysator.liu.se>
 
-	* Version 1.1.7 released	
-	
+	* Version 1.1.7 released
+
 	* psgml-parse.el (sgml-push-to-entity): carry XML-ness to parsed
 	text entities.
-	
+
 	* psgml-charent.el (sgml-display-char-list-filename): new default
 	is "iso8859.map" in the same directory where psgml is installed.
 
@@ -301,9 +307,9 @@ Sat Aug 14 22:34:59 1999  Lennart Staflin  <lenst@lysator.liu.se>
 	(sgml-read-number): dito.
 
 	* psgml.el (sgml-option-value-indicator): moved here.
-	(sgml-mode): activate-menubar-hook can't be local in XEmacs and 
+	(sgml-mode): activate-menubar-hook can't be local in XEmacs and
 	sgml-build-custom-menus need to be after the easy-menu-adds.
-	
+
 1998-11-14  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el, psgml-edit.el: Fix from David Megginson to some
@@ -315,12 +321,12 @@ Sat Aug 14 22:34:59 1999  Lennart Staflin  <lenst@lysator.liu.se>
 	buffer directly, call sgml-append-to-help-buffer. Fixes problem
 	with read-only buffer.
 	(sgml-append-to-help-buffer): new func.
-	
+
 	* psgml.el (sgml-main-menu):  Options handling changed after
 	suggestion and code from Matthias Clasen
 	(sgml-update-all-options-menus): new func. called by
 	activate-menubar-hook
-	
+
 Thu Nov  5 20:59:08 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-parse-processing-instruction): removed let
@@ -336,7 +342,7 @@ Thu Nov  5 20:59:08 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-declared-value-notation): change 'notation
 	to 'NOTATION
-	
+
 Sat Oct 31 20:00:22 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-cache-catalog): Use file-truename for
@@ -395,27 +401,27 @@ Fri Jul  3 18:14:21 1998  Lennart Staflin  <lenst@lysator.liu.se>
 	* Version 1.1.3
 
 	* Makefile.in: Call install with only one source file.
-	
+
 Fri Jul  3 17:54:06 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-complete): ignore case
 
-	* psgml-parse.el (sgml-push-to-entity): use setf to set 
+	* psgml-parse.el (sgml-push-to-entity): use setf to set
 	sgml-entity-marked-undefined-p.
 	(setf sgml-entity-marked-undefined-p): define setf method
-	
+
 Tue Jun 30 22:06:20 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-do-set-option): Added file-list and
 	file-or-nil types contributed by Matthias Clasen
 	<mclasen@sun2.mathematik.uni-freiburg.de>
-	
+
 Tue Jun 30 21:48:39 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el (sgml-mode-map): C-c C-i calls sgml-add-element-to-element
 
 	* psgml-edit.el (sgml-add-element-to-element): New command.
-	
+
 Wed Jun 24 23:23:38 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-attribute-buffer): Fixed another victim of
@@ -434,10 +440,10 @@ Mon Jun 22 19:58:43 1998  Lennart Staflin  <lenst@lysator.liu.se>
 	* psgml-edit.el (sgml-indent-line): Previous change of
 	sgml-indent-line did not work well with OMITTAG. Restore old
 	functionallity.
-	
+
 Fri Jun 19 18:54:27 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
-	* psgml-edit.el (sgml-attribute-buffer): 
+	* psgml-edit.el (sgml-attribute-buffer):
 	changed case of default value type, here and in many other functions.
 	(sgml-translate-attribute-specification-list): changed case for
 	declared value
@@ -451,7 +457,7 @@ Fri Jun 19 18:54:27 1998  Lennart Staflin  <lenst@lysator.liu.se>
 	sgml-read-attribute-value, sgml-insert-attribute,
 	sgml-custom-markup): Use sgml-namecase-general to set
 	completion-ignore-case.
-	
+
 1998-06-16  Dave Love  <d.love@dl.ac.uk>
 
 	* psgml-parse.el (sgml-push-to-entity): Don't use save-excursion
