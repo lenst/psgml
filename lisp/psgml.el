@@ -1210,6 +1210,7 @@ All bindings:
   (setq sgml-always-quote-attributes t)
   (setq sgml-validate-command "nsgmls -wxml -s %s %s")
   (unless sgml-declaration
+    (make-local-variable 'sgml-declaration)
     (setq sgml-declaration sgml-xml-declaration)))
 
 (defun sgml-default-dtd-file ()
