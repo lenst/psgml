@@ -256,22 +256,16 @@ a list using attlist TO."
 If called from a program first two arguments are start and end of
 region. And optional third argument true unhides."
   (interactive "r\nP")
-  (let ((mp (buffer-modified-p))
-	(inhibit-read-only t)		;
-	(buffer-read-only nil)		; should not need this, but
-					; perhaps some old version of
-					; emacs does not understand
-					; inhibit-read-only
-	(before-change-function nil)
-	(after-change-function nil))
-    (setq selective-display t)
-    (unwind-protect
-	(subst-char-in-region beg end
-			      (if unhide ?\r ?\n)
-			      (if unhide ?\n ?\r)
-			      'noundo)
-      (when sgml-buggy-subst-char-in-region
-	(set-buffer-modified-p mp)))))
+  (setq selective-display t)
+  (let ((mp (buffer-modified-p)))
+    (sgml-without-change-hooks
+     (unwind-protect
+         (subst-char-in-region beg end
+                               (if unhide ?\r ?\n)
+                               (if unhide ?\n ?\r)
+                               'noundo)
+       (when sgml-buggy-subst-char-in-region
+         (set-buffer-modified-p mp))))))
 
 (defun sgml-fold-element ()
   "Fold the lines comprising the current element, leaving the first line visible.
@@ -1644,8 +1638,11 @@ references will be expanded."
   (let ((only-one (not (null element))))
     (setq element (or element (sgml-top-element)))
     (goto-char (sgml-element-end element)) 
-    (let ((before-change-function nil))
-      (sgml-normalize-content element only-one)))
+    ;; FIXME: actually the sgml-note-change-at called by the
+    ;; before-change-function need to be delayed to after the normalize
+    ;; to avoid destroying the tree wile traversing it.
+    (sgml-without-before-change-hooks
+     (sgml-normalize-content element only-one)))
   (sgml-note-change-at (sgml-element-start element))
   (sgml-message "Done"))
 
