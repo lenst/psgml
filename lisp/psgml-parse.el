@@ -6,7 +6,7 @@
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Acknowledgment:
 ;;   The catalog and XML parsing code was contributed by
-;;      David Megginson <dmeggins@??>
+;;      David Megginson <david@megginson.com>
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License
@@ -35,9 +35,8 @@
 ;;; Interface to psgml-dtd
 (eval-and-compile
   (autoload 'sgml-do-usemap-element  "psgml-dtd")
-  (autoload 'sgml-write-dtd  "psgml-dtd")
-  (autoload 'sgml-check-dtd-subset  "psgml-dtd")
-  )
+  (autoload 'sgml-write-dtd	     "psgml-dtd")
+  (autoload 'sgml-check-dtd-subset   "psgml-dtd") )
 
 
 ;;;; Advise to do-auto-fill
