@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: 1998-12-06 22:38:03 lenst
+;;;\Last edited: 1999-08-09 23:38:43 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -282,12 +282,12 @@
 
 (defun profile-sgml (&optional file)
   (interactive)
-  (or file (setq file (expand-file-name "~/src/psgml/1.0/test/shortref.sgml")))
+  (or file (setq file (expand-file-name "~/work/config/metaspec.xml")))
   (find-file file)
   (sgml-need-dtd)
   (sgml-instrument-parser)
   (elp-reset-all)
-  (dotimes (i 20)
+  (dotimes (i 10)
     (garbage-collect)
     (sgml-reparse-buffer (function sgml-handle-shortref)))
   (elp-results))
@@ -319,9 +319,16 @@
 	  sgml-check-tag-close
 	  sgml-do-move
 	  sgml-open-element
-	  sgml-execute-implied
 	  sgml-list-implications
 	  sgml-move-current-state
+          sgml-do-empty-start-tag
+          sgml-lookup-eltype
+          sgml-startnm-char-next
+          sgml-eltype-defined
+          sgml-execute-implied
+          sgml-next-sub-and
+          sgml-get-and-move
+          format
 	  ))
   (elp-instrument-list))
 
