@@ -922,6 +922,18 @@ than one to choose from, a comment can be inserted with the
 available choices if the option
 @code{sgml-insert-missing-element-comment} is non-nil.
 
+@kindex C-c C-i
+@findex sgml-add-element-to-element
+@item C-c C-i
+Inserts a new element in the current element where it is legal. Prompts
+for element name with completion. The completion list contains all
+elements that could be added to the current element somewhere, without
+making the content invalid. This assumes that the content is valid to
+begin with. Currently this list only has regular elements, not
+inclusions. The new element will be inserted as late as possible in the
+current element (unless prefix argument is given, then as early as
+possible.)
+
 @kindex C-c C-r
 @findex sgml-tag-region
 @item C-c C-r
@@ -932,6 +944,11 @@ element name from mini-buffer with completion as for @kbd{C-c C-e}.
 @findex sgml-insert-end-tag
 @item C-c /
 Inserts an end-tag for the current element (@code{sgml-insert-end-tag}).
+
+@c note that this keybinding doesn't follow the conventions for
+@c major-modes. Perhaps warn that this binding may change in the next
+@c major release?
+
 
 @kindex C-c RET
 @findex sgml-split-element
@@ -956,6 +973,10 @@ completion.  The prompt for attribute value will typically look like:
 @example
 Value for @var{attribute} (@var{type} Default: @var{current value}):
 @end example
+
+@c note that this keybinding doesn't follow the conventions for
+@c major-modes. Perhaps warn that this binding may change in the next
+@c major release?
 
 @kindex C-c C-u C-m
 @findex sgml-custom-markup
@@ -995,6 +1016,12 @@ command.
 
 @item Insert entity
 Menu of all general entities defined in the DTD.
+
+@item Add Element to Element
+Pops up a menu of all elements valid somewhere in the current element.
+The menu contains all elements that could be added to the current
+element somewhere, without making the content invalid. The new element
+will be inserted as late as possible in the current element.
 
 @item Insert attribute
 Pops up a menu with all the attributes of an element.  The element is
