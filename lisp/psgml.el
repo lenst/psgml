@@ -72,7 +72,8 @@
   "Abbrev table in use in sgml-mode.")
 (define-abbrev-table 'sgml-mode-abbrev-table ())
 
-(defvar sgml-running-lucid (string-match "Lucid" emacs-version))
+(eval-and-compile
+  (defvar sgml-running-lucid (string-match "Lucid" emacs-version)))
 
 (defvar sgml-xml-p nil
   "Is this an XML document?")

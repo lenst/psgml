@@ -1,6 +1,9 @@
 2001-11-09  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.2.3 released
+	
+	* psgml.el (sgml-running-lucid): make sure it gets defined during
+	compilation.
 
 2001-11-04  Lennart Staflin  <lenst@lysator.liu.se>
 
