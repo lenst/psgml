@@ -2452,6 +2452,7 @@ overrides the entity type in entity look up."
   (let ((cb (current-buffer))
 	(dd default-directory)
         (syntax-table (syntax-table))
+        (xml-p sgml-xml-p)
 	;;*** should eref be argument ?
 	(eref (sgml-make-eref (if (stringp entity)
 				  (sgml-make-entity entity nil nil)
@@ -2479,6 +2480,7 @@ overrides the entity type in entity look up."
     (set-syntax-table syntax-table)
     (make-local-variable 'sgml-previous-buffer)
     (setq sgml-previous-buffer cb)
+    (setq sgml-xml-p xml-p)
     (setq sgml-rs-ignore-pos		; don't interpret beginning of buffer
 					; as #RS if internal entity.
 	  (if (or (stringp entity)
