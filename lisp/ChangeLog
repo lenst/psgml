@@ -1,5 +1,10 @@
 Wed Oct  6 00:43:37 1999  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* Version 1.1.7 released	
+	
+	* psgml-parse.el (sgml-push-to-entity): carry XML-ness to parsed
+	text entities.
+	
 	* psgml-charent.el (sgml-display-char-list-filename): new default
 	is "iso8859.map" in the same directory where psgml is installed.
 
