@@ -116,6 +116,7 @@
 (eval-when (load)
   (unless sgml-running-lucid
     (def-edebug-spec sgml-with-parser-syntax (&rest form))
+    (def-edebug-spec sgml-with-parser-syntax-ro (&rest form))
     (def-edebug-spec sgml-skip-upto (sexp))
     (def-edebug-spec sgml-check-delim (sexp &optional sexp))
     (def-edebug-spec sgml-parse-delim (sexp &optional sexp))
@@ -262,8 +263,7 @@
 	    (progn
 	      (sgml-parse-prolog)
 	      ;;(sgml-next-trouble-spot)
-	      (sgml-parse-until-end-of nil)
-	      )
+	      (sgml-parse-until-end-of nil))
 	  (error
 	   (princ errcode)
 	   (terpri)))
