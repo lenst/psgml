@@ -32,6 +32,7 @@
 ;;;; Code:
 
 (require 'psgml)
+;;(require 'easymenu)
 
 (eval-and-compile
   (autoload 'sgml-do-set-option "psgml-edit"))
@@ -130,27 +131,19 @@ into several panes.")
 
 ;;;; Lucid menu bar
 
-(defun sgml-install-lucid-menus ()
-  "Install lucid menus for psgml mode"
-  (set-buffer-menubar (copy-sequence current-menubar))
-  (add-menu nil (car sgml-sgml-menu) (cdr sgml-sgml-menu))
-  (add-menu nil (car sgml-markup-menu) (cdr sgml-markup-menu))
-  (add-menu nil (car sgml-fold-menu) (cdr sgml-fold-menu))
-  (add-menu nil (car sgml-dtd-menu) (cdr sgml-dtd-menu)))
-
-(defvar sgml-markup-menu
-  '("Markup"
-    ["Insert Element" (sgml-element-menu last-command-event) t]
-    ["Insert Start-Tag" (sgml-start-tag-menu last-command-event) t]
-    ["Insert End-Tag" (sgml-end-tag-menu last-command-event) t]
-    ["Tag Region" (sgml-tag-region-menu last-command-event) t]
-    ["Insert Attribute" (sgml-attrib-menu last-command-event) t]
-    ["Insert Entity" (sgml-entities-menu last-command-event) t]
-    ))
-
 (defvar sgml-dtd-menu
   '("DTD"
     ["Parse DTD" sgml-parse-prolog t]
+    ("Info"
+	 ["Describe element type"	sgml-describe-element-type	t]
+	 ["Describe entity"		sgml-describe-entity		t]
+	 ["List elements" 		sgml-list-elements 		t]
+	 ["List attributes" 		sgml-list-attributes 		t]
+	 ["List terminals" 		sgml-list-terminals 		t]
+	 ["List content elements" 	sgml-list-content-elements 	t]
+	 ["List occur in elements" 	sgml-list-occur-in-elements 	t]
+	 )
+    "---"
     ["Load Parsed DTD" sgml-load-dtd t]
     ["Save Parsed DTD" sgml-save-dtd t]
     ))
@@ -165,6 +158,53 @@ into several panes.")
     ["Unfold All" sgml-unfold-all t]
     ["Expand" sgml-expand-element t]
     ))
+
+(defvar sgml-markup-menu
+  '("Markup"
+    ["Insert Element" (sgml-element-menu last-command-event) t]
+    ["Insert Start-Tag" (sgml-start-tag-menu last-command-event) t]
+    ["Insert End-Tag" (sgml-end-tag-menu last-command-event) t]
+    ["Tag Region" (sgml-tag-region-menu last-command-event) t]
+    ["Insert Attribute" (sgml-attrib-menu last-command-event) t]
+    ["Insert Entity" (sgml-entities-menu last-command-event) t]
+    ))
+
+(defvar
+ sgml-move-menu
+ '("Move"
+   ["Next trouble spot" sgml-next-trouble-spot t]
+   ["Next data field"   sgml-next-data-field   t]
+   ["Forward element"	sgml-forward-element t]
+   ["Backward element"  sgml-backward-element t]
+   ["Up element"	sgml-up-element t]
+   ["Down element"	sgml-down-element t]
+   ["Backward up element" sgml-backward-up-element t]
+   ["Beginning of element" sgml-beginning-of-element t]
+   ["End of element"	sgml-end-of-element t]
+   )
+ "Menu of move commands"
+ )
+
+(defvar
+ sgml-modify-menu
+ '("Modify"
+   ["Normalize"			sgml-normalize	t]
+   ["Expand All Short References"	sgml-expand-all-shortrefs t]
+   ["Expand Entity Reference"	sgml-expand-entity-reference t]
+   ["Normalize Element"		sgml-normalize-element t]
+   ["Make Character Reference"	sgml-make-character-reference t]
+   ["Unmake Character Reference"	(sgml-make-character-reference t) t]
+   ["Fill Element"		sgml-fill-element t]
+   ["Change Element Name..."	sgml-change-element-name t]
+   ["Edit Attributes..."	sgml-edit-attributes t]
+   ["Kill Markup"		sgml-kill-markup t]
+   ["Kill Element"		sgml-kill-element t]
+   ["Untag Element"		sgml-untag-element t]
+   ["Decode Character Entities"  sgml-charent-to-display-char t]
+   ["Encode Characters"		sgml-display-char-to-charent t]
+   )
+ "Menu of modification commands"
+ )
 
 (defun sgml-make-options-menu (vars)
   (loop for var in vars 
@@ -196,18 +236,12 @@ into several panes.")
 (defvar sgml-sgml-menu
   (append
    '("SGML"
-     ["Next Data Field"  sgml-next-data-field t]
-     ["End Element" sgml-insert-end-tag t]
+     ["Reset Buffer"  normal-mode t]
      ["Show Context" sgml-show-context t]
      ["What Element" sgml-what-element t]
-     ["Next Trouble Spot" sgml-next-trouble-spot t]
-     ["Edit Attributes" sgml-edit-attributes t]
-     ["Change Element Name" sgml-change-element-name t]
      ["Show Valid Tags" sgml-list-valid-tags t]
      ["Show/Hide Warning Log" sgml-show-or-clear-log t]
-     ["Validate" sgml-validate t]
-     ["Normalize" sgml-normalize t]
-     ["Fill Element" sgml-fill-element t])
+     ["Validate" sgml-validate t])
    (if (or (not (boundp 'emacs-major-version))
 	   (and (boundp 'emacs-minor-version)
 		(< emacs-minor-version 10)))
@@ -221,6 +255,17 @@ into several panes.")
    '(["Save File Options" sgml-save-options t]
      ["Submit Bug Report" sgml-submit-bug-report t]
      )))
+
+(defun sgml-install-lucid-menus ()
+  "Install lucid menus for psgml mode"
+  (set-buffer-menubar (copy-sequence current-menubar))
+  (add-menu nil (car sgml-sgml-menu) (cdr sgml-sgml-menu))
+  (add-menu nil (car sgml-modify-menu) (cdr sgml-modify-menu))
+  (add-menu nil (car sgml-move-menu) (cdr sgml-move-menu))
+  (add-menu nil (car sgml-markup-menu) (cdr sgml-markup-menu))
+  (add-menu nil (car sgml-fold-menu) (cdr sgml-fold-menu))
+  (add-menu nil (car sgml-dtd-menu) (cdr sgml-dtd-menu))
+)
 
 
 ;;;; Custom menus

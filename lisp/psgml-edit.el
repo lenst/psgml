@@ -904,10 +904,11 @@ tag inserted."
   (interactive "*e")
   (sgml-need-dtd)
   (let ((menu
-	 (loop for e in (cdr (sgml-dtd-entities
-			      (sgml-pstate-dtd sgml-buffer-parse-state)))
-	       collect (let ((name (sgml-entity-name e)))
-			 (cons name name))))
+	 (mapcar (function (lambda (x) (cons x x)))
+		 (sort (sgml-map-entities (function sgml-entity-name)
+					  (sgml-dtd-entities sgml-dtd-info)
+					  t)
+		       (function string-lessp))))
 	choice)
     (unless menu
       (error "No entities defined"))
@@ -1358,6 +1359,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
      (t
       (delete-region sgml-markup-start (point))
       (sgml-entity-insert-text entity)
+      (setq sgml-goal (point-max))	; May have changed size of buffer
       ;; now parse the entity text
       (goto-char (setq sgml-last-start-pos sgml-markup-start))))))
 
@@ -1369,6 +1371,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
     (setq re-found (search-forward "\n" end t))
     (delete-region sgml-markup-start end)	   
     (insert "&" name (if re-found "\n" ";"))
+    (setq sgml-goal (point-max))	; May have changed size of buffer
     (goto-char (setq sgml-last-start-pos sgml-markup-start))))
 
 (defun sgml-expand-all-shortrefs (to-entity)
@@ -1403,7 +1406,7 @@ references will be expanded."
 
 (defun sgml-normalize-element ()
   (interactive "*")
-  (sgml-normalize (sgml-find-element-of (point))))
+  (sgml-normalize nil (sgml-find-element-of (point))))
 
 (defun sgml-normalize-content (element only-first)
   "Normalize all elements in a content where ELEMENT is first element.

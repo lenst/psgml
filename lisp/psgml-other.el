@@ -31,6 +31,7 @@
 ;;;; Code:
 
 (require 'psgml)
+(require 'easymenu)
 
 (defvar sgml-max-menu-size (/ (* (frame-height) 2) 3)
   "*Max number of entries in Tags and Entities menus before they are split
@@ -39,17 +40,77 @@ into several panes.")
 
 ;;;; Menu bar
 
-(defvar sgml-markup-menu (make-sparse-keymap "Markup"))
-(fset 'sgml-markup-menu sgml-markup-menu)
+;;;(define-key sgml-mode-map [menu-bar sgml-dtd]
+;;;  (cons "DTD" (make-sparse-keymap "DTD")))
 
-(define-key sgml-mode-map [menu-bar sgml-dtd]
-  (cons "DTD" (make-sparse-keymap "DTD")))
+(easy-menu-define
+ sgml-dtd-menu sgml-mode-map "DTD menu"
+ '("DTD"))
+
+(defconst sgml-dtd-root-menu
+  '("DTD"
+    ["Parse DTD"  sgml-parse-prolog t]
+    ("Info"
+     ["Describe element type"	sgml-describe-element-type	t]
+     ["Describe entity"		sgml-describe-entity		t]
+     ["List elements" 		sgml-list-elements 		t]
+     ["List attributes" 	sgml-list-attributes 		t]
+     ["List terminals" 		sgml-list-terminals 		t]
+     ["List content elements" 	sgml-list-content-elements 	t]
+     ["List occur in elements" 	sgml-list-occur-in-elements 	t]
+     )
+    "--"
+    ["Load Parsed DTD"  sgml-load-dtd t]
+    ["Save Parsed DTD"  sgml-save-dtd t]
+    ))
 
 (define-key sgml-mode-map [menu-bar sgml-view]
   (cons "View" (make-sparse-keymap "View")))
 
+(defvar sgml-markup-menu (make-sparse-keymap "Markup"))
+(fset 'sgml-markup-menu sgml-markup-menu)
 (define-key sgml-mode-map [menu-bar sgml-markup]
   '("Markup" . sgml-markup-menu ))
+
+(easy-menu-define
+ sgml-move-menu
+ sgml-mode-map
+ "Menu of move commands"
+ '("Move"
+   ["Next trouble spot" sgml-next-trouble-spot t]
+   ["Next data field"   sgml-next-data-field   t]
+   ["Forward element"	sgml-forward-element t]
+   ["Backward element"  sgml-backward-element t]
+   ["Up element"	sgml-up-element t]
+   ["Down element"	sgml-down-element t]
+   ["Backward up element" sgml-backward-up-element t]
+   ["Beginning of element" sgml-beginning-of-element t]
+   ["End of element"	sgml-end-of-element t]
+   )
+ )
+
+(easy-menu-define
+ sgml-modify-menu
+ sgml-mode-map
+ "Menu of modification commands"
+ '("Modify"
+   ["Normalize"			sgml-normalize	t]
+   ["Expand All Short References"	sgml-expand-all-shortrefs t]
+   ["Expand Entity Reference"	sgml-expand-entity-reference t]
+   ["Normalize Element"		sgml-normalize-element t]
+   ["Make Character Reference"	sgml-make-character-reference t]
+   ["Unmake Character Reference"	(sgml-make-character-reference t) t]
+   ["Fill Element"		sgml-fill-element t]
+   ["Change Element Name..."	sgml-change-element-name t]
+   ["Edit Attributes..."	sgml-edit-attributes t]
+   ["Kill Markup"		sgml-kill-markup t]
+   ["Kill Element"		sgml-kill-element t]
+   ["Untag Element"		sgml-untag-element t]
+   ["Decode Character Entities"  sgml-charent-to-display-char t]
+   ["Encode Characters"		sgml-display-char-to-charent t]
+   )
+ )
+
 
 ;;(define-key sgml-mode-map [menu-bar sgml-entities]
 ;;  '("Entities" . sgml-entities-menu))
@@ -57,58 +118,92 @@ into several panes.")
 ;;(define-key sgml-mode-map [menu-bar sgml-tags]
 ;;  '("Tags" . sgml-tags-menu))
 
-(define-key sgml-mode-map [menu-bar sgml]
-  (cons "SGML" (make-sparse-keymap "SGML")))
+;;(define-key sgml-mode-map [menu-bar sgml]
+;;  (cons "SGML" (make-sparse-keymap "SGML")))
+
+(easy-menu-define
+ sgml-main-menu sgml-mode-map
+ "Main menu"
+ '("SGML"
+   ["Reset Buffer"	normal-mode t]
+   ["End Element"	sgml-insert-end-tag t]
+   ["Show Context"	sgml-show-context t]
+   ["What Element"	sgml-what-element t]
+   ["List Valid Tags"	sgml-list-valid-tags t]
+   ["Show/Hide Warning Log"  sgml-show-or-clear-log t]
+   ["Validate"		sgml-validate t]
+   ["File Options >"	sgml-file-options-menu t]
+   ["User Options >"	sgml-user-options-menu t]
+   ["Save File Options"  sgml-save-options t]
+   ["Submit Bug Report"  sgml-submit-bug-report t]
+   )
+ )
+
 
 
 ;;;; SGML menu
 
-(define-key sgml-mode-map [menu-bar sgml report-buf]
-  '("Submit Bug Report" . sgml-submit-bug-report))
-(define-key sgml-mode-map [menu-bar sgml save-options]
-  '("Save File Options" . sgml-save-options))
-(define-key sgml-mode-map [menu-bar sgml user-options]
-  '("User Options >" . sgml-user-options-menu))
-(define-key sgml-mode-map [menu-bar sgml file-options]
-  '("File Options >" . sgml-file-options-menu))
-(define-key sgml-mode-map [menu-bar sgml fill]
-  '("Fill Element" . sgml-fill-element))
-(define-key sgml-mode-map [menu-bar sgml normalize]
-  '("Normalize" . sgml-normalize))
-(define-key sgml-mode-map [menu-bar sgml validate]
-  '("Validate" . sgml-validate))
-(define-key sgml-mode-map [menu-bar sgml show-log]
-  '("Show/Hide Warning Log" . sgml-show-or-clear-log))
-(define-key sgml-mode-map [menu-bar sgml show-tags]
-  '("List Valid Tags" . sgml-list-valid-tags))
-(define-key sgml-mode-map [menu-bar sgml change-name]
-  '("Change Element Name" . sgml-change-element-name))
-(define-key sgml-mode-map [menu-bar sgml edit-attributes]
-  '("Edit Attributes..." . sgml-edit-attributes))
-(define-key sgml-mode-map [menu-bar sgml next-trouble]
-  '("Next Trouble Spot" . sgml-next-trouble-spot)) 
-(define-key sgml-mode-map [menu-bar sgml what-element]
-  '("What Element" . sgml-what-element))
-(define-key sgml-mode-map [menu-bar sgml show-context]
-  '("Show Context" . sgml-show-context))
-(define-key sgml-mode-map [menu-bar sgml insert-end-tag]
-  '("End Element" . sgml-insert-end-tag))
-(define-key sgml-mode-map [menu-bar sgml next-data]
-  '("Next Data Field" . sgml-next-data-field))
-(define-key sgml-mode-map [menu-bar sgml reset]
-  '("Reset" . normal-mode))
+;;;(define-key sgml-mode-map [menu-bar sgml report-buf]
+;;;  '("Submit Bug Report" . sgml-submit-bug-report))
+;;;(define-key sgml-mode-map [menu-bar sgml save-options]
+;;;  '("Save File Options" . sgml-save-options))
+;;;(define-key sgml-mode-map [menu-bar sgml user-options]
+;;;  '("User Options >" . sgml-user-options-menu))
+;;;(define-key sgml-mode-map [menu-bar sgml file-options]
+;;;  '("File Options >" . sgml-file-options-menu))
+;;;(define-key sgml-mode-map [menu-bar sgml char-chent]
+;;;  '("Encode characters" . sgml-display-char-to-charent))
+;;;(define-key sgml-mode-map [menu-bar sgml chent-char]
+;;;  '("Decode character entities" . sgml-charent-to-display-char))
+;;;(define-key sgml-mode-map [menu-bar sgml fill]
+;;;  '("Fill Element" . sgml-fill-element))
+;;;(define-key sgml-mode-map [menu-bar sgml normalize]
+;;;  '("Normalize" . sgml-normalize))
+;;;(define-key sgml-mode-map [menu-bar sgml validate]
+;;;  '("Validate" . sgml-validate))
+;;;(define-key sgml-mode-map [menu-bar sgml show-log]
+;;;  '("Show/Hide Warning Log" . sgml-show-or-clear-log))
+;;;(define-key sgml-mode-map [menu-bar sgml show-tags]
+;;;  '("List Valid Tags" . sgml-list-valid-tags))
+;;;(define-key sgml-mode-map [menu-bar sgml change-name]
+;;;  '("Change Element Name" . sgml-change-element-name))
+;;;(define-key sgml-mode-map [menu-bar sgml edit-attributes]
+;;;  '("Edit Attributes..." . sgml-edit-attributes))
+;;;(define-key sgml-mode-map [menu-bar sgml next-trouble]
+;;;  '("Next Trouble Spot" . sgml-next-trouble-spot)) 
+;;;(define-key sgml-mode-map [menu-bar sgml what-element]
+;;;  '("What Element" . sgml-what-element))
+;;;(define-key sgml-mode-map [menu-bar sgml show-context]
+;;;  '("Show Context" . sgml-show-context))
+;;;(define-key sgml-mode-map [menu-bar sgml insert-end-tag]
+;;;  '("End Element" . sgml-insert-end-tag))
+;;;(define-key sgml-mode-map [menu-bar sgml next-data]
+;;;  '("Next Data Field" . sgml-next-data-field))
+;;;(define-key sgml-mode-map [menu-bar sgml reset]
+;;;  '("Reset" . normal-mode))
 
 
 ;;;; DTD menu
 
-(define-key sgml-mode-map [menu-bar sgml-dtd blank-c]
-  '("" . nil))
-(define-key sgml-mode-map [menu-bar sgml-dtd save]
-  '("Save Parsed DTD" . sgml-save-dtd))
-(define-key sgml-mode-map [menu-bar sgml-dtd load]
-  '("Load Parsed DTD" . sgml-load-dtd))
-(define-key sgml-mode-map [menu-bar sgml-dtd parse]
-  '("Parse DTD" . sgml-parse-prolog))
+;;;(define-key sgml-mode-map [menu-bar sgml-dtd blank-c]
+;;;  '("" . nil))
+;;;(define-key sgml-mode-map [menu-bar sgml-dtd save]
+;;;  '("Save Parsed DTD" . sgml-save-dtd))
+;;;(define-key sgml-mode-map [menu-bar sgml-dtd load]
+;;;  '("Load Parsed DTD" . sgml-load-dtd))
+;;;(define-key sgml-mode-map [menu-bar sgml-dtd parse]
+;;;  '("Parse DTD" . sgml-parse-prolog))
+
+
+;;;(let ((menu
+;;;       '))
+;;;  (define-key sgml-mode-map [menu-bar sgml-dtd info]
+;;;    (let ((map (make-sparse-keymap (car menu))))
+;;;      (loop for e in (reverse (cdr menu)) do
+;;;	    (define-key map (vector (aref e 1))
+;;;	      (cons (aref e 0) (aref e 1))))
+;;;      (cons (car menu) map))))
+
 
 
 ;;;; View menu
@@ -177,6 +272,9 @@ into several panes.")
 (define-key sgml-markup-menu [entities]
   '("Insert Entity" . sgml-entities-menu))
 
+(define-key sgml-markup-menu [entities]
+  '("Insert Entity" . sgml-entities-menu))
+
 (define-key sgml-markup-menu [attributes]
   '("Insert Attribute" . sgml-attrib-menu))
 
@@ -231,15 +329,24 @@ into several panes.")
    (mapcar (function (lambda (e)
 		       (sgml-markup (car e) (cadr e))))
 	   sgml-custom-markup))
-  (sgml-add-custom-entries
-   (lookup-key sgml-mode-map [menu-bar sgml-dtd])
-   (mapcar (function
-	    (lambda (e)
-	      (cons (first e)
-		    (` (lambda ()
-			 (interactive)
-			 (apply 'sgml-doctype-insert '(, (cdr e))))))))
-	   sgml-custom-dtd)))
+  (easy-menu-change ()
+		  "DTD"
+		  (append (cdr sgml-dtd-root-menu)
+			  (list "----")
+			  (loop for e in sgml-custom-dtd collect
+				(vector (first e)
+					(` (sgml-doctype-insert '(,@(cdr e))))
+					t))))
+;;;  (sgml-add-custom-entries
+;;;   (lookup-key sgml-mode-map [menu-bar sgml-dtd])
+;;;   (mapcar (function
+;;;	    (lambda (e)
+;;;	      (cons (first e)
+;;;		    (` (lambda ()
+;;;			 (interactive)
+;;;			 (apply 'sgml-doctype-insert '(, (cdr e))))))))
+;;;	   sgml-custom-dtd))
+  )
 
 
 (defun sgml-add-custom-entries (keymap entries)
@@ -262,6 +369,10 @@ The entries are added last in keymap and a blank line precede it."
 		     collect (cons (intern (concat "custom" i)) e)))))
     ;; add keymap name to keymap
     (setcdr (last keymap) last)))
+
+
+
+
 
 
 ;;;; Insert with properties

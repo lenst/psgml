@@ -4,6 +4,9 @@
 ;; Copyright (C) 1994 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
+;; Acknowledgment:
+;;   The catalog parsing code was contributed by
+;;      David Megginson <dmeggins@aix1.uottawa.CA>
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License
@@ -714,7 +717,7 @@ If ATTSPEC is nil, nil is returned."
 	    (:constructor sgml-make-dtd  (doctype)))
   doctype				; STRING, name of doctype
   (eltypes				; OBLIST, element types defined
-   (sgml-make-eltypes-table))
+   (sgml-make-eltype-table))
   (parameters				; ALIST
    (sgml-make-entity-table))
   (entities				; ALIST
@@ -848,19 +851,20 @@ includes, excludes, conref-regexp, mixed, stag-optional, etag-optional."
     (setf (sgml-eltype-flags et) 0)
     et))
 
-
+
 ;;; Element type tables
 
-(defun sgml-make-eltypes-table ()
+(defun sgml-make-eltype-table ()
+  "Make an empty table of element types."
   (make-vector 73 0))
 
-(defun sgml-eltypes-empty (eltypes)
-  (loop for x across eltypes always (eq x 0)))
+(defun sgml-eltype-table-empty (eltype-table)
+  (loop for x across eltype-table always (eq x 0)))
 
 (defun sgml-merge-eltypes (eltypes1 eltypes2)
   "Return the merge of two element type tables ELTYPES1 and ELTYPES2.
 This may change ELTYPES1, ELTYPES2 is unchanged. Returns the new table."
-  (if (sgml-eltypes-empty eltypes1)
+  (if (sgml-eltype-table-empty eltypes1)
       eltypes2
     (progn
       (mapatoms
@@ -1004,26 +1008,31 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (let ((gc-cons-threshold (max gc-cons-threshold 500000))
 	temp dtd)
     (setq temp (sgml-read-sexp))	; file-version
-    (cond ((equal temp '(sgml-saved-dtd-version 5)))
-	  (t
-	   (error "Unknown file format for saved DTD: %s" temp)))
-    ;; Doctype -- create dtd structure
-    (setq dtd (sgml-make-dtd (sgml-read-sexp)))
-    ;; Element type names -- read and create token vector
-    (setq temp (sgml-read-number))	; # eltypes
-    (setq sgml-read-token-vector (make-vector (1+ temp) nil))
-    (aset sgml-read-token-vector 0 sgml-pcdata-token)
-    (loop for i from 1 to temp do
-	  (aset sgml-read-token-vector i
-		(sgml-lookup-eltype (sgml-read-sexp) dtd)))
-    ;; Element type descriptions
-    (loop for i from 1 to (sgml-read-number) do
-	  (sgml-read-element (aref sgml-read-token-vector i)))
-    (setf (sgml-dtd-parameters dtd) (sgml-read-sexp))
-    (setf (sgml-dtd-entities dtd) (sgml-read-sexp))
-    (setf (sgml-dtd-shortmaps dtd) (sgml-read-sexp))
-    (setf (sgml-dtd-notations dtd) (sgml-read-sexp))
-    (setf (sgml-dtd-dependencies dtd) (sgml-read-sexp))
+    (cond
+     ((equal temp '(sgml-saved-dtd-version 5))
+      ;; Doctype -- create dtd structure
+      (setq dtd (sgml-make-dtd (sgml-read-sexp)))
+      ;; Element type names -- read and create token vector
+      (setq temp (sgml-read-number))	; # eltypes
+      (setq sgml-read-token-vector (make-vector (1+ temp) nil))
+      (aset sgml-read-token-vector 0 sgml-pcdata-token)
+      (loop for i from 1 to temp do
+	    (aset sgml-read-token-vector i
+		  (sgml-lookup-eltype (sgml-read-sexp) dtd)))
+      ;; Element type descriptions
+      (loop for i from 1 to (sgml-read-number) do
+	    (sgml-read-element (aref sgml-read-token-vector i)))
+      (setf (sgml-dtd-parameters dtd) (sgml-read-sexp))
+      (setf (sgml-dtd-entities dtd) (sgml-read-sexp))
+      (setf (sgml-dtd-shortmaps dtd) (sgml-read-sexp))
+      (setf (sgml-dtd-notations dtd) (sgml-read-sexp))
+      (setf (sgml-dtd-dependencies dtd) (sgml-read-sexp)))
+     ;; New version
+     ((equal temp '(sgml-saved-dtd-version 6))
+      (setq dtd (sgml-bdtd-read-dtd)))
+     ;; Something else
+     (t
+      (error "Unknown file format for saved DTD: %s" temp)))
     dtd))
 
 (defun sgml-load-dtd (file)
@@ -1074,6 +1083,120 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
       (sgml-set-initial-state dtd)
       (setq sgml-default-dtd-file file)
       (setq sgml-loaded-dtd real-file))))
+
+;;;; Biniary coded DTD module
+;;; Works on the binary coded compiled DTD (bdtd)
+
+;;; bdtd-load: cfile dtdfile ents -> bdtd
+;;; bdtd-merge: bdtd dtd -> dtd?
+;;; bdtd-read-dtd: bdtd -> dtd
+
+;;; Implement by letting bdtd be implicitly the current buffer and 
+;;; dtd implicit in sgml-dtd-info.
+
+(defun sgml-bdtd-load (cfile dtdfile ents)
+  "Load the compiled dtd from CFILE into the current buffer.
+If this file does not exists, is of an old version or out of date, a
+new compiled dtd will be creted from file DTDFILE and parameter entity
+settings in ENTS."
+  ;;(Assume the current buffer is a scratch buffer and is empty)
+  (sgml-debug "Trying to load compiled DTD from %s..." cfile)
+  (or (and (file-readable-p cfile)
+	   (insert-file-contents cfile nil nil nil t)
+	   (equal '(sgml-saved-dtd-version 6) (sgml-read-sexp))
+	   (sgml-up-to-date-p cfile (sgml-read-sexp)))
+      (sgml-compile-dtd dtdfile cfile ents)))
+
+(defun sgml-up-to-date-p (file dependencies)
+  "Check if FILE is newer than all files in the list DEPENDENCIES.
+If DEPENDENCIES contains the symbol `t', FILE is not considered newer."
+  (if (memq t dependencies)
+      nil
+    (loop for f in dependencies
+	  always (file-newer-than-file-p file f))))
+
+(defun sgml-compile-dtd (dtd-file to-file ents)
+  "Construct a binary code compiled dtd from DTD-FILE and write it to TO-FILE.
+The dtd will be constructed with the parameter entities set according
+to ENTS. The bdtd will be left in the current buffer.  The current
+buffer is assumend to be empty to start with."
+  (sgml-log-message "Recompiling DTD file %s..." dtd-file)
+  (let* ((sgml-dtd-info (sgml-make-dtd nil))
+	 (parameters (sgml-dtd-parameters sgml-dtd-info))
+	 (sgml-parsing-dtd t))
+    (push dtd-file
+	  (sgml-dtd-dependencies sgml-dtd-info))
+    (loop for (name . val) in ents
+	  do (sgml-entity-declare name parameters 'text val))
+    (sgml-push-to-entity dtd-file)
+    (sgml-check-dtd-subset)
+    (sgml-pop-entity)
+    (erase-buffer)
+    (sgml-write-dtd sgml-dtd-info to-file)
+    t))
+
+(defun sgml-check-entities (params1 params2)
+  "Check that PARAMS1 is compatible with PARAMS2."
+  (block check-entities
+    (sgml-map-entities
+     (function (lambda (entity)
+		 (let ((other
+			(sgml-lookup-entity (sgml-entity-name entity)
+					    params2)))
+		   (unless (or (null other)
+			       (equal entity other))
+		     (return-from check-entities nil)))))
+     params1)
+    t))
+
+(defun sgml-bdtd-merge ()
+  "Merge the binary coded dtd in the current buffer with the current dtd.
+The current dtd is the variable sgml-dtd-info.  Return t if mereged
+was successfull or nil if failed."
+  (goto-char (point-min))
+  (sgml-read-sexp)			; skip filev
+  (let ((dependencies (sgml-read-sexp))
+	(parameters (sgml-read-sexp))
+	(gc-cons-threshold (max gc-cons-threshold 500000))
+	temp)
+    ;; Check comaptibility of parameters
+    (and (sgml-check-entities (sgml-dtd-parameters sgml-dtd-info)
+			      parameters)
+	 (progn
+	   ;; Do the merger
+	   (sgml-message "Reading compiled DTD...")
+	   (sgml-merge-entity-tables (sgml-dtd-parameters sgml-dtd-info)
+				     parameters)
+	   (setf (sgml-dtd-dependencies sgml-dtd-info)
+		 (nconc (sgml-dtd-dependencies sgml-dtd-info)
+			dependencies))
+	   ;; Doctype
+	   (setq temp (sgml-read-sexp))
+	   (when (and temp (null (sgml-dtd-doctype sgml-dtd-info)))
+	     (setf (sgml-dtd-doctype sgml-dtd-info) temp))
+
+	   ;; Element type names -- read and create token vector
+	   (setq temp (sgml-read-number)) ; # eltypes
+	   (setq sgml-read-token-vector (make-vector (1+ temp) nil))
+	   (aset sgml-read-token-vector 0 sgml-pcdata-token)
+	   (loop for i from 1 to temp do
+		 (aset sgml-read-token-vector i
+		       (sgml-lookup-eltype (sgml-read-sexp))))
+	   ;; Element type descriptions
+	   (loop for i from 1 to (sgml-read-number) do
+		 (sgml-read-element (aref sgml-read-token-vector i)))
+	   (sgml-merge-entity-tables (sgml-dtd-entities sgml-dtd-info)
+				     (sgml-read-sexp))
+	   (sgml-merge-shortmaps (sgml-dtd-shortmaps sgml-dtd-info)
+				 (sgml-read-sexp))
+	   (setf (sgml-dtd-notations sgml-dtd-info) (sgml-read-sexp))
+	   t))))
+
+(defun sgml-bdtd-read-dtd ()
+  "Create and return a dtd from the binary coded dtd in the current buffer."
+  (let ((sgml-dtd-info (sgml-make-dtd nil)))
+    (sgml-bdtd-merge)
+    sgml-dtd-info))
 
 ;;;; Set markup type
 
@@ -1970,113 +2093,66 @@ is the entity type and NAME is the entity name, used to find the entity."
 ;;		    "-//lenst//DTD My DTD//EN//"
 ;;		    "/home/u5/lenst/src/psgml/bar.dtd"))
 
-(defun sgml-compiled-dtd (pubid file)
-  "Return the complied DTD for extid or nil."
+
+;;;; Merge compiled dtd
+
+(defun sgml-try-merge-compiled-dtd (pubid file)
   (when pubid (setq pubid (sgml-canonize-pubid pubid)))
   (when file (setq file (expand-file-name file)))
   (sgml-debug "Find compiled dtd for %s %s" pubid file)
   (let ((ce (or (sgml-ecat-lookup sgml-current-local-ecat pubid file)
 		(sgml-ecat-lookup sgml-ecat-files pubid file)))
-	cfile dtd)
-    (when ce
-      (setq cfile (car ce))  
-      (sgml-debug "Found %s" cfile)
-      (setq dtd (sgml-cached-cdtd cfile))
-      (when (and (null dtd)
-		 (file-readable-p cfile))
-	(condition-case err
-	    (progn
-	      (sgml-push-to-entity cfile)
-	      (message "Loading compiled DTD from %s..." cfile)
-	      (sgml-debug "Loading compiled DTD from %s..." cfile)
-	      (setq dtd (sgml-read-dtd))
-	      (sgml-pop-entity))
-	  (error 
-	   (sgml-log-message "Load fail: %S" err))))
-      (when (and (not (and dtd (sgml-up-to-date-p
-				cfile
-				(sgml-dtd-dependencies dtd))))
-		 (file-writable-p cfile))
-	(sgml-log-message "Recompiling DTD %s" cfile)
-	(setq dtd (sgml-compile-cdtd file cfile (cdr ce)))))
-    (if dtd (cons cfile dtd))))
+	cfile dtd ents)
+    (and ce
+	 (let ((cfile (car ce))
+	       (entd  (cdr ce)))
+	   (sgml-debug "Found %s" cfile)
+	   (if (sgml-use-special-case)
+	       (sgml-try-merge-special-case pubid file cfile ents)
+	     (and (sgml-bdtd-load cfile file (cdr ce))
+		  (sgml-bdtd-merge)))))))
 
-(defun sgml-cached-cdtd (cfile)
-  (let ((cb (current-buffer))
-	(dtd
-	 (loop for b in (buffer-list)
-	       thereis
-	       (progn (set-buffer b)
-		      (if sgml-buffer-parse-state
-			  (let ((merged (sgml-dtd-merged
-					 (sgml-pstate-dtd
-					  sgml-buffer-parse-state))))
-			    (if (and merged
-				     (string-equal cfile (car merged)))
-				(cdr merged))))))))
-    (set-buffer cb)
-    dtd))
+(defun sgml-use-special-case ()
+  (and (null (sgml-dtd-merged sgml-dtd-info))
+       (sgml-eltype-table-empty (sgml-dtd-eltypes sgml-dtd-info))
+       (eq 'dtd (sgml-entity-type (sgml-eref-entity sgml-current-eref)))))
 
-(defun sgml-compile-cdtd (dtd-file to-file ents)
-  ;; Do compile
-  (let* ((sgml-dtd-info (sgml-make-dtd nil))
-	 (parameters (sgml-dtd-parameters sgml-dtd-info))
-	 (sgml-parsing-dtd t))
-    (push dtd-file
-	  (sgml-dtd-dependencies sgml-dtd-info))
-    (loop for (name . val) in ents
-	  do (sgml-entity-declare name parameters 'text val))
-    (sgml-push-to-entity dtd-file)
-    (sgml-check-dtd-subset)
-    (sgml-pop-entity)
-    (sgml-write-dtd sgml-dtd-info to-file)
-    sgml-dtd-info))
-
-
-(defun sgml-up-to-date-p (file dependencies)
-  "Check if FILE is newer than all files in the list DEPENDENCIES.
-If DEPENDENCIES contains the symbol `t', FILE is not considered newer."
-  (if (memq t dependencies)
-      nil
-    (loop for f in dependencies
-	  always (file-newer-than-file-p file f))))
-
-
-;;;; Merge compiled dtd
-
-(defun sgml-try-merge-compiled-dtd (pubid file)
-  (if (sgml-dtd-merged sgml-dtd-info)
-      nil				; Will not merge twice
-    (let ((merged (sgml-compiled-dtd pubid file)))
-      (and merged
-	   (block check-entities
-	     (sgml-map-entities
-	      (function (lambda (entity)
-			  (let ((other
-				 (sgml-lookup-entity
-				  (sgml-entity-name entity)
-				  (sgml-dtd-parameters (cdr merged)))))
-			    (unless (or (null other)
-					(equal entity other))
-			      (return-from check-entities nil)))))
-	      (sgml-dtd-parameters sgml-dtd-info))
-	     t)
-	   (progn
-	     ;; Do the merger
-	     (setf (sgml-dtd-eltypes sgml-dtd-info)
-		   (sgml-merge-eltypes (sgml-dtd-eltypes sgml-dtd-info)
-				       (sgml-dtd-eltypes (cdr merged))))
-	     (sgml-merge-entity-tables (sgml-dtd-entities sgml-dtd-info)
-				       (sgml-dtd-entities (cdr merged)))
-	     (sgml-merge-entity-tables (sgml-dtd-parameters sgml-dtd-info)
-				       (sgml-dtd-parameters (cdr merged)))
-	     (sgml-merge-shortmaps (sgml-dtd-shortmaps sgml-dtd-info)
-				   (sgml-dtd-shortmaps (cdr merged)))
-	     (setf (sgml-dtd-dependencies sgml-dtd-info)
-		   (nconc (sgml-dtd-dependencies sgml-dtd-info)
-			  (sgml-dtd-dependencies (cdr merged))))
-	     (setf (sgml-dtd-merged sgml-dtd-info) merged))))))
-
+(defun sgml-try-merge-special-case (pubid file cfile ents)
+  (let (cdtd)
+    (sgml-debug "Merging special case")
+    ;; Look for a compiled dtd in som other buffer
+    (let ((cb (current-buffer)))
+      (loop for b in (buffer-list)
+	    until
+	    (progn (set-buffer b)
+		   (and sgml-buffer-parse-state
+			(let ((m (sgml-dtd-merged
+				  (sgml-pstate-dtd sgml-buffer-parse-state))))
+			  (and m
+			       (string-equal cfile (car m))
+			       (setq cdtd (cdr m)))))))
+      (set-buffer cb))
+    ;; Load a new compiled dtd
+    (unless cdtd
+      (and (sgml-bdtd-load cfile file ents)
+	   (setq cdtd (sgml-bdtd-read-dtd))))
+    ;; Do the merger    
+    (cond
+     ((and cdtd
+	   (sgml-check-entities (sgml-dtd-parameters sgml-dtd-info)
+				(sgml-dtd-parameters cdtd)))
+      (setf (sgml-dtd-eltypes sgml-dtd-info)
+	    (sgml-dtd-eltypes cdtd))
+      (sgml-merge-entity-tables (sgml-dtd-entities sgml-dtd-info)
+				(sgml-dtd-entities cdtd))
+      (sgml-merge-entity-tables (sgml-dtd-parameters sgml-dtd-info)
+				(sgml-dtd-parameters cdtd))
+      (sgml-merge-shortmaps (sgml-dtd-shortmaps sgml-dtd-info)
+			    (sgml-dtd-shortmaps cdtd))
+      (setf (sgml-dtd-dependencies sgml-dtd-info)
+	    (nconc (sgml-dtd-dependencies sgml-dtd-info)
+		   (sgml-dtd-dependencies cdtd)))
+      (setf (sgml-dtd-merged sgml-dtd-info) (cons cfile cdtd))))))
 
 
 ;;;; Pushing and poping entities
@@ -2126,7 +2202,7 @@ overrides the entity type in entity look up."
 					    file))
 	  (goto-char (point-max)))
 	 (file
-	  (insert-file-contents file)
+	  (insert-file-contents file nil nil nil t)
 	  (goto-char (point-min))
 	  (push file (sgml-dtd-dependencies sgml-dtd-info)))
 	 (t
@@ -3548,7 +3624,8 @@ pointing to start of short ref and point pointing to the end."
 	   (sgml-is-delim "ETAGO" gi))
        (or sgml-current-shorttag
 	   (sgml-log-warning
-	    "Unclosed tag is not allowed with SHORTTAG NO")))
+	    "Unclosed tag is not allowed with SHORTTAG NO")
+	   t))
    (sgml-error "Invalid character in markup %c"
 	       (following-char))))
   
