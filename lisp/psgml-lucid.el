@@ -33,32 +33,50 @@
 
 ;;; These functions are needed for menus, etc. to work in lucid emacs
 
+(defun sgml-fix-x-menu (menudesc)
+  "Take a menu for x-popup-menu and return a lucid menu."
+  (cons (car menudesc)			; title
+	(mapcar (function
+		 (lambda (item)
+		   ;; item is (string . value)
+		   (vector (car item)
+			   (list 'quote (cdr item))
+			   t)))
+		(cdr menudesc))))
+
+
 (defun x-popup-menu (pos menudesc)
   "My hacked up function to do a blocking popup menu..."
   (let ((echo-keystrokes 0)
 	event menu)
-    (setq menudesc (cdr (car (cdr menudesc)))) ; remove the title
-    (while menudesc
-      (setq menu (cons (vector (car (car menudesc))
-			       (list (car (car menudesc))) t) menu)
-	    menudesc (cdr menudesc)))
-    (setq menu (cons "WWW" menu))
+    (cond
+     ((stringp (car menudesc))		; deck of meues
+      (setq menu (if (null (cddr menudesc)) ; only one menu
+		     (sgml-fix-x-menu (cadr menudesc))
+		   (cons (car menudesc)
+			 (mapcar (function sgml-fix-x-menu)
+				 (cdr menudesc))))))
+     ((listp (car menudesc))		; deck of keymaps
+      (error "NIY"))
+     (t					; keymap
+      (error "NIY")))
     (popup-menu menu)
-    (catch 'popup-done
-      (while t
-	(setq event (next-command-event event))
-	(cond ((and (menu-event-p event) (stringp (car-safe
-						   (event-object event))))
-	       (throw 'popup-done (event-object event)))
-	      ((and (menu-event-p event)
-		    (or (eq (event-object event) 'abort)
-			(eq (event-object event) 'menu-no-selection-hook)))
-	       (signal 'quit nil))
-	      ((button-release-event-p event);; don't beep twice
-	       nil)
-	      (t
-	       (beep)
-	       (message "please make a choice from the menu.")))))))
+    (cadr
+     (catch 'popup-done
+       (while t
+	 (setq event (next-command-event event))
+	 (cond ((and (menu-event-p event)
+		     (eq 'quote (car-safe (event-object event))))
+		(throw 'popup-done (event-object event)))
+	       ((and (menu-event-p event)
+		     (or (eq (event-object event) 'abort)
+			 (eq (event-object event) 'menu-no-selection-hook)))
+		(signal 'quit nil))
+	       ((button-release-event-p event) ; don't beep twice
+		nil)
+	       (t
+		(beep)
+		(message "please make a choice from the menu."))))))))
 
 (defun sgml-install-lucid-menus ()
   "Install lucid menus for psgml mode"
@@ -66,25 +84,28 @@
   (add-menu nil (car sgml-sgml-menu) (cdr sgml-sgml-menu) "Help")
   (add-menu nil (car sgml-markup-menu) (cdr sgml-markup-menu) "Help")
   (add-menu nil (car sgml-fold-menu) (cdr sgml-fold-menu) "Help")
-  (add-menu nil (car sgml-tags-menu) (cdr sgml-tags-menu) "Help")
-  (add-menu nil (car sgml-entities-menu) (cdr sgml-entities-menu) "Help")
+;;  (add-menu nil (car sgml-tags-menu) (cdr sgml-tags-menu) "Help")
+;;  (add-menu nil (car sgml-entities-menu) (cdr sgml-entities-menu) "Help")
   (add-menu nil (car sgml-dtd-menu) (cdr sgml-dtd-menu) "Help"))
 
 (defvar sgml-markup-menu
   '("Markup"
-    ["<!entity ... >" (insert "<!entity \r>\n") t]
-    ["<!attlist ... >" (insert "<!attlist \r>\n") t]
-    ["<!element ... >" (insert "<!element \r>\n") t]
+    ["Insert tag" (sgml-tags-menu last-command-event) t]
+    ["Insert entity" (sgml-entities-menu last-command-event) t]
     "----------"
-    ["Local variables comment" (insert "<!--\nLocal variables:\n\rEnd:\n-->\n")
+    ["Marked section" (sgml-insert-markup "<![ [\r]]>\n") t]
+    ["CDATA marked section" (sgml-insert-markup "<![CDATA[\r]]>\n") t]
+    ["RCDATA marked section" (sgml-insert-markup "<![RCDATA[\r]]>\n") t]
+    ["TEMP marked section" (sgml-insert-markup "<![TEMP[\r]]>") t]
+    "----------"
+    ["Doctype" (sgml-insert-markup "<!doctype \r -- public or system -- [\n]>\n") t]
+    ["Comment" (sgml-insert-markup "<!-- \r -->\n") t]
+    ["Local variables comment" (sgml-insert-markup "<!--\nLocal Variables:\nmode: sgml\n\rEnd:\n-->\n")
      t]
-    ["Comment" (insert "<!-- \r -->\n") t]
-    ["Doctype" (insert "<!doctype \r -- public or system -- [\n]>\n") t]
     "----------"
-    ["TEMP marked section" (insert "<![TEMP[\r]]>") t]
-    ["RCDATA marked section" (insert "<![RCDATA[\r]]>\n") t]
-    ["CDATA marked section" (insert "<![CDATA[\r]]>\n") t]
-    ["Marked section" (insert "<![ [\r]]>\n") t]
+    ["<!entity ... >" (sgml-insert-markup "<!entity \r>\n") t]
+    ["<!attlist ... >" (sgml-insert-markup "<!attlist \r>\n") t]
+    ["<!element ... >" (sgml-insert-markup "<!element \r>\n") t]
     ))
 
 (defvar sgml-dtd-menu
@@ -117,36 +138,61 @@
 
 (defvar sgml-sgml-menu
   '("SGML"
-    ["Save options" sgml-save-options t]
-    ["Options" sgml-options-menu t]
-    ["Show warning log" sgml-show-or-clear-log t]
-    ["Show valid tags" sgml-list-valid-tags t]
-    ["Change element name" sgml-change-element-name t]
-    ["Edit attributes" sgml-edit-attributes t]
-    ["Next trouble spot" sgml-next-trouble-spot t]
-    ["Show context" sgml-show-context t]
+    ["Next data field"  sgml-next-data-field t]
     ["End element" sgml-insert-end-tag t]
-    ["Next data field" sgml-next-data-field t]
+    ["Show context" sgml-show-context t]
+    ["What element" sgml-what-element t]
+    ["Next trouble spot" sgml-next-trouble-spot t]
+    ["Edit attributes" sgml-edit-attributes nil]
+    ["Change element name" sgml-change-element-name t]
+    ["Show valid tags" sgml-list-valid-tags t]
+    ["Show/hide warning log" sgml-show-or-clear-log t]
+    ["Normalize" sgml-normalize t]
+    ["Fill element" sgml-fill-element t]
+    ["Options" sgml-options-menu t]
+    ["Save options" sgml-save-options t]
     ))
 
 (defun sgml-build-custom-menus ()
   (and sgml-custom-markup (add-menu-item '("Markup") "------------" nil t))
   (mapcar (function
 	   (lambda (x)
-	     (add-menu-item '("Markup") (nth 0 x) (list 'insert (nth 1 x)) t)))
+	     (add-menu-item '("Markup") (nth 0 x)
+			    (list 'sgml-insert-markup (nth 1 x)) t)))
 	  sgml-custom-markup)
-  (and sgml-custom-dtd (add-menu-item '("Markup") "-------------" nil t))
+  (and sgml-custom-dtd (add-menu-item '("DTD") "-------------" nil t))
   (mapcar (function
 	   (lambda (x)
-	     (add-menu-item '("Markup") (nth 0 x)
-			    (list 'progn
-				  (list 'if (nth 1 x)
-					(list 'insert (nth 1 x)))
-				  (list 'if (nth 2 x)
-					(list 'sgml-load-dtd (nth 2 x)))) t)))
+	     (add-menu-item '("DTD") (nth 0 x)
+			    (list 'sgml-doctype-insert
+				  (cadr x) (caddr x))
+			    
+			    t)))
 	  sgml-custom-dtd))
-  
+
 (define-key sgml-mode-map [button3] 'sgml-tags-menu)
+
+
+;;;; Emulate text properties
+
+
+(set-face-underline-p (make-face 'underline) t) 
+
+
+(defun add-text-properties (start end props)
+  ;; First truncate existing extents
+  (let ((e (extent-at start)))
+    (when e
+      (set-extent-endpoints e (extent-start-position e) start)))
+  (when props
+  (let ((e (make-extent start end)))
+    (when (getf props 'read-only)
+      (set-extent-attribute e 'write-protected))
+    (when (getf props 'category)
+      (set-extent-face e (find-face 'underline))
+      (set-extent-data e (getf props 'category))))
+    )
+)
 
 
 
