@@ -1,7 +1,7 @@
 ;;;; psgml-parse.el --- Parser for SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1993 Lennart Staflin
+;; Copyright (C) 1994 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 
@@ -39,6 +39,9 @@
 
 (defvar sgml-throw-on-warning nil
   "Set to a symbol other than nil to make sgml-log-warning throw to that symbol.")
+
+(defvar sgml-supress-warning nil
+  "Set to t to supress warnings.")
 
 (defvar sgml-goal 0
   "Point in buffer to parse up to.")
@@ -849,15 +852,8 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	    sgml-current-state)
 	  (if (eq sgml-current-tree sgml-top-tree)
 	      "in empty context"
-	    (sgml-context-ass-rec sgml-current-tree))))
+	    (sgml-element-context-string sgml-current-tree))))
 
-(defun sgml-context-ass-rec (tree)
-  (if (eq tree sgml-top-tree)
-      ""
-    (format "in %s %s"
-	    (sgml-element-name tree)
-	    (sgml-context-ass-rec (sgml-tree-parent tree)))))
-
 (defun sgml-list-of-elements (tree state)
   (let* ((req (if (sgml-model-group-p state)
 		  (sgml-required-tokens state)))
@@ -906,7 +902,6 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 		(setq elems (nconc elems (list e)))))))
     (sort elems (function string-lessp))))
 
-
 (defun sgml-current-list-of-required-elements ()
   (let ((req (sgml-required-tokens sgml-current-state)))
     (if req
@@ -918,7 +913,6 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	  (sgml-required-tokens
 	   (sgml-tree-pstate sgml-current-tree))))))
 
-  
 (defun sgml-stags-of-names (names)
   (mapcar (function sgml-start-tag-of) names))
 
@@ -958,20 +952,23 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 					       (point-max))))))
 
 (defun sgml-log-warning (format &rest things)
-  (when sgml-throw-on-warning
-    (apply 'message format things)
-    (throw sgml-throw-on-warning nil))
-  (apply 'sgml-message format things)
-  (apply 'sgml-log-message format things))
+  (unless sgml-supress-warning
+    (when sgml-throw-on-warning
+      (apply 'message format things)
+      (throw sgml-throw-on-warning t))
+    (apply 'sgml-message format things)
+    (apply 'sgml-log-message format things)))
 
 (defun sgml-log-message (format &rest things)
   (let ((mess (apply 'format format things))
-	(buf (get-buffer-create sgml-log-buffer-name)))
-    (princ mess buf)
-    (terpri buf)
+	(buf (get-buffer-create sgml-log-buffer-name))
+	(cb (current-buffer)))
+    (set-buffer buf)
+    (goto-char (point-max))
+    (insert mess "\n")
     (when (get-buffer-window buf)
-      (setq sgml-log-last-size (save-excursion (set-buffer buf)
-					       (point-max))))))
+      (setq sgml-log-last-size  (point-max)))
+    (set-buffer cb)))
 
 (defun sgml-error (format &rest things)
   (while (and (boundp 'sgml-previous-buffer) sgml-previous-buffer)
@@ -1494,7 +1491,7 @@ a RNI must be followed by NAME."
 		    (not (memq value (cadr dv)))))
       (setq al (cdr al)))
     (if al
-	(sgml-attribute-name al))))
+	(sgml-attribute-name (car al)))))
 
 ;;;; Parser driver
 
@@ -1554,14 +1551,19 @@ or if nil, until end of buffer."
 	     (file-exists-p sgml-default-dtd-file))
     (sgml-load-dtd sgml-default-dtd-file))
   (sgml-find-start-point (min sgml-goal (point-max)))
-  (let ((normal-sytnax-table (syntax-table))
+  (assert sgml-current-tree)
+  (let ((bigparse (> (- sgml-goal (point)) 10000))
 	(sgml-param-entities sgml-buffer-param-entities))
-    (set-syntax-table sgml-parser-syntax)
+    (when bigparse
+	(sgml-message "Parsing"))
     (sgml-with-parser-syntax
-     (sgml-parser-loop))))
+     (sgml-parser-loop))
+    (when bigparse
+      (sgml-message ""))))
 
 (defun sgml-parser-loop ()
   (while (< (point) sgml-goal)
+    (assert sgml-current-tree)
     (setq sgml-markup-start (point)
 	  sgml-markup-type nil)
     (cond
@@ -1668,7 +1670,7 @@ or if nil, until end of buffer."
 	     gi))
 	  (when (eq sgml-current-tree sgml-top-tree)
 	    (sgml-error
-	     "%s end tag ended documet and parse" gi))
+	     "%s end tag ended document and parse" gi))
 	  (not (eq gi (sgml-element-name sgml-current-tree))))
       (sgml-implied-end-tag (format "%s end tag" gi)
 			    sgml-markup-start sgml-markup-start))
@@ -1851,8 +1853,8 @@ Returns parse tree; error if no element after POS."
 (defun sgml-element-next (element)
   (unless (sgml-tree-end element)
     (save-excursion (sgml-parse-until-end-of element)))
-  (unless (and (sgml-tree-next element)
-	       (null (sgml-tree-end (sgml-tree-parent element))))
+  (unless (or (sgml-tree-next element)
+	      (sgml-tree-end (sgml-tree-parent element)))
     (save-excursion (sgml-parse-until-end-of t)))
   (sgml-tree-next element))
 
@@ -1881,6 +1883,39 @@ Returns parse tree; error if no element after POS."
 				   (and (null (cdr tab)) (caar tab)))))))
 	(t
 	 (read-from-minibuffer prompt))))
+
+(defun sgml-map-content (element element-fun &optional data-fun pi-fun)
+  "Map content of ELEMENT, calling ELEMENT-FUN for every element.
+Also calling DATA-FUN, if non-nil, with data in content."
+  (let ((c (sgml-element-content element))
+	(last-pos (sgml-element-stag-end element)))
+    (save-excursion
+      (goto-char last-pos)
+      (when (eolp)
+	(setq last-pos (1+ last-pos))))
+    (while c
+      ;; Any data before first element in content
+      (when (and data-fun
+		 (sgml-element-mixed element))
+	(sgml-map-data (buffer-substring last-pos (sgml-element-start c))
+		       data-fun pi-fun))
+      ;; Do the element
+      (when element-fun
+	(funcall element-fun c))
+      (setq last-pos (sgml-element-end c))
+      ;; Next element
+      (setq c (sgml-element-next c)))
+    ;; Any data after last element
+    (when (and data-fun
+	       (sgml-element-data-p element))
+      (sgml-map-data (buffer-substring last-pos
+				       (sgml-element-etag-start element))
+		     data-fun
+		     pi-fun))))
+
+(defun sgml-map-data (data data-fun pi-fun)
+  (when (not (equal data ""))
+    (funcall data-fun data)))
 
 ;;;; SGML mode: structure editing
 
@@ -2115,11 +2150,12 @@ is determined."
   "Move forward to next point where something is amiss with the structure."
   (interactive)
   (sgml-parse-to-here)
-  (message "")
+  (push-mark)
   (sgml-note-change-at (point))		; Prune the parse tree
   (let ((sgml-throw-on-warning 'trouble))
-    (catch sgml-throw-on-warning
-      (sgml-parse-until-end-of nil))))
+    (or (catch sgml-throw-on-warning
+	  (sgml-parse-until-end-of nil))
+	(message "Ok"))))
 
 
 
@@ -2144,6 +2180,22 @@ is determined."
   (interactive)
   (sgml-parse-to-here)
   (sgml-message "%s" (sgml-context-as-string)))
+
+(defun sgml-what-element ()
+  "Display what element is under the cursor."
+  (interactive)
+  (let ((el (sgml-find-element-of (point))))
+    (assert (not (null el)))
+    (message "%s %s"
+	     (cond ((eq el sgml-top-tree)
+		    "outside document element")
+		   ((< (point) (sgml-element-stag-end el))
+		    "start tag")
+		   ((>= (point) (sgml-element-etag-start el))
+		    "end tag")
+		   (t
+		    "content"))
+	     (sgml-element-context-string el))))
 
 ;;;; SGML mode: inserting
 
@@ -2250,17 +2302,17 @@ after the first tag inserted."
 		 (if data sgml-indent-data t))
 	(sgml-indent-line))))))
 
-(defun sgml-insert-element (element &optional after silent)
+(defun sgml-insert-element (name &optional after silent)
   "Reads element name from minibuffer and inserts start and end tags."
   (interactive
    (list
     (sgml-read-element-name "Element: ")
     sgml-leave-point-after-insert))
-  (sgml-parse-to-here)
-  (let ((data (sgml-current-element-contains-data))
-	stag-end
+  (let ((inel (sgml-parse-to-here))	; element inserting in
+	(data (sgml-current-element-contains-data))
+	stag-end element
 	col)
-    (when (and element (not (equal element "")))
+    (when (and name (not (equal name "")))
       (cond ((and sgml-indent-data data
 		  (save-excursion
 		    (skip-chars-backward " \t")
@@ -2274,26 +2326,32 @@ after the first tag inserted."
 	     (unless (bolp) (insert "\n"))
 	     ))
       (when (prog1 (bolp)
-	      (insert (format "<%s>" element)))
+	      (insert (format "<%s>" name)))
 	(setq col (sgml-indent-line)))
       (setq stag-end (point))
-      (when (not (eq (element-model (sgml-lookup-element element))
-		     sgml-empty))
-	(let (reqs)
-	  (while (progn
-		   (sgml-parse-to-here)
-		   (and sgml-auto-insert-required-elements
-			(sgml-model-group-p sgml-current-state)
-			(setq reqs (sgml-required-tokens sgml-current-state))
-			(null (cdr reqs))))
-	    (setq stag-end (sgml-insert-element (car reqs) t t))))
-	(when (and col (not (sgml-current-element-contains-data)))
+      (setq element (sgml-find-element-of (1- (point))))
+      (when (not (sgml-element-empty element))
+	(when (and sgml-auto-insert-required-elements
+		   (sgml-model-group-p sgml-current-state))
+	  (let (tem
+		newpos
+		(sgml-supress-warning t))
+	    (while (and (setq tem (sgml-required-tokens sgml-current-state))
+			(null (cdr tem)))
+	      (setq tem (sgml-insert-element (car tem) t t))
+	      (setq newpos (or newpos tem))
+	      (sgml-parse-to-here))
+	    (when tem			; more than one req elem
+	      (insert (format "\n<!-- one of %s -->" tem))
+	      (sgml-indent-line nil element))
+	    (if newpos (setq stag-end newpos))))
+	(when (and col (not (sgml-element-data-p element)))
 	  (insert "\n")
 	  (sgml-indent-line col))
-	(insert (format "</%s>" element))
+	(insert (format "</%s>" name))
 	(unless after (goto-char stag-end))
-	(unless silent (sgml-show-context))
-	stag-end))))
+	(unless silent (sgml-show-context)))
+      stag-end)))
 
 (defun sgml-tag-region (element start end)
   "Reads element name from minibuffer and inserts start and end tags."
@@ -2337,11 +2395,80 @@ after the first tag inserted."
 		   (setq menu (nthcdr sgml-max-menu-size menu)))))))
     (cons title menus)))
 
+;;;; SGML mode: Fill 
+
+(defun sgml-fill-element (element)
+  (interactive (list (sgml-find-element-of (point))))
+  ;;
+  (message "Filling...")
+  (when (sgml-element-mixed element)
+    ;; Find bigest enclosing element with mixed content
+    (while (sgml-element-mixed (sgml-element-parent element))
+      (setq element (sgml-element-parent element))))
+  ;; 
+  (sgml-do-fill element)
+  (sgml-message "Done"))
+
+(defun sgml-do-fill (element)
+  (cond
+   ((sgml-element-mixed element)
+    (let ((last-pos (sgml-element-stag-end element))
+	  (c (sgml-element-content element))
+	  (agenda nil))			; regions to fill later
+      (while c
+	(cond
+	 ((sgml-element-mixed c))
+	 (t
+	  ;; Put region before element on agenda.  Can't fill it now
+	  ;; that would mangel the parse tree that is beeing traversed.
+	  (push (cons last-pos (sgml-element-start c))
+		agenda)
+	  (setq last-pos (sgml-element-end c))
+	  (sgml-fill-element c)))
+	(setq c (sgml-element-next c)))
+      (sgml-fill-region last-pos (sgml-element-etag-start element))
+      (while agenda
+	(sgml-fill-region (caar agenda) (cdar agenda))
+	(setq agenda (cdr agenda)))))
+   (t
+    ;; If element is not mixed, fill subelements recursively
+    (sgml-map-content element
+		      (function sgml-fill-element)))))
+
+(defun sgml-fill-region (start end)
+  (sgml-message "Filling...")
+  (save-excursion
+    (goto-char end)
+    (skip-chars-backward " \t\n")
+    (while (progn (beginning-of-line 1)
+		  (< start (point)))
+      (delete-horizontal-space)
+      (delete-char -1)
+      (insert " "))
+    (end-of-line 1)
+    (let (give-up prev-column opoint)
+      (while (and (not give-up) (> (current-column) fill-column))
+	(setq prev-column (current-column))
+	(setq opoint (point))
+	(move-to-column (1+ fill-column))
+	(skip-chars-backward "^ \t\n")
+	(if (bolp)
+	    (re-search-forward "[ \t]" opoint t))
+	(setq opoint (point))
+	(skip-chars-backward " \t")
+	(delete-region (point) opoint)
+	(newline)
+	(sgml-indent-line)
+	(setq give-up (>= (current-column) prev-column))
+	(end-of-line 1)))))
+
+
 ;;;; SGML mode: attributes
 
 (defvar sgml-start-attributes nil)
 (defvar sgml-end-attributes nil)
 (defvar sgml-main-buffer nil)
+(defvar sgml-attlist nil)
 
 (defun sgml-edit-attributes ()
   "Edit attributes of start tag before point.
@@ -2349,6 +2476,7 @@ Editing is done in a separate window."
   (interactive)
   (let* ((element (sgml-find-element-of (point)))
 	 (tag-beg (sgml-element-start element)))
+    (push-mark)
     (goto-char (1+ tag-beg))
     (sgml-check-name)
     (sgml-with-parser-syntax
@@ -2360,6 +2488,8 @@ Editing is done in a separate window."
        (switch-to-buffer-other-window
 	(sgml-attribute-buffer element asl))
        (sgml-edit-attrib-mode)
+       (make-local-variable 'sgml-attlist)
+       (setq sgml-attlist (sgml-element-attlist element))
        (make-local-variable 'sgml-start-attributes)
        (setq sgml-start-attributes start)
        (make-local-variable 'sgml-end-attributes)
@@ -2425,9 +2555,48 @@ To finsh edit use \\[sgml-edit-attrib-finish].
 (defun sgml-edit-attrib-finish ()
   "Finish editing and insert attribute values in original buffer."
   (interactive)
+  (let ((cb (current-buffer))
+	(avl (sgml-attribute-value-list))
+	;; save buffer local variables
+	(start sgml-start-attributes)
+	(end sgml-end-attributes)
+	(attlist sgml-attlist))
+    (when (markerp start)
+      (delete-windows-on cb)
+      (switch-to-buffer (marker-buffer start))
+      (kill-buffer cb)
+      (goto-char start)
+      (unless (= start end)
+	(kill-region start end))
+      (let (name val def tem)
+	(while avl
+	  (setq name (caar avl)
+		val (cdar avl)
+		def (assq name attlist)
+		avl (cdr avl))
+	  (cond ((and def
+		      (eq sgml-minimize-attributes 'max)
+		      (if (listp (setq tem (sgml-attribute-default-value def)))
+			  (if (symbolp (setq tem (cadr tem)))
+			      (eq tem (intern val))
+			    (equal val tem)))))
+		((and def
+		      sgml-minimize-attributes
+		      (listp (setq tem (sgml-attribute-declared-value def)))
+		      (eq 'name-token-group (car tem))
+		      (if (memq (intern val) (cadr tem))
+			  (progn (insert " " val) t)
+			(sgml-log-warning
+			 "%s is not an allowed value for attribute %s"
+			 val name)
+			nil)))
+		(t
+		 (insert " " (symbol-name name) "=" val))))))))
+
+(defun sgml-attribute-value-list ()
   (goto-char (point-min))
   (sgml-with-parser-syntax
-   (let ((asls ""))			;attribute specification list as string
+   (let ((avl nil))
      (while (not (or (eobp)
 		     (eq ?> (following-char))))
        (sgml-skip-s)
@@ -2437,23 +2606,10 @@ To finsh edit use \\[sgml-edit-attrib-finish].
 	   (sgml-check-char ?=)
 	   (sgml-parse-char ? )	;allow one space after =
 	   (unless (looking-at " *#")
-	     (setq asls
-		   (format "%s %s=%s"
-			   asls name
-			   (sgml-extract-attribute-value)))))
+	     (setq avl (cons (cons name (sgml-extract-attribute-value))
+			     avl))))
 	 (beginning-of-line 2)))
-     (let ((cb (current-buffer))
-	   (start sgml-start-attributes)
-	   (end sgml-end-attributes))
-       (when (markerp start)
-	 (delete-windows-on cb)
-	 (switch-to-buffer (marker-buffer start))
-	 (kill-buffer cb)
-	 (goto-char start)
-	 (unless (= start end)
-	   (kill-region start end))
-	 (insert asls)
-	 (forward-char 1))))))
+     (reverse avl))))
 
 (defun sgml-extract-attribute-value ()
   (save-excursion
@@ -2513,6 +2669,153 @@ To finsh edit use \\[sgml-edit-attrib-finish].
   (interactive)
   (sgml-identify-attributes 'invisible nil))
 
+;;;; SGML mode: Normalize
+
+(defun sgml-normalize (&optional element)
+  "Normalize buffer by filling in omitted tags and expanding empty tags.
+A  optional argument ELEMENT can be the element to normalize
+insted of the whole buffer."
+  (interactive)
+  (let ((only-one (not (null element))))
+    (setq element (or element (sgml-top-element)))
+    (goto-char (sgml-element-end element)) 
+    (let ((before-change-function nil))
+      (sgml-normalize-content element only-one)))
+  (sgml-note-change-at (sgml-element-start element))
+  (sgml-message "Done"))
+
+(defun sgml-top-element ()
+  (sgml-element-content (sgml-find-context-of (point-min))))
+
+(defun sgml-normalize-element ()
+  (interactive)
+  (sgml-normalize (sgml-find-element-of (point))))
+
+(defun sgml-normalize-content (element only-first)
+  "Normalize all elements in a content where ELEMENT is first element.
+If sgml-normalize-trims is non-nil, trim off white space from ends of
+elements with omitted end tags."
+  (let ((content nil))
+    (while element
+      (push element content)
+      (setq element (if only-first
+			nil
+		      (sgml-element-next element))))
+    (while content
+      (setq element (car content))
+      ;; Progress report
+      (message "Normalizing %d%% left"
+	       (/ (* 100.0 (point)) (point-max)))
+      ;; Fix the end tag
+      (unless (sgml-element-empty element)
+	(when (or (sgml-tree-net-enabled element)
+		  (zerop (sgml-tree-etag-len element))
+		  (= 3 (sgml-tree-etag-len element)))
+	  (goto-char (min (point) (sgml-element-etag-start element)))
+	  (if (zerop (sgml-element-etag-len element))
+	      (if sgml-normalize-trims
+		  (skip-chars-backward " \t\n\r"))
+	    (delete-char (sgml-tree-etag-len element)))
+	  (when (not (sgml-element-data-p element))
+	    (unless (bolp) (insert "\n"))
+	    (unless (eolp)
+	      (open-line 1)))
+	  (save-excursion
+	    (insert (sgml-end-tag-of (sgml-element-name element))))
+	  (when (not (sgml-element-data-p element))
+	    (sgml-indent-line nil element)
+	    (beginning-of-line 1))))
+      ;; Fix tags of content
+      (sgml-normalize-content (sgml-tree-content element) nil)
+      ;; Fix the start tag
+      (goto-char (min (point) (sgml-tree-start element)))
+      (cond ((zerop (sgml-tree-stag-len element))
+	     (save-excursion
+	       (insert (sgml-start-tag-of (sgml-tree-element element)))))
+	    (t
+	     (forward-char (1- (sgml-tree-stag-len element)))
+	     (cond ((looking-at ">"))
+		   (t
+		    (when (looking-at "/")
+		      (delete-char 1))
+		    (save-excursion (insert ">"))))))      
+      ;; Next content element
+      (setq content (cdr content)))))
+
+
+;;;; SGML mode: TAB completion
+
+(defun sgml-complete ()
+  (interactive)
+  (let ((tab nil)
+	(pattern nil)
+	(c nil)
+	(here (point)))
+    (skip-chars-backward "^ \n\t</!&%")
+    (setq pattern (buffer-substring (point) here))
+    (setq c (char-after (1- (point))))
+    (cond ((eq c ?&)			; entitiy
+	   (setq tab sgml-buffer-entities))
+	  ((eq c ?<)			; start tag
+	   (save-excursion
+	     (backward-char 1)
+	     (sgml-parse-to-here)
+	     (setq tab (sgml-current-list-of-valid-elements))))
+	  ((eq c ?/)			; end tag
+	   (save-excursion
+	     (backward-char 2)
+	     (sgml-parse-to-here)
+	     (setq tab (sgml-current-list-of-endable-elements))))
+	  ((eq c ?!)
+	   (setq tab '("entity" "element" "attlist" "doctype"
+		       "notation" "sgml")))
+	  (t
+	   (goto-char here)
+	   (ispell-complete-word)))
+    (message "Tab=%s" tab)
+    (when tab
+      (setq tab (mapcar
+		 (lambda (x)
+		   (cons (if (symbolp x) (symbol-name x) x)
+			 nil))
+		 tab))
+      (let ((completion (try-completion pattern tab)))
+	(cond ((null completion)
+	       (goto-char here)
+	       (message "Can't find completion for \"%s\"" pattern)
+	       (ding))
+	      ((eq completion t)
+	       (goto-char here)
+	       (message "[Complete]"))
+	      ((not (string= pattern completion))
+	       (delete-char (length pattern))
+	       (insert completion))
+	      (t
+	       (goto-char here)
+	       (message "Making completion list...")
+	       (let ((list (all-completions pattern tab)))
+		 (with-output-to-temp-buffer " *Completions*"
+		   (display-completion-list list)))
+	       (message "Making completion list...%s" "done")))))))
+
+(defun sgml-current-list-of-endable-elements ()
+  (let* ((elems nil)
+	 (tree sgml-current-tree)
+	 (state sgml-current-state))
+    (while
+	(and (sgml-final-p state)
+	     (not (eq tree sgml-top-tree))
+	     (progn
+	       (setq elems
+		     (nconc elems
+			    (list (element-name (sgml-tree-element tree))))) 
+	       sgml-omittag-transparent)
+	     (element-etag-optional (sgml-tree-element tree)))
+      (setq state (sgml-tree-pstate tree)
+	    tree (sgml-tree-parent tree)))
+    elems))
+
+
 ;;;; SGML mode: menus
 
 (defun sgml-options-menu (&optional event)
@@ -2528,6 +2831,11 @@ To finsh edit use \\[sgml-edit-attrib-finish].
 		   . sgml-always-quote-attributes)
 		  ("Warn about undefined elements"
 		   . sgml-warn-about-undefined-elements)
+		  ("Normalize trims trailing blanks"
+		   . sgml-normalize-trims)
+		  ("Minimize attributes"
+		   . sgml-minimize-attributes)
+		  ;;("Omittag" . sgml-omittag)
 		  ;;("Debug" . sgml-debug)
 		  ))
        (indents '(("None" . nil) ("0" . 0) ("1" . 1) ("2" . 2) ("3" . 3)
