@@ -1014,25 +1014,32 @@ a default for the element type name."
 
 ;;;; Load a saved dtd
 
+;;; Wing addition
+(defmacro sgml-char-int (ch)
+  (if (fboundp 'char-int)
+      (` (char-int (, ch)))
+    ch))
+
 (defsubst sgml-read-octet ()
-  (prog1 (following-char)
+  ;; Wing change
+  (prog1 (sgml-char-int (following-char))
     (forward-char)))
+
+(defsubst sgml-read-peek ()
+  (sgml-char-int (following-char)))
 
 (defsubst sgml-read-number ()
   "Read a number.
 A number is 1: an octet [0--sgml-max-singel-octet-number]
 or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
-  (if (> (following-char) sgml-max-single-octet-number)
-      (+ (* (- (following-char) (eval-when-compile
-				 (1+ sgml-max-single-octet-number)))
+  (if (> (sgml-read-peek) sgml-max-single-octet-number)
+      (+ (* (- (sgml-read-octet) (eval-when-compile
+				   (1+ sgml-max-single-octet-number)))
 	    256)
-	 (prog1 (char-after (1+ (point)))
-	   (forward-char 2))
+	 (sgml-read-octet)
 	 sgml-max-single-octet-number)
     (sgml-read-octet)))
 
-(defsubst sgml-read-peek ()
-  (following-char))
 
 (defun sgml-read-sexp ()
   (prog1
