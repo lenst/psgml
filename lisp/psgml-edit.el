@@ -2459,11 +2459,11 @@ otherwise it will be added at the first legal position."
             (forward-char (sgml-element-stag-len child1))
             (when (looking-at "\\s-*$")
               (forward-line 1))
-            (when (< (point) end-epos))
-            (setq title
-                  (buffer-substring (point)
-                                    (min (line-end-position)
-                                         end-epos))))))
+            (when (< (point) end-epos)
+              (setq title
+                    (buffer-substring (point)
+                                      (min (line-end-position)
+                                           end-epos)))))))
       (cons (list (sgml-general-insert-case gi)
                   level marker title)
             (loop for child = child1 then (sgml-element-next child)
