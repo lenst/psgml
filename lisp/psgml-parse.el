@@ -32,6 +32,8 @@
 
 (require 'psgml)
 (require 'psgml-sysdep)
+(require 'psgml-ids)			; just for sgml-add-id
+
 
 ;;; Interface to psgml-dtd
 (eval-and-compile
@@ -3767,6 +3769,9 @@ Returns a list of attspec (attribute specification)."
       ;; FIXME: What happens when eltype is nil ??
       (cond
        (attdecl
+	;; JDF's addition 12/2001
+	(if (eq (sgml-attdecl-declared-value attdecl) 'ID)
+	    (sgml-add-id val))
 	(push (sgml-make-attspec (sgml-attdecl-name attdecl) val)
 	      asl)
 	(when (sgml-default-value-type-p 'CONREF

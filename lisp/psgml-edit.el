@@ -31,6 +31,7 @@
 (provide 'psgml-edit)
 (require 'psgml)
 (require 'psgml-parse)
+(require 'psgml-ids)
 (eval-when-compile (require 'cl))
 
 ;; (eval-when-compile
@@ -878,25 +879,51 @@ CURVALUE is nil or a string that will be used as default value."
 	 (dv (sgml-attdecl-declared-value attdecl))
 	 (tokens (sgml-declared-value-token-group dv))
 	 (notations (sgml-declared-value-notation dv))
+	 ; JDF's addition
+	 (ids (and (memq dv '(IDREF IDREFS)) (sgml-id-list)))
 	 (type (cond (tokens "token")
 		     (notations "NOTATION")
 		     (t (symbol-name dv))))
 	 (prompt
 	  (format "Value for %s in %s (%s%s): "
 		  name element type 
-		  (if curvalue
+		  (if (and curvalue (not (eq dv 'IDREFS)))
 		      (format " Default: %s" curvalue)
 		    "")))
 	 value)
     (setq value 
-	  (if (or tokens notations)
-	      (let ((completion-ignore-case sgml-namecase-general))
-		(completing-read prompt
-				 (mapcar 'list (or tokens notations))
-				 nil t))
-	    (read-string prompt)))
+	  (cond ((or tokens notations)
+		 (let ((completion-ignore-case sgml-namecase-general))
+		   (completing-read prompt
+				    (mapcar 'list (or tokens notations))
+				    nil t)))
+		(ids
+		 (let ((completion-ignore-case sgml-namecase-general)
+		       (minibuffer-local-completion-map sgml-edit-idrefs-map))
+		   (completing-read prompt
+				    'sgml-idrefs-completer
+				    nil nil
+				    (and curvalue
+					 (cons curvalue (length curvalue))))))
+		(t
+		 (read-string prompt))))
     (if (and curvalue (equal value ""))
 	curvalue value)))
+
+(defun sgml-idrefs-completer (fullstring pred action)
+  (let* ((start (string-match "\\(\\(:?-\\|\\w\\)*\\)$" fullstring))
+	 (string (match-string 0 fullstring))
+	 (prefix (substring fullstring 0 start)))
+    ;(message "prefix: %s string: %s" prefix string)
+    (cond ((null action)
+	   (let ((completion (try-completion string (sgml-id-alist) pred)))
+	     (if (eq completion t)
+		 t
+	       (concat prefix completion))))
+	  ((eq action t)
+	   (all-completions string (sgml-id-alist) pred))
+	  ((eq action 'lambda)
+	   (member string (sgml-id-alist))))))
 
 (defun sgml-non-fixed-attributes (attlist)
   (loop for attdecl in attlist
