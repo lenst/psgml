@@ -1,7 +1,7 @@
-;;;; psgml-edit.el --- Editing commands for SGML-mode with parsing support
+;;; psgml-edit.el --- Editing commands for SGML-mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1994, 1995 Lennart Staflin
+;; Copyright (C) 1994, 1995, 1996 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 
@@ -59,13 +59,15 @@ to find current open element."
 If the start-tag is implied, move to the start of the element."
   (interactive)
   (goto-char (sgml-element-stag-end (sgml-last-element)))
-  (sgml-set-last-element))
+  (sgml-set-last-element (if (sgml-element-empty sgml-last-element)
+			     (sgml-element-parent sgml-last-element))))
 
 (defun sgml-end-of-element ()
   "Move to before the end-tag of the current element."
   (interactive)
   (goto-char (sgml-element-etag-start (sgml-last-element)))
-  (sgml-set-last-element))
+  (sgml-set-last-element (if (sgml-element-empty sgml-last-element)
+			     (sgml-element-parent sgml-last-element))))
 
 (defun sgml-backward-up-element ()
   "Move backward out of this element level.
@@ -85,10 +87,7 @@ That is move to after the end-tag or where an end-tag is implied."
   "Move forward over next element."
   (interactive)
   (let ((next
-	 (sgml-find-element-after
-	  (point)
-	  (if (memq last-command sgml-users-of-last-element)
-	      sgml-last-element))))
+	 (sgml-find-element-after (point) (sgml-last-element))))
     (goto-char (sgml-element-end next))
     (sgml-set-last-element (sgml-element-parent next))))
 
@@ -97,27 +96,20 @@ That is move to after the end-tag or where an end-tag is implied."
 With implied tags this is ambigous."
   (interactive)
   (let ((prev				; previous element
-	 (sgml-find-previous-element
-	  (point)
-	  (if (memq last-command sgml-users-of-last-element)
-	      sgml-last-element))))
+	 (sgml-find-previous-element (point) (sgml-last-element))))
     (goto-char (sgml-element-start prev))
     (sgml-set-last-element (sgml-element-parent prev))))
 
 (defun sgml-down-element ()
   "Move forward and down one level in the element structure."
   (interactive)
-  (goto-char
-   (sgml-element-stag-end
-    (setq sgml-last-element
-	  (sgml-find-element-after
-	   (point)
-	   (if (memq last-command sgml-users-of-last-element)
-	       sgml-last-element)))))
-  (sgml-set-last-element
-   (if (sgml-element-empty sgml-last-element)
-       (setq sgml-last-element (sgml-element-parent sgml-last-element))
-     sgml-last-element)))
+  (let ((to
+	 (sgml-find-element-after (point) (sgml-last-element))))
+    (goto-char (sgml-element-stag-end to))
+    (sgml-set-last-element (if (sgml-element-empty to)
+			       (sgml-element-parent to)
+			     to))))
+
 
 (defun sgml-kill-element ()
   "Kill the element following the cursor."
@@ -592,7 +584,7 @@ after the first tag inserted."
   "Reads element name from minibuffer and inserts start and end tags."
   (interactive (list (sgml-read-element-name "Element: ")
 		     sgml-leave-point-after-insert))
-  (let (stag-end			; position after start tag
+  (let (newpos				; position to leave cursor at
 	element				; inserted element
 	(sgml-show-warnings nil))
     (when (and name (not (equal name "")))
@@ -603,26 +595,28 @@ after the first tag inserted."
 				       element)
 			      (sgml-element-attlist element))
       (forward-char 1)
-      (setq stag-end (point))
       (when (not (sgml-element-empty element))
 	(when (and sgml-auto-insert-required-elements
 		   (sgml-model-group-p sgml-current-state))
-	  (let (tem newpos)
+	  (let (tem)
 	    (while (and (setq tem (sgml-required-tokens sgml-current-state))
 			(null (cdr tem)))
 	      (setq tem (sgml-insert-element (car tem) t t))
 	      (setq newpos (or newpos tem))
 	      (sgml-parse-to-here))
 	    (when tem			; more than one req elem
-	      (insert (format "\n<!-- one of %s -->" tem))
-	      (sgml-indent-line nil element))
-	    (if newpos (setq stag-end newpos))))
+	      (insert "\n")
+	      (when sgml-insert-missing-element-comment
+		(insert (format "<!-- one of %s -->" tem))
+		(sgml-indent-line nil element)))))
+	(setq newpos (or newpos (point)))
+	(when sgml-insert-end-tag-on-new-line
+	  (insert "\n"))
 	(sgml-insert-tag (sgml-end-tag-of name) 'silent)
 	(unless after
-	  (goto-char stag-end)
-	  (sgml-end-of-element))
+	  (goto-char newpos))
 	(unless silent (sgml-show-context)))
-      stag-end)))
+      newpos)))
 
 (defun sgml-default-asl (element)
   (loop for attdecl in (sgml-element-attlist element)
@@ -677,7 +671,10 @@ AVL should be a assoc list mapping symbols to strings."
 			 (sgml-declared-value-token-group dcl)))
 	    (insert " " val))
 	   (t
-	    (insert " " name "=" (sgml-quote-attribute-value val)))))))
+	    (insert " " name "=" (sgml-quote-attribute-value val)))))
+    (when auto-fill-function
+      (funcall auto-fill-function))))
+
 
 (defun sgml-quote-attribute-value (value)
   "Add quotes to the string VALUE unless minimization is on."
@@ -1669,8 +1666,16 @@ If it is something else complete with ispell-complete-word."
 	  val))
      (t
       "-"))))
+
+;;;; NEW
 
-
+(defun sgml-trim-and-leave-element ()
+  (interactive)
+  (goto-char (sgml-element-etag-start (sgml-last-element)))
+  (while (progn (forward-char -1)
+		(looking-at "\\s-"))
+    (delete-char 1))
+  (sgml-up-element))
 
 
 ;;; psgml-edit.el ends here
