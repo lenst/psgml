@@ -1,7 +1,7 @@
 ;;;; psgml-edit.el --- Editing commands for SGML-mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1994 Lennart Staflin
+;; Copyright (C) 1994, 1995 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 
@@ -358,13 +358,15 @@ is determined."
       (back-to-indentation)
       (unless (or col element)
 	;; Determine element
-	(setq element (if (eobp)
-			  (sgml-find-context-of (point))
-			(sgml-find-element-of (point)))))
+	(setq element
+	      (let ((sgml-throw-on-error 'parse-error))
+		(catch sgml-throw-on-error
+		  (if (eobp)
+		      (sgml-find-context-of (point))
+		    (sgml-find-element-of (point)))))))
       (when (eq element sgml-top-tree)	; not in a element at all
 	(setq element nil)		; forget element
-	(goto-char here)		; insert normal tab insted
-	(insert-tab))
+	(goto-char here))		; insert normal tab insted)
       (when element
 	(sgml-with-parser-syntax
 	 (let ((stag (sgml-is-start-tag))
