@@ -576,13 +576,14 @@ All bindings:
   (run-hooks 'text-mode-hook 'sgml-mode-hook))
 
 (defun sgml-default-dtd-file ()
-  (let ((base (file-name-nondirectory (buffer-file-name))))
-    (concat
-     (cond ((string-match "\\.[^.]+$" base)
-	    (substring base 0 (match-beginning 0)))
-	   (t
-	    base))
-     ".ced")))
+  (and (buffer-file-name)
+       (let ((base (file-name-nondirectory (buffer-file-name))))
+	 (concat
+	  (cond ((string-match "\\.[^.]+$" base)
+		 (substring base 0 (match-beginning 0)))
+		(t
+		 base))
+	  ".ced"))))
 
 (defun sgml-comment-indent ()
   (if (and (looking-at "--")
