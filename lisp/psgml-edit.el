@@ -448,9 +448,9 @@ is determined."
 	     (terpri))
 	    (t
 	     (princ "Current element can not end here\n")))
-      (let ((s (sgml-tree-shortmap sgml-current-tree)))
-	(when s
-	  (princ (format "Current shortref map: %s\n" s))))
+;;;      (let ((s (sgml-tree-shortmap sgml-current-tree)))
+;;;	(when s
+;;;	  (princ (format "Current shortref map: %s\n" s))))
       (princ "Valid start-tags\n")
       (sgml-print-valid-tags "In current element:"
 			     sgml-current-tree sgml-current-state))))
