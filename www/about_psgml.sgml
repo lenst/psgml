@@ -1,5 +1,5 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
-<!ENTITY last.ed  'Time-stamp: "2004-11-02 11:34:17 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "2005-03-05 18:02:33 lenst"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
@@ -27,6 +27,7 @@
 <!ENTITY psgml1.2.4 "psgml-1.2.4.tar.gz">
 <!ENTITY psgml1.2.5 "psgml-1.2.5.tar.gz">
 <!ENTITY psgml1.3.1 "psgml-1.3.1.tar.gz">
+<!ENTITY psgml1.3.2 "psgml-1.3.2.tar.gz">
 <!ENTITY ftp-dir    "&psgml.dir;">
 
 <!ENTITY newdoc.url "&base.url;/psgml.html">
@@ -102,6 +103,14 @@ HR.divider { width: 50%; align: center; }
 
    <DIV> <h2><A NAME="UPDATE">Update</A></h2>
     <DL>
+     <dt>2005-03-05</dt>
+     <dd><p>Alpha version 1.3.2. Some user interface changes. This
+       version should work with latest Emacs in multi-byte mode (only
+       tested with the CVS-version of Emacs). Compatibility with
+       earlier versions of Emacs (19.34,20.x) and with XEmacs is
+       unclear. <a href="&alpha.dir;&psgml1.3.2;">Download (ftp)</a>
+       <a href="&base.url;/&psgml1.3.2;">or http.</a></p></dd>
+
      <dt>2002-12-14</dt>
      <dd><p>Alpha version 1.3.1. This version should work with latest
        Emacs in multi-byte mode. Compatibility with earlier versions of
