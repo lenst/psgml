@@ -4010,13 +4010,9 @@ pointing to start of short ref and point pointing to the end."
 (defun sgml-do-move (token type)
   (cond ((eq sgml-any sgml-current-state))
         (t
-         (let ((next-state (sgml-get-move sgml-current-state token)))
-           (cond (next-state
-                  (setq sgml-current-state next-state))
-                 (t
-                  (sgml-execute-implied (sgml-list-implications token type) type)
-                  (unless (eq sgml-any sgml-current-state)
-                    (sgml-move-current-state token))))))))
+         (sgml-execute-implied (sgml-list-implications token type) type)
+         (unless (eq sgml-any sgml-current-state)
+           (sgml-move-current-state token)))))
 
 
 (defun sgml-pcdata-move ()
