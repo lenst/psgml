@@ -226,19 +226,6 @@ if the item is selected."
 	do (delete-extent o)))
 
 
-;;;; misc
-
-(defmacro sgml-without-change-hooks (&rest body)
-  `(let ((inhibit-read-only t))
-         (after-change-functions nil)
-         (before-change-functions nil)
-     ,@body))
-
-(defmacro sgml-without-before-change-hooks (&rest body)
-  `(let ((before-change-functions nil))
-     ,@body))
-
-
 ;;;; Functions not in Lucid Emacs
 
 (unless (fboundp 'frame-width)
