@@ -1,7 +1,7 @@
 ;;; psgml.el --- SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1993, 1994, 1995 Lennart Staflin
+;; Copyright (C) 1993, 1994, 1995, 1996 Lennart Staflin
 ;; Copyright (C) 1992 Free Software Foundation, Inc.
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
@@ -50,7 +50,7 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.0a11"
+(defconst psgml-version "1.0a12"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -416,7 +416,7 @@ Example:
 ;;; Its error messages can be parsed by next-error.
 ;;; The -s option suppresses output.
 
-(defvar sgml-validate-command "sgmls -s %s %s"
+(defvar sgml-validate-command "nsgmls -s %s %s"
   "*The shell command to validate an SGML document.
 
 This is a `format' control string that by default should contain two
@@ -444,8 +444,10 @@ These file names will serve as the arguments to the `sgml-validate-command'
 format control string instead of the defaults.")
 
 (defvar sgml-validate-error-regexps
-  '(("\\(error\\|warning\\) at \\([^,]+\\), line \\([0-9]+\\)" 2 3)
-    ("^\\(.+\\):\\([0-9]+\\):\\([0-9]+\\):E: " 1 2 3))
+  '((":\\(.+\\):\\([0-9]+\\):\\([0-9]+\\):[EX]: " 1 2 3)
+    ("\\(error\\|warning\\) at \\([^,]+\\), line \\([0-9]+\\)" 2 3)
+    ("\n[a-zA-Z]?:?[^0-9 \n\t:]+:[ \t]*\\([^ \n\t:]+\\):\
+\\([0-9]+\\):\\(\\([0-9]+\\)[: \t]\\)?" 1 2 4))
   "Alist of regexps to recognize error messages from `sgml-validate'.
 See `compilation-error-regexp-alist'.")
 
