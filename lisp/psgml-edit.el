@@ -147,16 +147,15 @@ With implied tags this is ambigous."
 (defun sgml-mark-element ()
   "Set mark after next element."
   (interactive)
-  (set-mark (sgml-element-end (sgml-find-element-after (point))))
-  (sgml-message "Mark set"))
+  (push-mark (sgml-element-end (sgml-find-element-after (point))) nil t))
 
 (defun sgml-mark-current-element ()
   "Set mark at end of current element, and leave point before current element."
   (interactive)
   (let ((el (sgml-find-element-of (point))))
-    (set-mark (sgml-element-end el))
-    (goto-char (sgml-element-start el)))
-  (sgml-message "Mark set"))
+    (goto-char (sgml-element-start el))
+    (push-mark (sgml-element-end el) nil t)))
+
 
 (defun sgml-change-element-name (gi)
   "Replace the name of the current element with a new name.
