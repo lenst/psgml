@@ -268,38 +268,104 @@ Syntax: var dfa-expr &body forms"
   ;;*** some comments are accepted that shouldn't
   (sgml-skip-ps))
 
+(defun sgml-parse-cro ()
+  (sgml-parse-chars ?& ?#))
+
+(defun sgml-parse-character-reference ()
+  (if (sgml-parse-cro)
+      (if (looking-at "[0-9]")
+	  (prog1 (string-to-int (sgml-parse-nametoken-string))
+	    (or (sgml-parse-char ?\;)
+		(sgml-parse-char ?\n)))
+	;; It may be illegal or it may be a function char reference
+	;; *** leave it as it is 
+	(forward-char -2)
+	nil)))
+
+(defun sgml-parse-minimum-literal ()
+  "Parse a quoted SGML string and return it, if no string return nil."
+  (cond
+   ((memq (following-char) '(?\" ?\'))
+    (let* ((qchar (following-char))
+	   (blanks " \t\r\n")
+	   (qskip (format "^%s%c" blanks qchar))
+	   (start (point))
+	   (value			; accumulates the literal value
+	    "")
+	   (spaced ""))
+      (forward-char 1)
+      (skip-chars-forward blanks)
+      (while (not (sgml-parse-char qchar))
+	(cond ((eobp)
+	       (goto-char start)
+	       (sgml-parse-error "Unterminated literal"))
+	      ((not (zerop (skip-chars-forward blanks)))
+	       (setq spaced " "))
+	      (t
+	       (setq value
+		     (concat value spaced
+			     (buffer-substring
+			      (point)
+			      (progn (skip-chars-forward qskip)
+				     (point))))
+		     spaced ""))))
+      value))))
+
+(defun sgml-parse-external ()
+  "Leaves nil if no external id, or (pubid . sysid)"
+  (sgml-skip-ps)
+  (let* ((p (point))
+	 (token (sgml-parse-nametoken-string)))
+    (cond
+     (token
+      (setq token (sgml-gname-symbol token))
+      (sgml-skip-ps)
+      (cond ((memq token '(public system))
+	     (cons
+	      (if (eq token 'public)
+		  (or (sgml-parse-minimum-literal) ;the public id
+		      (sgml-error "Public identifier expected")))
+	      (progn (sgml-skip-ps)
+		     (sgml-parse-string)))) ;the system id
+	    (t
+	     (goto-char p)
+	     nil))))))
 
 (defun sgml-parse-parameter-literal ()
-  (let ((qchar (following-char))
-	qregexp
-	value
-	(level 0)			; Open parameters
-	)
+  (let* ((qchar				; LIT or LITA
+	  (following-char))
+	 (qregexp			; what can be skipped in literal
+	  (format "^%c%%&" qchar))
+	 (value				; accumulates literals value
+	  "")
+	 (level				; Open parameters
+	  0)
+	 temp)
     (cond
      ((memq qchar '(?\" ?\'))
       (forward-char 1)
-      (setq qregexp (format "^%c%%" qchar))
-      (setq value "")
       (while (not (and (zerop level)
 		       (sgml-parse-char qchar)))
-	(setq value
-	      (concat value
-		      (buffer-substring
-		       (point)
-		       (progn (skip-chars-forward (if (zerop level)
-						      qregexp
-						    "^%"))
-			      (point)))))
-	(cond ((sgml-parse-char ?%)	;parameter entity reference
+	(cond ((eobp)
+	       (or (sgml-pop-param)
+		   (sgml-error "Parameter literal unterminated"))
+	       (setq level (1- level)))
+	      ((sgml-parse-char ?%)	;parameter entity reference
 	       (cond ((sgml-startnm-char-next)
 		      (sgml-push-to-param (sgml-check-entity-ref))
 		      (setq level (1+ level)))
 		     (t
 		      (setq value (concat value "%")))))
-	      ((eobp)
-	       (or (sgml-pop-param)
-		   (sgml-error "Parameter literal unterminated"))
-	       (setq level (1- level)))))
+	      ((setq temp (sgml-parse-character-reference))
+	       (setq value (concat value (format "%c" temp))))
+	      (t
+	       (setq value
+		     (concat value
+			     (buffer-substring
+			      (point)
+			      (progn (forward-char 1)
+				     (skip-chars-forward qregexp)
+				     (point))))))))
       value))))
 
 (defun sgml-check-parameter-literal ()
