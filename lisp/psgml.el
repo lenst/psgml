@@ -61,7 +61,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "1.0a6"
+(defconst psgml-version "1.0a7"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -83,6 +83,21 @@
 (defvar sgml-running-lucid (string-match "Lucid" emacs-version))
 
 ;;; User settable options:
+
+(defvar sgml-doctype nil
+  "*If set, this should be the namn of a file that contains the doctype
+declaration to use.
+Setting this variable automatically makes it local to the current buffer.")
+(put 'sgml-doctype 'sgml-type 'string)
+(make-variable-buffer-local 'sgml-doctype)
+
+(defvar sgml-system-identifiers-are-preferred nil
+  "*If nil PSGML will look up external entities by searching the catalogs
+in `sgml-local-catalogs' and `sgml-catalog-files'  and only if the entity
+is not found in will a given system identifer be used.  If the variable
+is non-nil and a system identifer is given, the system identifier will
+be used for the entity. If no system identifier is given the catalogs
+will searched.")
 
 (defvar sgml-range-indicator-max-length 9
   "*Maximum number of characters used from the first and last entry
@@ -141,13 +156,31 @@ will be shown in the mode line.")
   "*If non-nil, ask about saving modified buffers before \\[sgml-validate] is run.")
 
 (defvar sgml-parent-document nil
-  "*File name (a string) of a file containing a DOCTYPE declaration to use,
-or a list (FILENAME DOCTYPENAME), where FILENAME is a file name of a file '
-containing a DOCTYPE declaration to use with the modification that the
-document type name is DOCTYPENAME.
+  "* Used when the current file is part of a bigger document.
+
+The variable describes how the current files content fits into the element
+hierarchy. The variable should have the form
+
+  (parent-file context-element* top-element (has-seen-element*)?)
+
+* parent-file (string) is the name of the file contatining the
+document entity.
+
+* context-element (string) is used to set up exceptions and short
+reference map. Good candidates for these elements are the elements
+open when the entity pointing to the current file is used.
+
+* top-element (string) is the top level element in the current file.
+The file should contain one instance of this element, unless the last
+\(lisp) element of sgml-parent-document is a list. If it is a list, the
+top level of the file should follow the content model of top-element.
+
+* has-seen-element (string) element satisfied in the content model
+of top-element.
+
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-parent-document)
-(put 'sgml-parent-document 'sgml-type 'list-or-string)
+(put 'sgml-parent-document 'sgml-type 'list)
 
 (defvar sgml-tag-region-if-active nil
   "*If non-nil, the Tags menu will tag a region if the region is 
@@ -381,14 +414,24 @@ Example:
 (defvar sgml-validate-command "sgmls -s %s %s"
   "*The shell command to validate an SGML document.
 
-This is a `format' control string that by default should contain two `%s'
-conversion specifications: the first will be replaced by the value of
-`sgml-declaration' \(or the empty string, if nil\); the second will be
-replaced by the current buffer's file name \(or the empty string, if
-nil\).
+This is a `format' control string that by default should contain two
+`%s' conversion specifications: the first will be replaced by the
+value of `sgml-declaration' \(or the empty string, if nil\); the
+second will be replaced by the current buffer's file name \(or the
+empty string, if nil\).
 
 If `sgml-validate-files' is non-nil, the format string should contain
-one `%s' conversion specification for each element of its result.")
+one `%s' conversion specification for each element of its result.
+
+If sgml-validate-command is a list, then every element should be a
+string.  The strings will be tried in order and %-sequences in the
+string will be replaced according to the list below, if the string contains
+%-sequences with no replacement value the next string will be tried.
+
+%b means the visited file of the current buffer
+%s means the SGML declaration specified in the sgml-declaration variable
+%d means the file containing the DOCTYPE declaration, if not in the buffer 
+")
 
 (defvar sgml-validate-files nil
   "If non-nil, a function of no arguments that returns a list of file names.
@@ -415,6 +458,7 @@ See `compilation-error-regexp-alist'.")
     sgml-always-quote-attributes
     sgml-indent-step
     sgml-indent-data
+    sgml-doctype
     sgml-parent-document
     sgml-default-dtd-file
     sgml-exposed-tags
@@ -444,6 +488,7 @@ See `compilation-error-regexp-alist'.")
     sgml-declaration
     sgml-validate-command
     sgml-markup-faces
+    sgml-system-identifiers-are-preferred
     sgml-system-path
     sgml-public-map
     sgml-catalog-files
@@ -632,6 +677,8 @@ as that may change."
 	(concat "psgml.el " psgml-version)
 	(list 
 	 'sgml-parent-document
+	 'sgml-doctype
+	 'sgml-declaration
 	 'sgml-tag-region-if-active
 	 'sgml-normalize-trims
 	 'sgml-omittag
@@ -730,8 +777,10 @@ actually only the state that persists between commands.")
 (make-variable-buffer-local 'sgml-buffer-parse-state)
 
 (eval-and-compile			; Interface to psgml-parse
-  (autoload 'sgml-need-dtd "psgml-parse")
-  (autoload 'sgml-update-display "psgml-parse"))
+  (loop for fun in '(sgml-need-dtd sgml-update-display sgml-subst-expand
+				   sgml-declaration)
+	do (autoload fun "psgml-parse")))
+
 
 (defun sgml-command-post ()
   (when (eq major-mode 'sgml-mode)
@@ -1029,6 +1078,28 @@ start tag, and the second / is the corresponding null end tag."
 (eval-and-compile
   (autoload 'compile-internal "compile" ""))
 
+(defun sgml-default-validate-command ()
+  (cond
+   ((consp sgml-validate-command)
+    (let ((validate-subst
+	   (list
+	    (cons ?b (and (buffer-file-name)
+			  (file-name-nondirectory (buffer-file-name))))
+	    (cons ?s (sgml-declaration))
+	    (cons ?d sgml-doctype))))
+      (loop for template in sgml-validate-command
+	    thereis
+	    (sgml-subst-expand template validate-subst))))
+   (t
+    (apply 'format sgml-validate-command
+	   (if sgml-validate-files
+	       (funcall sgml-validate-files)
+	     (list (or sgml-declaration "")
+		   (let ((name (buffer-file-name)))
+		     (if name
+			 (file-name-nondirectory name)
+		       ""))))))))
+
 (defun sgml-validate (command)
   "Validate an SGML document.
 Runs COMMAND, a shell command, in a separate process asynchronously
@@ -1037,14 +1108,7 @@ You can then use the command \\[next-error] to find the next error message
 and move to the line in the SGML document that caused it."
   (interactive
    (list (read-from-minibuffer "Validate command: "
-			       (apply 'format sgml-validate-command
-				      (if sgml-validate-files
-					  (funcall sgml-validate-files)
-					(list (or sgml-declaration "")
-					      (let ((name (buffer-file-name)))
-						(if name
-						    (file-name-nondirectory name)
-						  "")))))
+			       (sgml-default-validate-command)
 			       nil nil 'sgml-validate-command-history)))
   (if sgml-offer-save
       (save-some-buffers nil nil))
