@@ -1,3 +1,11 @@
+2001-12-20  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-xml-validate-command): new option. Default for
+	sgml-validate-command in XML mode.
+	(xml-mode): use sgml-xml-validate-command.
+	(xml-mode): remove conditional. Always set sgml-declaration to
+	sgml-xml-declaration.
+
 2001-12-18  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-attribute-buffer): Don't write protect the
