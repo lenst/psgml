@@ -443,13 +443,16 @@ If this is not possible, but all DFAS are final, move by TOKEN in NEXT."
 	 (sgml-tokens-of-moves (sgml-state-opts (sgml-&state-next state)))))))
 
 
-(defun sgml-final (state)
+(defsubst sgml-final (state)
   (if (sgml-normal-state-p state)
       (sgml-state-final-p state)
-    (and (sgml-final (sgml-&state-substate state))
-         (loop for s in (sgml-&state-dfas state)
-               always (sgml-state-final-p s))
-         (sgml-state-final-p (sgml-&state-next state)))))
+    (sgml-final& state)))
+
+(defun sgml-final& (state)
+  (and (sgml-final (sgml-&state-substate state))
+       (loop for s in (sgml-&state-dfas state)
+	     always (sgml-state-final-p s))
+       (sgml-state-final-p (sgml-&state-next state))))
 
 
 ;;;; Attribute Types
@@ -659,8 +662,8 @@ If ATTSPEC is nil, nil is returned."
 ;;shortmaps = (name, shortmap)*
 
 (defstruct (sgml-dtd
-	    (:constructor
-	     sgml-make-dtd  (doctype)))
+	    (:type vector)
+	    (:constructor sgml-make-dtd  (doctype)))
   doctype				; STRING, name of doctype
   (eltypes				; OBLIST, element types defined
    (sgml-make-eltypes-table))
@@ -682,6 +685,9 @@ If ATTSPEC is nil, nil is returned."
 
 (defun sgml-eltype-name (et)
   (symbol-name et))
+
+(define-compiler-macro sgml-eltype-name (et)
+  (`(symbol-name (, et))))
 
 (defun sgml-eltype-token (et)
   "Return a token for the element type"
@@ -1292,9 +1298,16 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 
 ;;; Parameter entities and files
 
+(defvar sgml-scratch-buffer nil)
+
 (defun sgml-push-to-entity (entity &optional ref-start)
+  (unless (and sgml-scratch-buffer
+	       (buffer-name sgml-scratch-buffer))
+    (setq sgml-scratch-buffer (generate-new-buffer " *entity*")))
   (let ((cb (current-buffer))
-	(buf (generate-new-buffer " *entity*"))
+	(buf (if (null sgml-current-eref) ; First entity ref uses scratch buf
+		 sgml-scratch-buffer
+	       (generate-new-buffer " *entity*")))
 	eref
 	file)
     ;;*** should eref be argument to fun?
@@ -1304,6 +1317,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 		(sgml-epos (point))))
     (sgml-debug "Enter entity ref %S" eref)
     (set-buffer buf)
+    (erase-buffer)
     (make-local-variable 'sgml-current-eref)
     (setq sgml-current-eref eref)
     (set-syntax-table sgml-parser-syntax)
@@ -1318,8 +1332,11 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (cond ((and (boundp 'sgml-previous-buffer)
 	      (bufferp sgml-previous-buffer))
 	 (sgml-debug "Exit entity")
-	 (kill-buffer (prog1 (current-buffer)
-			(set-buffer sgml-previous-buffer)))
+	 (cond ((eq (current-buffer) sgml-scratch-buffer)
+		(set-buffer sgml-previous-buffer))
+	       (t
+		(kill-buffer (prog1 (current-buffer)
+			       (set-buffer sgml-previous-buffer)))))
 	 t)))
 
 (defun sgml-goto-epos (epos)
@@ -1440,7 +1457,11 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   "True if start-tag of ELEMENT is omissible."
   (`(sgml-eltype-stag-optional (sgml-tree-eltype (, element)))))
 
-(defmacro sgml-element-etag-optional (element)
+(defun sgml-element-etag-optional (element)
+  "True if end-tag of ELEMENT is omissible."
+  (sgml-eltype-etag-optional (sgml-tree-eltype element)))
+
+(define-compiler-macro sgml-element-etag-optional (element)
   "True if end-tag of ELEMENT is omissible."
   (`(sgml-eltype-etag-optional (sgml-tree-eltype (, element)))))
 
@@ -1451,6 +1472,9 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-element-mixed (element)
   "True if ELEMENT has mixed content."
   (sgml-eltype-mixed (sgml-tree-eltype element)))
+
+(define-compiler-macro sgml-element-mixed (element)
+  (`(sgml-eltype-mixed (sgml-tree-eltype (, element)))))
 
 (defun sgml-element-start (element)
   "Position before start of ELEMENT."
@@ -1541,11 +1565,12 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 
 ;;;; Set markup type
 
-(defun sgml-set-markup-type (type)
+(defsubst sgml-set-markup-type (type)
   "Set the type of the markup parsed to TYPE.
 The markup starts at position given by variable sgml-markup-start and
 ends at point."
-  (when sgml-set-face
+  (when (and sgml-set-face
+	     (null sgml-current-eref))
     (sgml-set-face-for sgml-markup-start (point) type))
   (setq sgml-markup-type type))
 
@@ -2130,15 +2155,15 @@ in any of them."
 (defun sgml-is-end-tag ()
   (sgml-is-delim "ETAGO" nmstart))
 
-(defun sgml-is-enabled-net ()
-  (and sgml-current-shorttag
-       (sgml-tree-net-enabled sgml-current-tree)
-       (sgml-is-delim "NET")))
+(defsubst sgml-is-enabled-net ()
+  (and (sgml-is-delim "NET")
+       sgml-current-shorttag
+       (sgml-tree-net-enabled sgml-current-tree)))
 
 (defun sgml-is-start-tag ()
   (sgml-is-delim "STAGO" gi))
 
-(defun sgml-parse-s (&optional shortmap)
+(defsubst sgml-parse-s (&optional shortmap)
   (if shortmap
       (or (/= 0 (skip-chars-forward " "))
 	  (/= 0 (skip-chars-forward "\t"))
@@ -2146,12 +2171,16 @@ in any of them."
 	  (sgml-parse-char ?\r))
     (/= 0 (skip-chars-forward " \t\n\r"))))
 
-(defun sgml-parse-processing-instruction ()
+(defsubst sgml-parse-processing-instruction ()
   (if (sgml-parse-delim "PIO")
-      (progn (sgml-skip-upto "PIC")
-	     (sgml-check-delim "PIC")
-	     (sgml-set-markup-type 'pi)
-	     t)))
+      (sgml-do-processing-instruction)))
+
+(defun sgml-do-processing-instruction ()
+  (sgml-skip-upto "PIC")
+  (sgml-check-delim "PIC")
+  (sgml-set-markup-type 'pi)
+  t)
+
 
 (defmacro sgml-general-case (string)  (`(downcase (, string))))
 (defmacro sgml-entity-case (string)   string)
@@ -2168,6 +2197,13 @@ in any of them."
 (defun sgml-check-name (&optional entity-name)
   (or (sgml-parse-name entity-name)
       (sgml-parse-error "Name expected")))
+
+(define-compiler-macro sgml-check-name (&optional entity-name)
+  (`(or (, (if entity-name
+	       '(sgml-parse-name)
+	     (`(sgml-parse-name (, entity-name)))))
+	(sgml-parse-error "Name expected"))))
+
 
 (defun sgml-parse-nametoken (&optional entity-name)
   "Parses a name token and returns a string or nil if no nametoken."
@@ -2191,22 +2227,25 @@ in any of them."
   "Convert a string to an entity name."
   (intern (sgml-entity-case string)))
 
-(defun sgml-parse-general-entity-ref ()
+(defsubst sgml-parse-general-entity-ref ()
   (if (sgml-parse-delim "ERO" nmstart)
-      (let* ((name (sgml-parse-name t))
-	     (ent (sgml-lookup-entity name
-				      (sgml-dtd-entities sgml-dtd-info))))
-	(or (sgml-parse-delim "REFC")
-	    (sgml-parse-char ?\n))
-	(sgml-set-markup-type 'entity)
-	(cond ((null ent)
-	       (sgml-log-warning
-		"Undefined entity %s" name))
-	      ((sgml-entity-data-p ent)
-	       (sgml-pcdata-move))
-	      (t
-	       (sgml-push-to-entity ent sgml-markup-start)))
-	t)))
+      (sgml-do-general-entity-ref)))
+
+(defun sgml-do-general-entity-ref ()
+  (let* ((name (sgml-parse-name t))
+	 (ent (sgml-lookup-entity name
+				  (sgml-dtd-entities sgml-dtd-info))))
+    (or (sgml-parse-delim "REFC")
+	(sgml-parse-char ?\n))
+    (sgml-set-markup-type 'entity)
+    (cond ((null ent)
+	   (sgml-log-warning
+	    "Undefined entity %s" name))
+	  ((sgml-entity-data-p ent)
+	   (sgml-pcdata-move))
+	  (t
+	   (sgml-push-to-entity ent sgml-markup-start)))
+    t))
 
 (defun sgml-parse-parameter-entity-ref ()
   "Parse and push to a parameter entity, return nil if no ref here."
@@ -2774,7 +2813,7 @@ pointing to start of short ref and point pointing to the end."
 	  nil)
 	 ((sgml-do-implied "data character"))))))
 
-(defun sgml-parse-pcdata ()
+(defsubst sgml-parse-pcdata ()
   (/= 0
       (if sgml-current-shortmap
 	  (skip-chars-forward (sgml-shortmap-skipstring sgml-current-shortmap))
@@ -2907,7 +2946,7 @@ pointing to start of short ref and point pointing to the end."
 	found)				; Set to true when found element to end
     (cond ((sgml-parse-delim "TAGC")		; empty end-tag
 	   (setq et (sgml-tree-eltype sgml-current-tree)))
-	  ((sgml-parse-char ?/))	; NET
+	  ((sgml-parse-delim "NET"))
 	  (t
 	   (setq et (sgml-lookup-eltype (sgml-check-name)))
 	   (sgml-parse-s)
@@ -2983,6 +3022,7 @@ pointing to start of short ref and point pointing to the end."
     (unless (and sgml-current-omittag
 		 (sgml-element-stag-optional sgml-current-tree))
       (sgml-log-warning
+
        "%s start-tag implied by %s; not minimizable"
        (car temp) type))
     t)
