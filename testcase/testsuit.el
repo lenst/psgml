@@ -42,7 +42,7 @@
        (if expected
            (case (caar expected)
              (error (debug)))
-         (error "Unexptectd %s" errcode))))
+         (error "Unexpected %s" errcode))))
     (when (null expected)
         (set-buffer (get-buffer-create sgml-log-buffer-name))
         (goto-char (point-min))
