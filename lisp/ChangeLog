@@ -1,3 +1,9 @@
+1999-11-11  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-parse.el (sgml-parse-to): Let sgml-with-parser-syntax wrap
+	a bigger chunk of the code to make sure the syntax table is set up
+	before any buffer changes.
+
 Tue Nov  9 16:25:53 1999  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-modify-dtd): use sgml-general-case on names

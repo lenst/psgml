@@ -1,4 +1,4 @@
-TODO      [Time-stamp: "1999-11-04 19:37:58 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "1999-11-10 20:06:54 lenst"]           -*- outline -*- 
 
 * sgml-kill-element
 
@@ -49,3 +49,30 @@ i sgml-parse-attribute-specification-list
 måste också plocka bort optimering av start-tag utan asl.
 
 Hur mycket är funktionalliteten värd? Vad kostar den? 
+
+* Determining legal elements
+
+If the current element has valid content, then only elements that does
+not make the current element invalid is legal.
+
+If current element has invalid content, then ??
+
+If current element has no end tag, and OMITTAG is on. Consider
+elements legal after this element if the current position is last in
+the element.
+
+Possibly clean up old functions and variables like
+sgml-omittag-transparent and sgml-insert-tag.
+
+* Parsing start-tag
+
+Parse the different consituents of the start tag without reference to
+the DTD. If the tag is well-formed then check it against the DTD. If
+this is XML w/o a DTD, adjust the constructed DTD to allow the element
+and attributes.
+
+Consequences for SGML: parse attspec does not always identify
+attributes. The check against the DTD will fill in attribute names for
+attributes specified with a value only. This is also the time to check
+for CONREF and check that all required attributes are given.
+
