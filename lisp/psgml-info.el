@@ -1,5 +1,5 @@
 ;;;; psgml-info.el
-;;; Last edited: 1999-11-09 16:42:29 lenst
+;;; Last edited: 2000-04-16 16:50:01 lenst
 ;;; $Id$
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
@@ -292,16 +292,19 @@
 
 ;;;; Describe element type
 
-(defun sgml-princ-names (names)
+(defun sgml-princ-names (names &optional first sep)
+  (setq sep (or sep " "))
   (loop with col = 0
 	for name in names
+        for this-sep = (if first (prog1 first (setq first nil)) sep)
 	do
-	(when (and (> col 0) (> (+ col (length name) 1) fill-column))
-	  (princ "\n")
-	  (setq col 0))
-	(princ " ") (princ name)
-	(incf col (length name))
-	(incf col 1)))
+        (princ this-sep)
+	(incf col (length this-sep))
+	(when (and (> col 0) (> (+ col (length name)) fill-column))
+	  (princ "\n ")
+	  (setq col 1))
+        (princ name)
+	(incf col (length name))))
 
 (defun sgml-describe-element-type (et-name)
   "Describe the properties of an element type as declared in the current DTD."
@@ -387,17 +390,8 @@
 		     (when (memq et (sgml-eltype-refrenced-elements cand))
 		       (push cand occurs-in))))
 	 (sgml-pstate-dtd sgml-buffer-parse-state))
-
-	(loop with col = 0
-	      for occur-et in (sort occurs-in (function string-lessp))
-	      for name = (sgml-eltype-name occur-et)
-	      do
-	      (when (and (> col 0) (> (+ col (length name) 1) fill-column))
-		(princ "\n")
-		(setq col 0))
-	      (princ " ") (princ name)
-	      (incf col (length name))
-	      (incf col 1))))))
+        (sgml-princ-names (mapcar 'sgml-eltype-name
+                                  (sort occurs-in (function string-lessp))))))))
 
 
 ;;;; Print general info about the DTD.
@@ -410,8 +404,8 @@
 	(entities 0)
 	(parameters 0)
 	(fmt "%20s %s\n")
-	(hdr "")
-	)
+	(hdr ""))
+
     (sgml-map-eltypes (function (lambda (e) (incf elements)))
 		      sgml-dtd-info)
     (sgml-map-entities (function (lambda (e) (incf entities)))
