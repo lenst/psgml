@@ -4,7 +4,7 @@
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Version: $Id$
 ;; Keywords: 
-;; Last edited: 1999-05-02 21:34:59 lenst
+;; Last edited: 1999-08-02 20:55:20 lenst
 
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -55,7 +55,7 @@
     (literal . nil)))
 
 (defvar fs-special-styles
-  '(top bottom before after hang-from text)
+  '(top bottom before after hang-from text sub-style)
   "Style attribues that should not be entered in the characteristics table.")
 
 
@@ -90,6 +90,7 @@
 (defun fs-add-output (str &optional just)
   (save-excursion
     (set-buffer fs-buffer)
+    (goto-char (point-max))
     (let ((start (point)))
       (insert str)
       (when just
@@ -151,7 +152,9 @@
 	   hang-from
 	 (make-string (or first-indent indent) ? )))
       (fill-region-as-paragraph (point-min) (point-max))
-      ))
+      (goto-char (point-max))
+      (unless (bolp)
+        (insert ?\n))))
     (fs-add-output (buffer-string) (fs-char 'justification)))
   (sgml-pop-entity)
   (sit-for 0))
@@ -239,11 +242,14 @@ The value can be the style-sheet list, or it can be a file name
 	     (when (stringp text)
 	       (fs-paraform-data text))))
 	  (t
-	   (sgml-map-content e
-			     (function fs-engine)
-			     (function fs-paraform-data)
-			     nil
-			     (function fs-paraform-entity))))
+           (let ((fs-style
+                  (append (getf style 'sub-style)
+                          fs-style)))
+             (sgml-map-content e
+                               (function fs-engine)
+                               (function fs-paraform-data)
+                               nil
+                               (function fs-paraform-entity)))))
     (let ((after (getf style 'after)))
       (when after
 	(fs-do-style e after)))
