@@ -1,4 +1,12 @@
-2001-12-16  Lennart Staflin  <lennarts@manamind.no>
+2001-12-18  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-attribute-buffer): Don't write protect the
+	"#DEFAULT" marker.
+	(sgml-extract-attribute-value): strip any remains of "#DEFAULT".
+	(sgml-edit-attrib-next): if point is before the attribute value,
+	move to beginning of line to avoid skipping this attribute.
+
+2001-12-16  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.2.4 released
 
@@ -24,7 +32,7 @@
 2001-11-09  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.2.3 released
-	
+
 	* psgml.el (sgml-running-lucid): make sure it gets defined during
 	compilation.
 
