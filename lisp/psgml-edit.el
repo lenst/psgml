@@ -1034,6 +1034,10 @@ buffers local variables list."
 
 ;;;; SGML mode: Fill 
 
+(defun sgml-element-fillable (element)
+  (and (sgml-element-mixed element)
+       (not (sgml-element-appdata element 'nofill))))
+
 (defun sgml-fill-element (element)
   "Fill bigest enclosing element with mixed content.
 If current element has pure element content, recursively fill the
@@ -1041,9 +1045,9 @@ subelements."
   (interactive (list (sgml-find-element-of (point))))
   ;;
   (message "Filling...")
-  (when (sgml-element-mixed element)
-    ;; Find bigest enclosing element with mixed content
-    (while (sgml-element-mixed (sgml-element-parent element))
+  (when (sgml-element-fillable element)
+    ;; Find bigest enclosing fillable element
+    (while (sgml-element-fillable (sgml-element-parent element))
       (setq element (sgml-element-parent element))))
   ;; 
   (sgml-do-fill element)
@@ -1055,7 +1059,7 @@ subelements."
     (sit-for 0))
   (save-excursion
     (cond
-     ((sgml-element-mixed element)
+     ((sgml-element-fillable element)
       (let (last-pos
 	    (c (sgml-element-content element))
 	    (agenda nil))		; regions to fill later
@@ -1064,10 +1068,10 @@ subelements."
 	(setq last-pos (point))
 	(while c
 	  (cond
-	   ((sgml-element-mixed c))
+	   ((sgml-element-fillable c))
 	   (t
 	    ;; Put region before element on agenda.  Can't fill it now
-	    ;; that would mangel the parse tree that is beeing traversed.
+	    ;; that would mangle the parse tree that is beeing traversed.
 	    (push (cons last-pos (sgml-element-start c))
 		  agenda)
 	    (goto-char (sgml-element-start c))
