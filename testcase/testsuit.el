@@ -7,7 +7,8 @@
 (require 'psgml-parse)
 
 (defconst psgml-test-cases
-  '(("tc01.sgml" (warning "Undefined entity.*"))
+  '(
+    ("tc01.sgml" (warning "Undefined entity.*"))
     ("tc02.xml")
     ("tc03.xml")
     ("tc04.sgml")
@@ -17,7 +18,9 @@
     ("tc13.el" (warning "Invalid character"))
     ("tc15.el")
     ("tc16.el")
-    ("tc17.html")))
+    ("tc17.html")
+    ("tc18.el")
+    ))
 
 (defun testsuit-run-test-case (case-description)
   (let* ((file (first case-description))
