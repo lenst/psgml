@@ -772,9 +772,9 @@ problem.  There is a simple translation to sequence- and or-connectors.
 For example @samp{(a & b & c)} is can be translated to:
 
 @example
-((a, b, c) | (a, c, b) | 
- (b, a, c) | (b, c, a) | 
- (c, a, b) | (c, b, a))
+((a, ((c, b) | (b, c))) | 
+ (b, ((a, c) | (c, a))) | 
+ (c, ((a, b) | (b, a))) )
 @end example
 
 But this grows too fast to be of direct practical use.  PSGML represents

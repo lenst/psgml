@@ -1,3 +1,13 @@
+1999-12-03  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml.el (sgml-mode-syntax-table): new variable
+	(sgml-mode): use sgml-mode-syntax-table
+
+1999-11-29  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-validate-error-regexps): Also recognize warnings
+	(:W:) in output from nsgmls.
+
 1999-11-11  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml-parse.el (sgml-parse-to): Let sgml-with-parser-syntax wrap

@@ -481,7 +481,7 @@ These file names will serve as the arguments to the `sgml-validate-command'
 format control string instead of the defaults.")
 
 (defvar sgml-validate-error-regexps
-  '((".*:\\(.+\\):\\([0-9]+\\):\\([0-9]+\\):[EX]: " 1 2 3)
+  '((".*:\\(.+\\):\\([0-9]+\\):\\([0-9]+\\):[EXW]: " 1 2 3)
     ("\\(error\\|warning\\) at \\([^,]+\\), line \\([0-9]+\\)" 2 3)
     ("\n[a-zA-Z]?:?[^0-9 \n\t:]+:[ \t]*\\([^ \n\t:]+\\):\
 \\([0-9]+\\):\\(\\([0-9]+\\)[: \t]\\)?" 1 2 4))
@@ -761,6 +761,14 @@ as that may change."
 	 'sgml-tag-region-if-active
          'sgml-use-text-properties
 	 ))))
+
+;;;; SGML mode: syntax table
+
+(defvar sgml-mode-syntax-table
+  (let ((s (copy-syntax-table text-mode-syntax-table)))
+    (modify-syntax-entry ?< "."  s)
+    (modify-syntax-entry ?> "."  s)
+    s))
 
 
 ;;;; SGML mode: keys and menus
@@ -1152,7 +1160,7 @@ All bindings:
   (set (make-local-variable 'paragraph-start)
        paragraph-separate)
 
-  (set-syntax-table text-mode-syntax-table)
+  (set-syntax-table sgml-mode-syntax-table)
   (make-local-variable 'comment-start)
   (setq comment-start "<!-- ")
   (make-local-variable 'comment-end)
