@@ -1,8 +1,8 @@
 ;;;; psgml-info.el
-;;; Last edited: Sun Dec  4 20:54:52 1994 by lenst@lysistrate (Lennart Staflin)
+;;; Last edited: Sun Mar 19 16:43:11 1995 by lenst@tiny.lysator.liu.se (Lennart Staflin)
 ;;; $Id$
 
-;; Copyright (C) 1994 Lennart Staflin
+;; Copyright (C) 1994, 1995 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 
@@ -346,6 +346,24 @@
 		   (when (memq et (sgml-eltype-refrenced-elements cand))
 		     (princ (format " %s" (sgml-eltype-name cand))))))
        (sgml-pstate-dtd sgml-buffer-parse-state)))))
+
+
+;;;; Print general info about the DTD.
+
+(defun sgml-general-dtd-info ()
+  "Display information about the current DTD."
+  (interactive)
+  (sgml-need-dtd)
+  (sgml-display-table
+   (list (list "Doctype" (sgml-dtd-doctype sgml-dtd-info))
+	 (list "Compiled DTD"
+	       (if (sgml-dtd-merged sgml-dtd-info)
+		   (car (sgml-dtd-merged sgml-dtd-info))
+		 "Maybe"))
+	 (cons "Files used:"
+	       (loop for x in (sgml-dtd-dependencies sgml-dtd-info)
+		     if (stringp x) collect x)))
+   "DTD Info" "What" "Value"))
 
 
 ;;; psgml-info.el ends here
