@@ -37,7 +37,7 @@
 (eval-and-compile
   (autoload 'sgml-do-set-option "psgml-edit"))
 
-(defvar sgml-max-menu-size (/ (* (screen-height) 2) 3)
+(defvar sgml-max-menu-size (/ (* (frame-height) 2) 3)
   "*Max number of entries in Tags and Entities menus before they are split
 into several panes.")
 
@@ -78,9 +78,9 @@ into several panes.")
   (let ((value nil)
 	(event nil))
     (popup-menu menudesc)
-    (while (popup-menu-up-p)
+    (while (popup-up-p)
       (setq event (next-command-event event))
-      (cond ((menu-event-p event)
+      (cond ((misc-user-event-p event)
 	     (cond
 	      ((eq (event-object event) 'abort)
 	       (signal 'quit nil))

@@ -1,7 +1,14 @@
 1998-11-15  Lennart Staflin  <lenst@lysator.liu.se>
 
-	* psgml.el (sgml-option-value-indicator): moved here.
+	* psgml-parse.el (sgml-char-int): from XEmacs
+	(sgml-read-octet): modified for XEmacs
+	(sgml-read-peek): dito.
+	(sgml-read-number): dito.
 
+	* psgml.el (sgml-option-value-indicator): moved here.
+	(sgml-mode): activate-menubar-hook can't be local in XEmacs and 
+	sgml-build-custom-menus need to be after the easy-menu-adds.
+	
 1998-11-14  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el, psgml-edit.el: Fix from David Megginson to some

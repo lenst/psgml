@@ -48,7 +48,8 @@
 
 (defconst psgml-elisp-source
   (append psgml-common-files
-	  (cond ((string-match "lucid" emacs-version)
+	  (cond ((or (string-match "Lucid" emacs-version)
+		     (string-match "XEmacs" emacs-version))
 		 psgml-xemacs-files)
 		(t
 		 psgml-emacs-files))))
@@ -57,7 +58,7 @@
 (defun psgml-find-source-dir (&optional ask)
   (if psgml-source-dir
       t 
-    (let ((cand (list "." "./psgml-1.0.2")))
+    (let ((cand (list "." "./psgml-1.1.6")))
       (while cand
 	(if (file-exists-p (expand-file-name "psgml-maint.el" (car cand)))
 	    (progn
