@@ -1,5 +1,5 @@
 ;;;; psgml-info.el
-;;; Last edited: Wed Mar 20 21:24:16 1996 by lenst@triton.lstaflin.pp.se (Lennart Staflin)
+;;; Last edited: 1998-06-19 18:59:43 lenst
 ;;; $Id$
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
@@ -328,13 +328,13 @@
 		  (defl (sgml-attdecl-default-value attdecl)))
 	      (when (listp dval)
 		(setq dval (concat (if (eq (first dval)
-					   'notation)
+					   'NOTATION)
 				       "#NOTATION (" "(")
 				   (mapconcat (function identity)
 					      (second dval)
 					      "|")
 				   ")")))
-	      (cond ((sgml-default-value-type-p 'fixed defl)
+	      (cond ((sgml-default-value-type-p 'FIXED defl)
 		     (setq defl (format "#FIXED '%s'"
 					(sgml-default-value-attval defl))))
 		    ((symbolp defl)

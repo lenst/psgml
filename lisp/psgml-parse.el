@@ -1347,8 +1347,13 @@ ends at point."
       "NULL"  ""
       )))
 
-(defun sgml-delim (drole)
+(defun sgml-get-delim-string (drole)
   (car (cdr (member drole sgml-delimiters))))
+
+(defmacro sgml-delim (drole)
+  (if (stringp drole)
+      (sgml-get-delim-string (upcase drole))
+    `(sgml-get-delim-string ,drole)))
 
 
 (defmacro sgml-is-delim (delim &optional context move offset)
@@ -1370,11 +1375,9 @@ string -- delimiter with that name,
 list -- any of the contextual constraints in the list."
 
   (or offset (setq offset 0))
-  (let ((ds (member (upcase (format "%s" delim))
-		    sgml-delimiters)))
+  (setq delim (upcase (format "%s" delim)))
+  (let ((ds (sgml-get-delim-string delim)))
     (assert ds)
-    (setq delim (car ds)
-	  ds (cadr ds))
     (cond ((eq context 'gi)
 	   (setq context '(nmstart stagc)))
 	  ((eq context 'com)
@@ -1421,7 +1424,7 @@ list -- any of the contextual constraints in the list."
 
 (defun sgml-delimiter-parse-error (delim)
   (sgml-parse-error "Delimiter %s (%s) expected"
-		    delim (cadr (member delim sgml-delimiters))))
+		    delim (sgml-get-delim-string delim)))
 
 (defmacro sgml-parse-delim (delim &optional context)
   (`(sgml-is-delim (, delim) (, context) move)))
@@ -1448,10 +1451,7 @@ in any of them."
 				       (concat "\\" s)
 				     s)))))))
    (t
-    (let ((ds (member (upcase (format "%s" delim))
-		      sgml-delimiters)))
-      (assert ds)
-      (setq ds (cadr ds))
+    (let ((ds (sgml-get-delim-string (upcase (format "%s" delim)))))
       (if (= 1 (length ds))
 	  (list 'skip-chars-forward (concat "^" ds))
 	(`(and (search-forward (, ds) nil t)
@@ -1533,6 +1533,14 @@ in any of them."
     (if (sgml-parse-delim "PIO")
 	(sgml-do-processing-instruction))))
 
+(defun sgml-parse-set-appflag (flagsym)
+  (loop for name = (sgml-parse-name)
+        while name
+        for et = (sgml-lookup-eltype name)
+        do (setf (sgml-eltype-appdata et flagsym) t)
+        (message "Defining element %s as %s" name flagsym)
+        (sgml-skip-cs)))
+
 (defun sgml-do-processing-instruction ()
   (let ((start (point)))
     (when (and (eq ?P (following-char))
@@ -1546,7 +1554,14 @@ in any of them."
 		     for et = (sgml-lookup-eltype name)
 		     do (setf (sgml-eltype-appdata et 'nofill) t)
 		     (message "Defining element %s as a NOFILL" name)
-		     (sgml-skip-cs))))))
+		     (sgml-skip-cs)))
+              ((string-equal command "breakafter")
+               (sgml-parse-set-appflag 'break-after-stag))
+              ((string-equal command "breakbefore")
+               (sgml-parse-set-appflag 'break-brefore-stag))
+              (t
+               (sgml-log-warning "Unknown processing instruction for PSGML: %s"
+                                 command)))))
     (if sgml-xml-p
 	(sgml-skip-upto "XML-PIC")
       (sgml-skip-upto "PIC"))
@@ -1701,6 +1716,7 @@ in any of them."
   (if (sgml-parse-delim "XML-SCOM")
       (progn (sgml-skip-upto "XML-ECOM")
 	     (sgml-check-delim "XML-ECOM")
+             (sgml-set-markup-type 'comment)
 	     t)))
 
 (defun sgml-skip-cs ()
@@ -1747,15 +1763,14 @@ a RNI must be followed by NAME."
                         name)))
 
 (defun sgml-check-case (name)
-  "Convert the argument to upper case.
+  "Check that NAME is in upper case.
 If sgml-namecase-general is nil, then signal an error if the argument
 is not already in upper case."
-  ;; FIXME: Is this function needed when the internal representation
-  ;; of keywords has changed to upper case?
+  ;; FIXME: Perhaps only warn and upcase
   (or sgml-current-namecase-general
       (equal name (upcase name))
       (sgml-parse-error "Uppercase keyword expected."))
-  (upcase name))
+  name)
 
 (defun sgml-parse-literal ()
   "Parse a literal and return a string, if no literal return nil."
@@ -1872,7 +1887,7 @@ is not already in upper case."
 
 (defun sgml-entity-declare (name entity-table type text)
   "Declare an entity with name NAME in table ENTITY-TABLE.
-TYPE should be the type of the entity (text|cdata|ndata|sdata...).
+TYPE should be the type of the entity (text|CDATA|NDATA|SDATA...).
 TEXT is the text of the entity, a string or an external identifier.
 If NAME is nil, this defines the default entity."
   (cond
@@ -2431,6 +2446,7 @@ overrides the entity type in entity look up."
     (setq sgml-scratch-buffer (generate-new-buffer " *entity*")))
   (let ((cb (current-buffer))
 	(dd default-directory)
+        (syntax-table (syntax-table))
 	;;*** should eref be argument ?
 	(eref (sgml-make-eref (if (stringp entity)
 				  (sgml-make-entity entity nil nil)
@@ -2455,7 +2471,7 @@ overrides the entity type in entity look up."
     (setq default-directory dd)
     (make-local-variable 'sgml-current-eref)
     (setq sgml-current-eref eref)
-    (set-syntax-table sgml-parser-syntax)
+    (set-syntax-table syntax-table)
     (make-local-variable 'sgml-previous-buffer)
     (setq sgml-previous-buffer cb)
     (setq sgml-rs-ignore-pos		; don't interpret beginning of buffer
@@ -2469,7 +2485,9 @@ overrides the entity type in entity look up."
       (setq sgml-buffer-parse-state nil))
     (cond
      ((stringp entity)			; a file name
-      (save-excursion (insert-file-contents entity))
+      ;;(save-excursion ) test remove [lenst/1998-06-19 12:49:47]
+      (insert-file-contents entity)
+      ;; (goto-char (point-min)) ??
       (setq default-directory (file-name-directory entity)))
      ((consp (sgml-entity-text entity)) ; external id?
       (let* ((extid (sgml-entity-text entity))
@@ -2488,7 +2506,7 @@ overrides the entity type in entity look up."
 	  (goto-char (point-max)))
 	 (file
 	  ;; fifth arg not available in early v19
-	  (erase-buffer)
+	  ;;(erase-buffer) already erase the buffer
 	  (insert-file-contents file nil nil nil)
 	  (setq default-directory (file-name-directory file))
 	  (goto-char (point-min)))
@@ -3464,6 +3482,7 @@ Assumes starts with point inside a markup declaration."
 	(eref sgml-current-eref)
 	sgml-signal-data-function)
     (while (not done)
+      ;; FIXME: a lot of hardcoded knowledge about concrete delimiters
       (cond (marked-section
 	     (skip-chars-forward (if (eq type sgml-cdata) "^]" "^&]"))
 	     (when sgml-data-function
@@ -3473,7 +3492,8 @@ Assumes starts with point inside a markup declaration."
 	    (t
 	     (skip-chars-forward (if (eq type sgml-cdata) "^</" "^</&"))
 	     (when sgml-data-function
-	       (funcall sgml-data-function (buffer-substring-no-properties start (point))))
+	       (funcall sgml-data-function
+                        (buffer-substring-no-properties start (point))))
 	     (setq done (or (sgml-is-delim "ETAGO" gi)
 			    (sgml-is-enabled-net)))))
       (setq start (point))
@@ -3526,7 +3546,7 @@ Assumes starts with point inside a markup declaration."
 (defun sgml-do-usemap ()
   (let (mapname)
     ;;(setq sgml-markup-type 'usemap)
-    (unless (sgml-parse-rni "empty")
+    (unless (sgml-parse-rni "EMPTY")
       (setq mapname (sgml-check-name)))
     (sgml-skip-ps)
     (cond
@@ -3548,22 +3568,18 @@ Assumes starts with point inside a markup declaration."
       (sgml-do-usemap-element mapname)))))
 
 (defconst sgml-markup-declaration-table
-  (mapcar (lambda (pair)
-	    (cons (sgml-general-case (car pair))
-		  (cdr pair)))
-	
-	  '(("sgml"     . sgml-do-sgml-declaration)
-	    ("doctype"  . sgml-do-doctype)
-	    ("element"  . sgml-declare-element)
-	    ("entity"   . sgml-declare-entity)
-	    ("usemap"   . sgml-do-usemap)
-	    ("shortref" . sgml-declare-shortref)
-	    ("notation" . sgml-declare-notation)
-	    ("attlist"  . sgml-declare-attlist)
-	    ("uselink"  . sgml-skip-upto-mdc)
-	    ("linktype" . sgml-skip-upto-mdc)
-	    ("link"     . sgml-skip-upto-mdc)
-	    ("idlink"   . sgml-skip-upto-mdc))))
+  '(("SGML"     . sgml-do-sgml-declaration)
+    ("DOCTYPE"  . sgml-do-doctype)
+    ("ELEMENT"  . sgml-declare-element)
+    ("ENTITY"   . sgml-declare-entity)
+    ("USEMAP"   . sgml-do-usemap)
+    ("SHORTREF" . sgml-declare-shortref)
+    ("NOTATION" . sgml-declare-notation)
+    ("ATTLIST"  . sgml-declare-attlist)
+    ("USELINK"  . sgml-skip-upto-mdc)
+    ("LINKTYPE" . sgml-skip-upto-mdc)
+    ("LINK"     . sgml-skip-upto-mdc)
+    ("IDLINK"   . sgml-skip-upto-mdc)))
 
 
 (defun sgml-parse-markup-declaration (option)
@@ -3601,7 +3617,6 @@ dtd or `ignore' if the declaration is to be ignored."
     t)
    ((sgml-parse-delim "MS-START")
     (sgml-do-marked-section))))
-
 
 ;;;; Parsing attribute values
 
@@ -3639,12 +3654,12 @@ Returns a list of attspec (attribute specification)."
 	      "%s is not in any name group for element %s."
 	      val
 	      (sgml-eltype-name eltype))))
-      ;; *** What happens when eltype is nil ??
+      ;; FIXME: What happens when eltype is nil ??
       (cond
        (attdecl
 	(push (sgml-make-attspec (sgml-attdecl-name attdecl) val)
 	      asl)
-	(when (sgml-default-value-type-p 'conref
+	(when (sgml-default-value-type-p 'CONREF
 					 (sgml-attdecl-default-value attdecl))
 	  (setq sgml-conref-flag t)))
        (t                               ; No attdecl, record attribute any way
@@ -4288,16 +4303,20 @@ Returns parse tree; error if no element after POS."
          ;; no DTD
          (sgml-read-element-type prompt
                                  sgml-dtd-info))
-	((and ;;sgml-buffer-eltype-map
-	      (not (eq sgml-current-state sgml-any)))
+	((and;;sgml-buffer-eltype-map
+          (not (eq sgml-current-state sgml-any)))
 	 (let ((tab
-		(mapcar (function (lambda (x) (cons (symbol-name x) nil)))
+		(mapcar (function
+                         (lambda (x)
+                           (cons (sgml-general-insert-case (symbol-name x))
+                                 nil)))
 			(sgml-current-list-of-valid-eltypes))))
 	   (cond ((null tab)
 		  (error "No element valid at this point"))
 		 (t
-		  (completing-read prompt tab nil t
-				   (and (null (cdr tab)) (caar tab)))))))
+                  (let ((completion-ignore-case sgml-namecase-general))
+                    (completing-read prompt tab nil t
+                                     (and (null (cdr tab)) (caar tab))))))))
 	(t
 	 (read-from-minibuffer prompt))))
 

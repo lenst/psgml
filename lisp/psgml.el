@@ -227,7 +227,13 @@ Setting this variable automatically makes it local to the current buffer.")
 
 ;;[lenst/1998-03-09 19:51:55]
 (defconst sgml-namecase-entity nil)
-(defvar sgml-general-insert-case 'upper)
+
+(defvar sgml-general-insert-case 'lower
+  "*The case that will be used for general names in inserted markup.
+This can be the symbol `lower' or `upper'. Only effective if
+sgml-namecase-general is true.")
+(put 'sgml-general-insert-case 'sgml-type '(lower upper))
+
 (defvar sgml-entity-insert-case nil)
 
 
@@ -538,6 +544,7 @@ See `compilation-error-regexp-alist'.")
     sgml-public-map
     sgml-catalog-files
     sgml-ecat-files
+    sgml-general-insert-case
     )
   "User options that can be saved or set from menu."
   )
@@ -972,8 +979,9 @@ actually only the state that persists between commands.")
 	       (not (zerop (buffer-size)))
 	       (looking-at ".*<"))
       (setq sgml-auto-activate-dtd-tried t)
-      (sgml-need-dtd)
-      (sgml-fontify-buffer 0))
+      (ignore-errors
+        (sgml-need-dtd)
+        (sgml-fontify-buffer 0)))
     (when sgml-buffer-parse-state
       (sgml-update-display))))
 

@@ -196,8 +196,8 @@ a list using attlist TO."
 	  do
 	  (cond
 	   ;; Special case ID attribute
-	   ((and (eq 'id (sgml-attdecl-declared-value from-decl))
-		 (setq tem (sgml-attribute-with-declared-value to 'id)))
+	   ((and (eq 'ID (sgml-attdecl-declared-value from-decl))
+		 (setq tem (sgml-attribute-with-declared-value to 'ID)))
 	    (push
 	     (sgml-make-attspec (sgml-attdecl-name tem)
 				(sgml-attspec-attval attspec))
@@ -354,17 +354,33 @@ is determined."
 	(setq element
 	      (let ((sgml-throw-on-error 'parse-error))
 		(catch sgml-throw-on-error
-                  (sgml-find-context-of (point))))))
+		  (if (eobp)
+		      (sgml-find-context-of (point))
+		    (sgml-find-element-of (point)))))))
+      (when (eq element sgml-top-tree)	; not in a element at all
+	(setq element nil)		; forget element
+	(goto-char here))		; insert normal tab insted)
       (when element
 	(sgml-with-parser-syntax
-	 (let ((etag (sgml-is-end-tag)))
-	   (when (or sgml-indent-data
-		     (not (sgml-element-data-p element)))
-	     (setq col
-		   (* sgml-indent-step
-		      (+ (if etag -1 0)
-                         (if sgml-markup-type 1 0)
-			 (sgml-element-level element))))))))
+	 (let ((stag (sgml-is-start-tag))
+	       (etag (sgml-is-end-tag)))
+           (cond ((and (> (point) (sgml-element-start element))
+                       (< (point) (sgml-element-stag-end element)))
+                  (setq col
+                        (+ (save-excursion
+                             (goto-char (sgml-element-start element))
+                             (current-column))
+                           (length (sgml-element-gi element))
+                           2)))
+                 ((or sgml-indent-data
+                      (not (sgml-element-data-p
+                            (if stag
+                                (sgml-element-parent element)
+                              element))))
+                  (setq col
+                        (* sgml-indent-step
+                           (+ (if (or stag etag) -1 0)
+                              (sgml-element-level element)))))))))
       (when (and col (/= col (current-column)))
 	(beginning-of-line 1)    
 	(delete-horizontal-space)
@@ -372,6 +388,7 @@ is determined."
       (when (< (point) here)
 	(goto-char here))
       col)))
+
 
 (defun sgml-next-data-field ()
   "Move forward to next point where data is allowed."
@@ -553,6 +570,31 @@ is determined."
 
 ;;;; SGML mode: keyboard inserting
 
+(defun sgml-coerce-element-type (obj)
+  (when (stringp obj)
+    (setq obj (sgml-lookup-eltype (sgml-general-case obj))))
+  (when nil                             ;FIXME: need predicate
+    (setq obj (sgml-tree-eltype obj)))
+  obj)
+
+(defun sgml-break-brefore-stag-p (element)
+  (sgml-eltype-appdata (sgml-coerce-element-type element)
+                       'break-brefore-stag))
+
+(defun sgml-break-after-stag-p (element)
+  (sgml-eltype-appdata (sgml-coerce-element-type element)
+                       'break-after-stag))
+
+(defun sgml-insert-break ()
+  (skip-chars-backward " \t")
+  (cond ((bolp)
+         (if (looking-at "^\\s-*$")
+             (fixup-whitespace)))
+        (t
+         ;; FIXME: fixup-whitespace ??
+         (insert "\n"))))
+
+
 (defun sgml-insert-tag (tag &optional silent no-nl-after)
   "Insert a tag, reading tag name in minibuffer with completion.
 If the variable sgml-balanced-tag-edit is t, also inserts the
@@ -594,6 +636,8 @@ after the first tag inserted."
 	element				; inserted element
 	(sgml-show-warnings nil))
     (when (and name (not (equal name "")))
+      (when (sgml-break-brefore-stag-p name)
+        (sgml-insert-break))
       (sgml-insert-tag (sgml-start-tag-of name) 'silent)
       (if (and sgml-xml-p (sgml-check-empty name))
 	  (forward-char -2)
@@ -605,6 +649,8 @@ after the first tag inserted."
       (if (and sgml-xml-p (sgml-check-empty name))
 	  (forward-char 2)
 	(forward-char 1))
+      (when (sgml-break-after-stag-p name)
+        (sgml-insert-break))
       (when (not (sgml-element-empty element))
 	(when (and sgml-auto-insert-required-elements
 		   (sgml-model-group-p sgml-current-state))
@@ -631,7 +677,7 @@ after the first tag inserted."
 (defun sgml-default-asl (element)
   (loop for attdecl in (sgml-element-attlist element)
 	when (sgml-default-value-type-p (sgml-attdecl-default-value attdecl)
-					'required)
+					'REQUIRED)
 	collect
 	(sgml-make-attspec
 	 (sgml-attdecl-name attdecl)
@@ -664,14 +710,14 @@ AVL should be a assoc list mapping symbols to strings."
           (setq name (sgml-general-insert-case name))
 	  (unless val			; no value given
 	    ;; Supply the default value if a value is needed
-	    (cond ((sgml-default-value-type-p 'required def)
+	    (cond ((sgml-default-value-type-p 'REQUIRED def)
 		   (setq val ""))
 		  ((and (not (or sgml-omittag sgml-shorttag))
 			(consp def))
 		   (setq val (sgml-default-value-attval def)))))
           (when val
-            (cond ((eq dcl 'cdata))
-                  ((eq dcl 'entity) (setq val (sgml-entity-insert-case val)))
+            (cond ((eq dcl 'CDATA))
+                  ((eq dcl 'ENTITY) (setq val (sgml-entity-insert-case val)))
                   (t (setq val (sgml-general-insert-case val)))))
 	  (cond 
 	   ((null val))			; Ignore
@@ -780,7 +826,7 @@ CURVALUE is nil or a string that will be used as default value."
 	 (tokens (sgml-declared-value-token-group dv))
 	 (notations (sgml-declared-value-notation dv))
 	 (type (cond (tokens "token")
-		     (notations "notation")
+		     (notations "NOTATION")
 		     (t (symbol-name dv))))
 	 (prompt
 	  (format "Value for %s (%s%s): "
@@ -791,16 +837,17 @@ CURVALUE is nil or a string that will be used as default value."
 	 value)
     (setq value 
 	  (if (or tokens notations)
-	      (completing-read prompt
-			       (mapcar 'list (or tokens notations))
-			       nil t)
+	      (let ((completion-ignore-case sgml-namecase-general))
+		(completing-read prompt
+				 (mapcar 'list (or tokens notations))
+				 nil t))
 	    (read-string prompt)))
     (if (and curvalue (equal value ""))
 	curvalue value)))
 
 (defun sgml-non-fixed-attributes (attlist)
   (loop for attdecl in attlist
-	unless (sgml-default-value-type-p 'fixed 
+	unless (sgml-default-value-type-p 'FIXED 
 					  (sgml-attdecl-default-value attdecl))
 	collect attdecl))
 
@@ -809,11 +856,12 @@ CURVALUE is nil or a string that will be used as default value."
   (interactive
    (let* ((el (sgml-find-attribute-element))
 	  (name
-	   (completing-read
-	    "Attribute name: "
-	    (mapcar (function (lambda (a) (list (sgml-attdecl-name a))))
-		    (sgml-non-fixed-attributes (sgml-element-attlist el)))
-	    nil t)))
+	   (let ((completion-ignore-case sgml-namecase-general))
+	     (completing-read
+	      "Attribute name: "
+	      (mapcar (function (lambda (a) (list (sgml-attdecl-name a))))
+		      (sgml-non-fixed-attributes (sgml-element-attlist el)))
+	      nil t))))
      (list name
 	   (sgml-read-attribute-value
 	    (sgml-lookup-attdecl name (sgml-element-attlist el))
@@ -874,7 +922,8 @@ of then current element."
 (defun sgml-custom-markup (markup)
   "Insert markup from the sgml-custom-markup alist."
   (interactive
-   (list (completing-read "Insert Markup: " sgml-custom-markup nil t)))
+   (let ((completion-ignore-case sgml-namecase-general))
+     (list (completing-read "Insert Markup: " sgml-custom-markup nil t))))
   (sgml-insert-markup (cadr (assoc markup sgml-custom-markup))))
 
 
@@ -1035,7 +1084,7 @@ buffers local variables list."
 			   (list 'sgml-read-attribute-value
 				 (list 'quote attdecl)
 				 (sgml-element-attval el name))))))
-	    (if (sgml-default-value-type-p 'required defval)
+	    (if (sgml-default-value-type-p 'REQUIRED defval)
 		nil
 	      (list "--"
 		    (list (if (sgml-default-value-type-p nil defval)
@@ -1196,7 +1245,7 @@ Editing is done in a separate window."
 	  '(read-only t rear-nonsticky (read-only))
 	  " %s = " aname)
 	 (cond				; attribute value
-	  ((sgml-default-value-type-p 'fixed def-value)
+	  ((sgml-default-value-type-p 'FIXED def-value)
 	   (sgml-insert '(read-only t category sgml-fixed
 				    rear-nonsticky (category))
 			"#FIXED %s"
@@ -1298,7 +1347,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
       (narrow-to-region (point)
 			(progn (sgml-edit-attrib-field-end)
 			       (point)))
-      (unless (eq type 'cdata)
+      (unless (eq type 'CDATA)
 	(subst-char-in-region (point-min) (point-max) ?\n ? )
 	(goto-char (point-min))
 	(delete-horizontal-space))

@@ -1,3 +1,62 @@
+Mon Jun 22 19:58:43 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-indent-line): Previous change of
+	sgml-indent-line did not work well with OMITTAG. Restore old
+	functionallity.
+	
+Fri Jun 19 18:54:27 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-attribute-buffer): 
+	changed case of default value type, here and in many other functions.
+	(sgml-translate-attribute-specification-list): changed case for
+	declared value
+
+	* psgml-parse.el (sgml-parse-attribute-specification-list):
+	changed case of default value type
+
+1998-06-16  Dave Love  <d.love@dl.ac.uk>
+
+	* psgml-edit.el (sgml-read-element-name,
+	sgml-read-attribute-value, sgml-insert-attribute,
+	sgml-custom-markup): Use sgml-namecase-general to set
+	completion-ignore-case.
+	
+1998-06-16  Dave Love  <d.love@dl.ac.uk>
+
+	* psgml-parse.el (sgml-push-to-entity): Don't use save-excursion
+	around insert-file-contents -- may break in Emacs 20.3.
+
+Fri Jun 19 10:40:53 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-dtd.el (sgml-check-declared-value): upcase NOTATION
+
+	* psgml-parse.el (sgml-read-element-name): bind
+	completion-ignore-case as suggested by Mark Eichin. Also present
+	element names in the insert case.
+
+Tue Jun 16 00:31:03 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-command-post): added ignore-errors
+
+	* psgml-parse.el (sgml-get-delim-string): new func.
+	(sgml-delim): changed to macro.
+	(sgml-do-usemap): upcase #EMPTY
+	(sgml-parse-xml-comment): set markup type
+
+	* psgml-dtd.el (sgml-validate-default-value-rn): upcase keywords
+	(sgml-declare-entity): remove case fiddling
+
+	* psgml-parse.el (sgml-check-case): remove case fiddling -- retain
+	check.
+
+	* psgml-dtd.el (sgml-validate-declared-value): upcase attribute types
+	(sgml-check-default-value): remove case fiddling -- reserved names
+	should be in upper case.
+
+	* psgml-parse.el (sgml-push-to-entity): use syntax table from
+	current buffer in entity buffer and not the sgml-parser-syntax as
+	XML will use another syntax table.
+
 Wed Jun 10 23:28:42 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-catalog-lookup): Take additional catalogs

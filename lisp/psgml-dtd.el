@@ -443,11 +443,11 @@ Case transformed for general names."
 	   nil))))
 
 (defun sgml-parse-modifier ()
-  (cond ((sgml-parse-delim PLUS)
+  (cond ((sgml-parse-delim "PLUS")
 	 (function sgml-make-+))
-	((sgml-parse-delim REP)
+	((sgml-parse-delim "REP")
 	 (function sgml-make-*))
-	((sgml-parse-delim OPT)
+	((sgml-parse-delim "OPT")
 	 (function sgml-make-opt))))
 
 (defun sgml-check-primitive-content-token ()
@@ -611,26 +611,25 @@ Case transformed for general names."
 	    (setq type (or (sgml-parse-entity-type) 'text))
 	    extid)
 	   ((sgml-startnm-char-next)
-	    (let ((token (intern (downcase (sgml-check-case (sgml-check-name))))))
-              ;; FIXME: to much case fiddling. 
+	    (let ((token (intern (sgml-check-case (sgml-check-name)))))
 	      (sgml-skip-ps)
 	      (when (and sgml-xml-p
 			 (memq token '(cdata sdata pi starttag endtag ms md)))
 		(sgml-error "XML forbids %s entities."
 			    (upcase (symbol-name token))))
 	      (cond
-	       ((memq token '(cdata sdata)) ; data text ***
+	       ((memq token '(CDATA SDATA)) ; data text ***
 		(setq type token)
 		(sgml-check-parameter-literal))
-	       ((eq token 'pi)
+	       ((eq token 'PI)
 		(concat "<?" (sgml-check-parameter-literal) ">"))
-	       ((eq token 'starttag)
+	       ((eq token 'STARTTAG)
 		(sgml-start-tag-of (sgml-check-parameter-literal)))
-	       ((eq token 'endtag)
+	       ((eq token 'ENDTAG)
 		(sgml-end-tag-of (sgml-check-parameter-literal)))	
-	       ((eq token 'ms)		; marked section
+	       ((eq token 'MS)		; marked section
 		(concat "<![" (sgml-check-parameter-literal) "]]>"))
-	       ((eq token 'md)		; Markup declaration
+	       ((eq token 'MD)		; Markup declaration
 		(concat "<!" (sgml-check-parameter-literal) ">")))))
 	   ((sgml-check-parameter-literal))))
     (when dest
@@ -700,7 +699,7 @@ Case transformed for general names."
 
 (defun sgml-parse-attribute-definition ()
   (sgml-skip-ps)
-  (if (sgml-is-delim MDC) ; End of attlist?
+  (if (sgml-is-delim "MDC") ; End of attlist?
       nil
     (sgml-make-attdecl (sgml-check-name)
 		       (sgml-check-declared-value)
@@ -711,51 +710,51 @@ Case transformed for general names."
   (let ((type 'name-token-group)
 	(names nil))
     (unless (eq (following-char) ?\()
-      (setq type (intern (downcase (sgml-check-case (sgml-check-name)))))
+      (setq type (intern (sgml-check-case (sgml-check-name))))
       (sgml-validate-declared-value type)
       (sgml-skip-ps))
-    (when (memq type '(name-token-group notation))
+    (when (memq type '(name-token-group NOTATION))
       (setq names (sgml-check-nametoken-group)))
     (sgml-make-declared-value type names)))
 
 (defun sgml-validate-declared-value (type)
   (unless (memq type
-		'(cdata
-		  entity
-		  entities
-		  id
-		  idref
-		  idrefs
-		  name
-		  names
-		  nmtoken
-		  nmtokens
-		  notation
-		  number
-		  numbers
-		  nutoken
-		  nutokens))
+		'(CDATA
+		  ENTITY
+		  ENTITIES
+		  ID
+		  IDREF
+		  IDREFS
+		  NAME
+		  NAMES
+		  NMTOKEN
+		  NMTOKENS
+		  NOTATION
+		  NUMBER
+		  NUMBERS
+		  NUTOKEN
+		  NUTOKENS))
     (sgml-error "Invalid attribute declared value: %s" type))
   (when (and sgml-xml-p (memq type
-			      '(name names number numbers nutoken nutokens)))
+			      '(NAME NAMES NUMBER NUMBERS NUTOKEN NUTOKENS)))
     (sgml-error "XML forbids %s attributes." (upcase (symbol-name type)))))
 
 (defun sgml-check-default-value ()
   (sgml-skip-ps)
   (let* ((rni (sgml-parse-rni))
-	 (key (if rni (intern (downcase (sgml-check-case (sgml-check-name)))))))
+	 (key (if rni (intern (sgml-check-case (sgml-check-name))))))
     (if rni (sgml-validate-default-value-rn key))
     (sgml-skip-ps)
     (sgml-make-default-value
      key
-     (if (or (not rni) (eq key 'fixed))
+     (if (or (not rni) (eq key 'FIXED))
 	 (sgml-check-attribute-value-specification)))))
 
 (defun sgml-validate-default-value-rn (rn)
-  (unless (memq rn '(required fixed current conref implied))
+  (unless (memq rn '(REQUIRED FIXED CURRENT CONREF IMPLIED))
     (sgml-error "Unknown reserved name: %s."
 		(upcase (symbol-name rn))))
-  (when (and sgml-xml-p (memq rn '(current conref)))
+  (when (and sgml-xml-p (memq rn '(CURRENT CONREF)))
     (sgml-error "XML forbids #%s attributes."
 		(upcase (symbol-name rn)))))
   
