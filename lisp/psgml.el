@@ -480,7 +480,7 @@ These file names will serve as the arguments to the `sgml-validate-command'
 format control string instead of the defaults.")
 
 (defvar sgml-validate-error-regexps
-  '((":\\(.+\\):\\([0-9]+\\):\\([0-9]+\\):[EX]: " 1 2 3)
+  '((".*:\\(.+\\):\\([0-9]+\\):\\([0-9]+\\):[EX]: " 1 2 3)
     ("\\(error\\|warning\\) at \\([^,]+\\), line \\([0-9]+\\)" 2 3)
     ("\n[a-zA-Z]?:?[^0-9 \n\t:]+:[ \t]*\\([^ \n\t:]+\\):\
 \\([0-9]+\\):\\(\\([0-9]+\\)[: \t]\\)?" 1 2 4))

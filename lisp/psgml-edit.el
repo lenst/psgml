@@ -1699,10 +1699,9 @@ argument INVERT to non-nil."
 				  (sgml-entity-text entity)
 				  type
 				  (sgml-entity-name entity)))
-			   (command (format "%s %s" handler file))
 			   (process (start-process 
 				     (format "%s background" handler)
-				     nil "/bin/sh" "-c" command)))
+				     nil handler file)))
 		      (process-kill-without-query process))))
 	      (error "Don't know how to handle notation '%s'." notation)))
 	   (text (progn
@@ -1913,7 +1912,7 @@ will reset the variable."))
       (if val "Yes" "No"))
      ((eq type 'string)
       (if (stringp val)
-	  (substring val 0 4)
+	  (substring val 0 (min (length val) 4))
 	"-"))
      ((and (atom type) val)
       "...")

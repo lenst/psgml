@@ -1,3 +1,14 @@
+1998-10-20  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-edit-external-entity): fix from Matthias Clasen
+
+	* psgml.el (sgml-validate-error-regexps): modify regexp to work in
+	Emacs 20.3
+
+1998-09-30  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* Version 1.1.4 release
+
 Mon Aug 31 21:53:45 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-bdtd-load): Increase version number
