@@ -3,7 +3,7 @@
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Version: $Id$
-;; Keywords: 
+;; Keywords:
 
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 ;; run the emacs command `M-x style-format'.
 
 ;; The style file should contain a single Lisp list. The elements of
-;; this list, are them self lists, describe the style for an element type. 
+;; this list, are them self lists, describe the style for an element type.
 ;; The sublists begin with the generic identifier for the element types and
 ;; the rest of the list are characteristic/value pairs.
 
@@ -103,7 +103,7 @@
   (when (> n fs-vspace)
     (fs-add-output (make-string (- n fs-vspace) ?\n))
     (setq fs-vspace n)))
-	   
+
 
 (defun fs-para ()
   (when (if (fs-char 'ignore-empty-para)
@@ -149,7 +149,7 @@
 	(replace-match " "))
       (goto-char (point-min))
       (delete-horizontal-space)
-      (insert 
+      (insert
        (if hang-from
 	   hang-from
 	 (make-string (or first-indent indent) ? )))
@@ -214,9 +214,9 @@ The value can be the style-sheet list, or it can be a file name
 (defun fs-do-style (fs-current-element style)
   (let ((hang-from (eval (getf style 'hang-from))))
     (when hang-from
-      (setq fs-hang-from 
+      (setq fs-hang-from
 	    (format "%s%s "
-		    (make-string 
+		    (make-string
 		     (or (fs-char 'hang-left) (fs-char 'left))
 		     ? )
                     hang-from))))

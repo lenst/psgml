@@ -1,5 +1,5 @@
 ;;;;\filename psgml-debug.el
-;;;\Last edited: 2001-02-21 01:02:23 lenst
+;;;\Last edited: 2001-03-10 00:32:00 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -46,7 +46,7 @@
 	  (progn (set-buffer standard-output)
 		 (erase-buffer))
 	(set-buffer cb))
-    
+
       (sgml-dump-rec (sgml-pstate-top-tree sgml-buffer-parse-state))
 
       ))
@@ -206,9 +206,9 @@
    (t
     (princ (format "%sand-state\n" (make-string indent ? )))
     (sgml-dp-state (sgml-and-state-substate state) (+ 2 indent))
-    (princ (format "%s--next\n" (make-string indent ? )))    
+    (princ (format "%s--next\n" (make-string indent ? )))
     (sgml-dp-state (sgml-and-state-next state)     (+ 2 indent))
-    (princ (format "%s--dfas\n" (make-string indent ? )))        
+    (princ (format "%s--dfas\n" (make-string indent ? )))
     (loop for m in (sgml-and-state-dfas state)
 	  do (sgml-dp-model m (+ indent 2))
 	  (princ (format "%s--\n" (make-string indent ? )))))))
@@ -370,7 +370,7 @@
 	  sgml-copy-moves
 	  ;; is ps*
 	  sgml-do-parameter-entity-ref
-	  ;; 
+	  ;;
 	  sgml-make-primitive-content-token
 	  sgml-push-to-entity
 	  sgml-lookup-entity
@@ -482,7 +482,7 @@
 	    (t
 	     (princ (if (sgml-eltype-mixed et)
                         "mixed\n"
-                      "element\n"))	     
+                      "element\n"))
              (sgml-print-position-in-model el et (point) sgml-current-state)
              (princ "\n\n")
 	     (sgml-princ-names
@@ -545,7 +545,7 @@
                   (setq defl (format "'%s'"
                                      (sgml-default-value-attval defl)))))
 
-           (indent-to 48 1)          
+           (indent-to 48 1)
            (princ defl)
            (terpri)))
       (set-buffer ob))))
@@ -658,7 +658,7 @@
 (defun sgml-set-face-for (start end type)
   (let ((face (cdr (assq type sgml-markup-faces))))
     ;;++
-    (if (and (null type) sgml-current-tree) 
+    (if (and (null type) sgml-current-tree)
         (setq face (sgml-element-appdata sgml-current-tree 'face)))
     ;;--
     (cond
@@ -745,7 +745,7 @@ after the first tag inserted."
              `("Misc"
                ("Edit attributes" (sgml-edit-attributes))
                ("Normalize" (sgml-normalize-element))
-               ("Fill" (sgml-fill-element 
+               ("Fill" (sgml-fill-element
                         (sgml-find-context-of (point))))
                ("Splice" (sgml-untag-element))
                ("Fold"   (sgml-fold-element)))
@@ -771,7 +771,7 @@ after the first tag inserted."
       (goto-char (sgml-element-start el))
       (sgml-change-element-name "TABLE")
       (sgml-insert-attribute "BORDER" border)
-      (sgml-insert-attribute "WIDTH" table-width)      
+      (sgml-insert-attribute "WIDTH" table-width)
       (while (search-forward "<" end t)
         (cond
          ((looking-at "dt")
@@ -779,7 +779,7 @@ after the first tag inserted."
           (insert "<tr>")
           (sgml-change-element-name "TD")
           (sgml-insert-attribute "WIDTH" first-col-width))
-         ((looking-at "tr>\s-*<td")
+         ((looking-at "tr>\\s-*<td")
           (sgml-down-element)
           (sgml-insert-attribute "WIDTH" first-col-width))
          ((looking-at "dd")
