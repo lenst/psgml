@@ -1,3 +1,15 @@
+Wed Oct  6 00:43:37 1999  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-charent.el (sgml-display-char-list-filename): new default
+	is "iso8859.map" in the same directory where psgml is installed.
+
+Wed Sep 22 19:34:08 1999  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el: Apply sgml-general-case to attribute name for
+ 	interactive sgml-insert-attribute. Don't test for non empty asl in
+ 	sgml-edit-attrib. A lot of changes in handling text attributes
+ 	when in attribute edit mode.
+
 Sat Aug 14 22:34:59 1999  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-tag-regexp): Recognize XMLs empty tags.
