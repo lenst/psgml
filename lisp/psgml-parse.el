@@ -1,7 +1,7 @@
 ;;;; psgml-parse.el --- Parser for SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1994, 1995 Lennart Staflin
+;; Copyright (C) 1994, 1995, 1996, 1997 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Acknowledgment:
@@ -321,7 +321,7 @@ to point to the next scratch buffer.")
 ;; there is a datastruture called and-node.
 
 ;; An and-node is a specification for a dfa that has not been computed.
-;; It contains a set of dfas that all have to be traversed befor going
+;; It contains a set of dfas that all have to be traversed before going
 ;; to the next state.  The and-nodes are only stored in moves and are
 ;; not seen by the parser.  When a move is taken the and-node is converted
 ;; to an and-state.
@@ -531,7 +531,7 @@ If this is not possible, but all DFAS are final, move by TOKEN in NEXT."
 ;;;; Attribute Types
 
 ;;; Basic Types
-;; name = string	attribute names are lisp symbols
+;; name = string	attribute names are lisp strings
 ;; attval = string	attribute values are lisp strings
 
 ;;; Attribute Declaration Type 
@@ -1840,7 +1840,7 @@ FILE is the file containing the catalog.  Maintains a cache of parsed
 catalog files in variable CACHE-VAR. The parsing is done by function
 PARSER-FUN that should parse the current buffer and return the parsed
 repreaentation of the catalog."
-  (setq file (file-truename (expand-file-name file default-dir)))
+  (setq file (expand-file-name file default-dir))
   (and
    (file-readable-p file)
    (let ((c (assoc file (symbol-value cache-var)))
@@ -3520,12 +3520,14 @@ Returns a list of attspec (attribute specification)."
       (sgml-parse-s)
       (cond ((sgml-parse-delim "VI")
 	     (sgml-parse-s)
-	     (setq val (sgml-check-attribute-value-specification))
-	     (when eltype
-	       (or (setq attdecl (sgml-lookup-attdecl name attlist))
-		   (sgml-log-warning
-		    "Attribute %s not declared for element %s"
-		    name (sgml-eltype-name eltype)))))
+	     (setq val (sgml-parse-attribute-value-specification 'warn))
+	     (if (null val)
+		 (setq attdecl nil)
+	       (when eltype
+		 (or (setq attdecl (sgml-lookup-attdecl name attlist))
+		     (sgml-log-warning
+		      "Attribute %s not declared for element %s"
+		      name (sgml-eltype-name eltype))))))
 	    ((null eltype)
 	     (sgml-parse-error "Expecting a ="))
 	    ((progn
@@ -3554,6 +3556,16 @@ Returns a list of attspec (attribute specification)."
       (sgml-parse-nametoken t)		; Not really a nametoken, but an
 					; undelimited literal
       (sgml-parse-error "Expecting an attribute value: literal or token")))
+
+(defun sgml-parse-attribute-value-specification (&optional warn)
+  (or (sgml-parse-literal)
+      (sgml-parse-nametoken t)		; Not really a nametoken, but an
+					; undelimited literal
+      (if warn
+	  (progn
+	    (sgml-log-warning "Expecting an attribute value: literal or token")
+	    nil))))
+
 
 (defun sgml-find-attdecl-for-value (value eltype)
   "Find the attribute declaration of ELTYPE that has VALUE in its name group.
