@@ -1,3 +1,9 @@
+2002-04-26  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-mode): make adding to
+	text-property-default-nonsticky conditional on
+	sgml-default-nonsticky to work with Emacs < 21.
+	
 2002-04-25  Lennart Staflin  <lenst@lysator.liu.se>
 
 	fixing merge of Dave Loves patch.
