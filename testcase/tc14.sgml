@@ -32,6 +32,7 @@ Marco
       <para>
         Yea! adn lsf alsdkf laksjf lkaslksdjf lskdfj &foo; lkasdjf
         alskdfj alsj</para>
+<!-- &far; starting a line is indented wrong -->
       <para>
         Mean Time To Detect. &dr; is het aantal geconstateerde
         incidenten gedeeld door het werkelijke aantal incidenten.
@@ -46,3 +47,10 @@ Marco
 
   </article>
 </Book>
+<!-- Keep this comment at the end of the file
+Local variables:
+sgml-general-insert-case:lower
+sgml-indent-step:2
+sgml-indent-data:t
+End:
+-->

@@ -316,10 +316,12 @@ to point to the next scratch buffer.")
 ;;(progn (set-syntax-table xml-parser-syntax) (describe-syntax))
 
 (defmacro sgml-with-parser-syntax (&rest body)
-  (` (let ((normal-syntax-table (syntax-table)))
+  (` (let ((normal-syntax-table (syntax-table))
+           (cb (current-buffer)))
        (set-syntax-table (if sgml-xml-p xml-parser-syntax sgml-parser-syntax))
        (unwind-protect
 	   (progn (,@ body))
+         (set-buffer cb)
 	 (set-syntax-table normal-syntax-table)))))
 
 
