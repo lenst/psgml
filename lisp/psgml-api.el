@@ -63,35 +63,31 @@ leaves the element with no start-tag some elements may be ignored."
 
 ;;;; Map content
 
-(defun sgml-map-content (element element-fun
-				 &optional sgml-data-function sgml-pi-function)
+(defun sgml-map-content (element element-fun &optional data-fun pi-fun)
   "Map content of ELEMENT, calling ELEMENT-FUN for every element.
 Also calling DATA-FUN, if non-nil, with data in content."
   (sgml-pop-all-entities)
   (sgml-need-dtd)
   (sgml-element-end element)		; Make sure all content is parsed
   (save-excursion
-    (let ((sgml-throw-on-element-change 'el-done)
-	  (sgml-goal (point-max)))
-      (sgml-set-parse-state element 'start)
-      (when (eobp) (sgml-pop-entity))
-      (when (eolp) (forward-char 1))
-      (catch sgml-throw-on-element-change
-	(sgml-with-parser-syntax
-	 (sgml-parser-loop nil))))
+    (sgml-set-parse-state element 'start)
+    (when (eobp) (sgml-pop-entity))
+    (when (eolp) (forward-char 1))
+    (sgml-parse-data (point-max) data-fun pi-fun)
     (let ((c (sgml-tree-content element)))
       (while c
 	(sgml-pop-all-entities)
 	(funcall element-fun c)
-	(let ((sgml-throw-on-element-change 'el-done)
-	      (sgml-goal (point-max)))
-	  (sgml-set-parse-state c 'after)
-	  (catch sgml-throw-on-element-change
-	    (sgml-with-parser-syntax
-	     (sgml-parser-loop nil))))
+	(sgml-set-parse-state c 'after)
+	(sgml-parse-data (point-max) data-fun pi-fun)
 	(setq c (sgml-tree-next c)))))
   (sgml-pop-all-entities))
 
+(defun sgml-parse-data (sgml-goal sgml-data-function sgml-pi-function)
+  (let ((sgml-throw-on-element-change 'el-done))
+    (catch sgml-throw-on-element-change
+      (sgml-with-parser-syntax
+       (sgml-parser-loop nil)))))
 
 ;;;; Entity management
 
