@@ -4124,7 +4124,11 @@ pointing to start of short ref and point pointing to the end."
 			 (format "%s start-tag" (sgml-eltype-name et)))
 	   (sgml-open-element et sgml-conref-flag
 			      sgml-markup-start (point) asl)
-	   (when net-enabled            ;FIXME: why not argument to sgml-open-el?
+	   (when net-enabled
+             ;; FIXME: why not argument to sgml-open-el? it's not just
+             ;; ugly it is wrong if the element is empty, then open-el
+             ;; closes it immediately and the wron node will be
+             ;; flagged.
 	     (setf (sgml-tree-net-enabled sgml-current-tree) t))))))
 
 (defun sgml-do-empty-start-tag ()
