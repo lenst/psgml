@@ -29,6 +29,7 @@
 
 (require 'psgml)
 (require 'psgml-parse)
+
 
 ;;;; Constructing basic
 
@@ -400,7 +401,9 @@ Syntax: var dfa-expr &body forms"
     (sgml-set-param-entity (sgml-check-ename) (sgml-parse-entity-text)))
    (t					; normal entity declaration
     (cond ((sgml-parse-rni 'default))
-	  ((sgml-check-name)))
+	  (t				; general entity
+	   (push (symbol-name (sgml-check-ename))
+		 sgml-entities)))
     (sgml-parse-entity-text)))
   (sgml-skip-ps)
   (sgml-check-char ?>))
@@ -594,7 +597,8 @@ Syntax: var dfa-expr &body forms"
   (message "Parsing prolog...")
   (setq	sgml-element-map nil		; Remove old element dcl
 	sgml-doctype-state nil
-	sgml-param-entities nil)
+	sgml-param-entities nil
+	sgml-entities nil)
   (goto-char (point-min))
   (sgml-with-parser-syntax
    (sgml-skip-ds)   
@@ -604,7 +608,10 @@ Syntax: var dfa-expr &body forms"
 	  (cond ((eq 'doctype (sgml-parse-nametoken))
 		 (sgml-set-doctype (sgml-parse-doctype))
 		 (setq sgml-buffer-element-map sgml-element-map
-		       sgml-buffer-param-entities sgml-param-entities))))))
+		       sgml-buffer-param-entities sgml-param-entities
+		       sgml-buffer-entities (sort sgml-entities
+						  (function string-lessp))
+		       ))))))
   (sgml-message "Parsing prolog...done"))
 
 ;;;; Save DTD: compute translation
@@ -723,6 +730,7 @@ FORMS should produce the binary coding of element in VAR."
   (assert (< (length sgml-buffer-element-map) 256))
   (let ((elems sgml-buffer-element-map)
 	(params sgml-buffer-param-entities)
+	(entities sgml-buffer-entities)
 	(doctype (element-model (sgml-tree-element sgml-top-tree)))
 	(cb (current-buffer)))
     (set-buffer target)
@@ -739,6 +747,7 @@ FORMS should produce the binary coding of element in VAR."
 	(sgml-code-element (cdr pair))
 	(message "Coding %d%% done" (* 100 (/ done tot))))
       (sgml-code-sexp params)
+      (sgml-code-sexp entities)
       (sgml-code-sexp doctype)
       (goto-char tv-point)
       (sgml-code-sexp
@@ -751,15 +760,23 @@ FORMS should produce the binary coding of element in VAR."
 (defun sgml-save-dtd (file)
   "Save the parsed dtd on FILE."
   (interactive
-   (let ((tem (or sgml-default-dtd-file
-		  (sgml-default-dtd-file))))
+   (let* ((tem (expand-file-name
+		(or sgml-default-dtd-file
+		    (sgml-default-dtd-file))))
+	  (dir (file-name-directory tem))
+	  (nam (file-name-nondirectory tem)))
      (list
-      (read-file-name "Save DTD in: " nil tem nil tem))))
+      (read-file-name "Save DTD in: " dir tem nil nam))))
   (setq file (expand-file-name file))
   (when (equal file (buffer-file-name))
     (error "Would clobber current file"))
   (unless sgml-buffer-element-map
     (sgml-parse-prolog))
+  (cond ((equal (expand-file-name default-directory)
+		(file-name-directory file))
+	 (setq sgml-default-dtd-file (file-name-nondirectory file)))
+	(t
+	 (setq sgml-default-dtd-file file)))
   (let ((tem (generate-new-buffer " *savedtd*")))
     (unwind-protect
 	(progn
