@@ -1,3 +1,16 @@
+2000-08-24  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-fs.el (style-format): set ps-left-header to include a
+	style-sheet specified title and the filename. (for ps-print-buffer)
+	(fs-special-styles): New special style 'title' for setting title.
+	(fs-do-style): handle title style
+	(fs-element-content): make element argument optional, defaults to
+	current element.
+
+2000-08-08  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-edit.el (sgml-insert-element): Fix bug with empty element.
+
 Thu Aug  3 07:52:46 2000  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-insert-element): Fix bug when inserting
