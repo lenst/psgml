@@ -130,6 +130,9 @@ e.g. a data entity reference.")
 
 ;;; Global variables active during parsing
 
+(defvar sgml-parsing-dtd nil
+  "This variable is bound to `t' while parsing a DTD (subset).")
+
 (defvar sgml-last-start-pos nil
   "Set to position of last parsing start in current buffer.")
 
@@ -263,7 +266,7 @@ If this is nil, then current entity is main buffer.")
 ;; is primitive state tokens) to states.  The pairs of the mapping is 
 ;; called moves.
 
-;; DFAs are allways represented by the start state, which is a 
+;; DFAs are always represented by the start state, which is a 
 ;; normal state.  Normal states contain moves of two types:
 ;; 1. moves for required tokens, 2. moves for optional tokens.
 ;; By design these are keept in two different sets.
@@ -674,12 +677,17 @@ If ATTSPEC is nil, nil is returned."
 
 ;;;; DTD 
 
-;;DTD = (doctype, eltypes, parameters, entities, shortmaps)
-;;doctype = name
-;;eltypes = oblist
-;;parameters = entity*
-;;entities = entity*
-;;shortmaps = (name, shortmap)*
+;; DTD = (doctype, eltypes, parameters, entities, shortmaps,
+;;	 notations, dependencies, merged)
+;; DTDsubset ~=~ DTD, but doctype is unused
+;;
+;; doctype = name
+;; eltypes = oblist
+;; parameters = entity*
+;; entities = entity*
+;; shortmaps = (name, shortmap)*
+;; dependencies = file*
+;; merged = Compiled-DTD?  where  Compiled-DTD = (file, DTD)
 
 (defstruct (sgml-dtd
 	    (:type vector)
@@ -692,7 +700,13 @@ If ATTSPEC is nil, nil is returned."
   (entities				; ALIST
    (sgml-make-entity-table))
   (shortmaps				; ALIST
-   (sgml-make-shortref-table)))
+   (sgml-make-shortref-table))
+  (notations				; ??
+   nil)
+  (dependencies				; LIST
+   nil)
+  (merged				; (file . DTD)
+   nil))
 
 
 ;;;; Element type objects
@@ -701,6 +715,9 @@ If ATTSPEC is nil, nil is returned."
 
 (defun sgml-make-eltypes-table ()
   (make-vector 17 0))
+
+(defun sgml-eltypes-empty (eltypes)
+  (loop for x in eltypes always (eq x 0)))
 
 (defun sgml-eltype-name (et)
   (symbol-name et))
@@ -842,7 +859,7 @@ ET is the result of a sgml-lookup-eltype."
 
 (defsubst sgml-read-octet ()
   (prog1 (following-char)
-    (forward-char 1)))
+    (forward-char)))
 
 (defsubst sgml-read-number ()
   "Read a number.
@@ -1497,6 +1514,11 @@ PTYPE can be 'param if this is a parameter entity."
 				       (sgml-entity-type entity))
 				   (sgml-entity-name entity))))))
 
+(defun sgml-entity-file (entity &optional ptype)
+  (sgml-external-file (sgml-entity-text entity)
+		      (or ptype (sgml-entity-type entity))
+		      (sgml-entity-name entity)))
+
 ;;; Entity tables
 
 (defun sgml-make-entity-table ()
@@ -1520,8 +1542,73 @@ PTYPE can be 'param if this is a parameter entity."
       (mapcar fn (cdr entity-table))
     (loop for e in (cdr entity-table) do (funcall fn e))))
 
+(defun sgml-merge-entity-tables (tab1 tab2)
+  "Merge entity table TAB2 into TAB1.  TAB1 is modified."
+  (nconc tab1 (cdr tab2)))
+
 
-;;; External identifyer resolve
+;;;; External identifyer resolve
+
+(defun sgml-external-file (extid &optional type name)
+  "Return file name for entity with external identifier EXTID.
+Optional argument TYPE should be the type of entity and NAME should be
+the entity name."
+  ;; extid is (pubid . sysid)
+  (sgml-compute-map)
+  (let* ((pubid (car extid))
+	 (sysid (cdr extid))
+	 (subst (list '(?% ?%)))
+	 res)
+    (when pubid
+      (nconc subst (list (cons ?p (sgml-transliterate-file pubid)))
+	     (sgml-pubid-parts pubid))
+      (setq pubid (sgml-canonize-pubid pubid)))
+    (when sysid (nconc subst (list (cons ?s sysid))))
+    (when name  (nconc subst (list (cons ?n name))))
+    (when type  (nconc subst (list (cons ?y (cond ((eq type 'dtd) "dtd")
+						  ((eq type 'text) "text")
+						  ((eq type 'param) "parm")
+						  (t "sgml"))))))
+    (sgml-debug "Ext. file subst. = %S" subst)
+;;;    (when sysid
+;;;      (loop for fn in sgml-sysid-resolve-functions
+;;;	    until res do (setq res (funcall fn sysid))))
+    (unless res
+      (loop
+       for entry in sgml-computed-map until res do
+       (cond
+	((stringp entry)
+	 (setq res (sgml-pub-expand entry subst)))
+	;; Catalog entry
+	((or (and (eq 'entity (first entry))
+		  name (not (eq type 'dtd))
+		  (string= name (second entry)))
+	     (and (eq 'public (first entry))
+		  pubid
+		  (string= pubid (second entry)))
+	     (and (eq 'doctype (first entry))
+		  (eq type 'dtd)
+		  (string= name (second entry))))
+	 (setq res (third entry)))
+	;; Predicated entry
+	((and (stringp (first entry))
+	      (string-match (first entry) pubid))
+	 (setq res (sgml-pub-expand (second entry) subst))))
+       (when res
+	 (sgml-debug "file-readable-p? %S" res)
+	 (unless (and (file-readable-p
+		       (setq res (substitute-in-file-name res)))
+		      (not (file-directory-p res)))
+	   (setq res nil))))
+;;;      (cond
+;;;       (t
+;;;	(sgml-log-warning "External entity %s not found" name)
+;;;	(when pubid
+;;;	  (sgml-log-warning "  Public identifier %s" pubid))
+;;;	(when sysid
+;;;	  (sgml-log-warning "  System identfier %s" sysid))))
+      res)))
+
 
 (defun sgml-compute-map ()
   (unless (and sgml-computed-map
@@ -1732,7 +1819,7 @@ PTYPE can be 'param if this is a parameter entity."
 	(substring string (match-beginning n)
 		   (match-end n)))))
 
-;;; Entity references and positions
+;;;; Entity references and positions
 
 (defstruct (sgml-eref
 	    (:constructor sgml-make-eref (entity start end))
@@ -1760,7 +1847,7 @@ PTYPE can be 'param if this is a parameter entity."
   (consp epos))
 
 (defun sgml-epos (pos)
-  "Convert a buffer position POS into a epos."
+  "Convert a buffer position POS into an epos."
   (if sgml-current-eref
       (sgml-make-epos sgml-current-eref pos)
     pos))
@@ -1782,24 +1869,125 @@ PTYPE can be 'param if this is a parameter entity."
   (sgml-epos-latest epos))
 
 
-;;; Parameter entities and files
+;;;; DTD repository
+;;compiled-dtd: extid -> Compiled-DTD?
+;;extid-cdtd-name: extid -> file?
+;;up-to-date-p: (file, dependencies) -> cond
+
+
+(defun sgml-extid-cdtd-name (extid)
+  "File name of file containing the compiled (DTD) version of EXTID."
+  nil
+  )
+
+(defun sgml-file-cdtd-name (file)
+  "File name of file containing the compiled (DTD) version of FILE."
+  (concat (file-name-directory file)
+	  ".ced."
+	  (file-name-nondirectory file)))
+
+(defvar sgml-file-cdtd-name-function 'sgml-file-cdtd-name)
+
+(defun sgml-compiled-dtd (pubid file)
+  "Return the complied DTD for extid or nil."
+  (let ((cfile (if file (sgml-file-cdtd-name file)))
+	cdtd
+	)
+    (when (and cfile (file-readable-p cfile))
+      (condition-case nil
+	  (let ((cb (current-buffer))
+		(tem (generate-new-buffer " *saveddtd*"))
+		dtd)
+	    (sgml-push-to-entity cfile)
+	    (message "Loading DTD from %s..." cfile)
+	    (setq dtd (sgml-read-dtd tem))
+	    (message "Loading DTD from %s...done" cfile)
+	    (setq cdtd (cons cfile dtd)))
+	(error nil)))
+    (when (and (not (and cdtd (sgml-up-to-date-p
+			       cfile
+			       (sgml-dtd-dependencies (cdr cdtd)))))
+	       (file-writable-p cfile))
+      (setq cdtd (sgml-compile-cdtd cfile file)))
+    cdtd))
+
+(defun sgml-compile-cdtd (dtd-file &optional to-file)
+  (interactive "fFile: ")
+  ;; Do compile
+  (let ((sgml-dtd-info (sgml-make-dtd nil))
+	(sgml-parsing-dtd t)
+	(cb (current-buffer))
+	(tem (generate-new-buffer " *dtdcomp*")))
+    (set-buffer tem)
+    (unwind-protect
+	(progn
+	  (set-syntax-table sgml-parser-syntax)
+	  (insert-file-contents file)
+	  (sgml-check-dtd-subset))
+      (kill-buffer tem))
+    (set-buffer cb)
+    (setq to-file (or to-file (sgml-file-cdtd-name dtd-file)))
+    (sgml-save-dtd to-file sgml-dtd-info)
+    (cons to-file sgml-dtd-info)))
+
+
+(defun sgml-up-to-date-p (file dependencies)
+  "Check if FILE is newer than all files in the list DEPENDENCIES.
+If DEPENDENCIES contains the symbol `t', FILE is not considered newer."
+  (if (memq t dependencies)
+      nil
+    (loop for f in dependencies
+	  always (file-newer-than-file-p file f))))
+
+
+;;;; Merge compiled dtd
+
+(defun sgml-try-merge-compiled-dtd (pubid file)
+  (let (merged)
+    (when (and (sgml-eltypes-empty (sgml-dtd-eltypes sgml-dtd-info))
+	       (setq merged (sgml-compiled-dtd pubid file)))
+      (sgml-map-entities
+       (function (lambda (entity)
+		   (let ((other
+			  (sgml-lookup-entity
+			   (sgml-entity-name entity)
+			   (sgml-dtd-parameters (cdr merged)))))
+		     (unless (or (null other)
+				 (equal entity other))
+		       (setq merged nil)))))
+       (sgml-dtd-parameters sgml-dtd-info))
+      (when merged
+	;; Do the merger
+	(setf (sgml-dtd-merged sgml-dtd-info) merged)
+	(setf (sgml-dtd-eltypes sgml-dtd-info) (sgml-dtd-eltypes (cdr merged)))
+	(sgml-merge-entity-tables (sgml-dtd-entities sgml-dtd-info)
+				  (sgml-dtd-entities (cdr merged)))
+	(sgml-merge-entity-tables (sgml-dtd-parameters sgml-dtd-info)
+				  (sgml-dtd-parameters (cdr merged)))
+	(sgml-merge-shortmaps (sgml-dtd-shortmaps sgml-dtd-info)
+			      (sgml-dtd-shortmaps (cdr merged)))))
+    merged))
+
+
+;;;; Pushing and poping entities
 
 (defvar sgml-scratch-buffer nil)
 (defvar sgml-last-entity-buffer nil)
 
 (defun sgml-push-to-entity (entity &optional ref-start type)
+  "Set current buffer to a buffer containing the entity ENTITY.
+ENTITY can also be a file name.  Optional argument REF-START should be
+the start point of the entity reference.  Optional argument TYPE,
+overrides the entity type in entity look up."
   (unless (and sgml-scratch-buffer
 	       (buffer-name sgml-scratch-buffer))
     (setq sgml-scratch-buffer (generate-new-buffer " *entity*")))
   (let ((cb (current-buffer))
 	(dd default-directory)
-	eref
-	file)
-    ;;*** should eref be argument to fun?
-    (setq eref (sgml-make-eref
-		entity
-		(sgml-epos (or ref-start (point)))
-		(sgml-epos (point))))
+	;;*** should eref be argument ?
+	(eref (sgml-make-eref entity
+			      (sgml-epos (or ref-start (point)))
+			      (sgml-epos (point)))))
     (set-buffer sgml-scratch-buffer)
     (when (eq sgml-scratch-buffer (default-value 'sgml-scratch-buffer))
       (make-local-variable 'sgml-scratch-buffer)
@@ -1813,12 +2001,29 @@ PTYPE can be 'param if this is a parameter entity."
     (make-local-variable 'sgml-previous-buffer)
     (setq sgml-previous-buffer cb)
     (setq sgml-last-start-pos
-	  (if (stringp (sgml-entity-text entity))
+	  (if (or (stringp entity)
+		  (stringp (sgml-entity-text entity)))
 	      (point)
 	    0))
-    (sgml-debug "Enter entity ref %S, last-start=%s"
-		eref sgml-last-start-pos)
-    (save-excursion (sgml-entity-insert-text entity type))))
+    (cond
+     ((stringp entity)			; a file name
+      (save-excursion (insert-file-contents entity)))
+     ((and sgml-parsing-dtd
+	   (consp (sgml-entity-text entity)))	; external id?
+      (let ((file (sgml-entity-file entity)))
+	(cond
+	 ((sgml-try-merge-compiled-dtd (car (sgml-entity-text entity))
+				       file)
+	  (goto-char (point-max)))
+	 (file
+	  (insert-file-contents file)
+	  (goto-char (point-min))
+	  (push file (sgml-dtd-dependencies sgml-dtd-info)))
+	 (t
+	  (push t (sgml-dtd-dependencies sgml-dtd-info))
+	  (save-excursion (sgml-entity-insert-text entity type))))))
+     (t
+      (save-excursion (sgml-entity-insert-text entity type))))))
 
 (defun sgml-pop-entity ()
   (cond ((and (boundp 'sgml-previous-buffer)
@@ -2597,6 +2802,9 @@ Also move point.  Return nil, either if no shortref or undefined."
 (defun sgml-lookup-shortref-map (table name)
   (cdr (assoc name (cdr table))))
 
+(defun sgml-merge-shortmaps (tab1 tab2)
+  "Merge short reference map TAB2 into TAB1, modifying TAB1."
+  (nconc tab1 (cdr tab2)))
 
 ;;;; Parse markup declarations
 
@@ -3339,7 +3547,9 @@ Returns parse tree; error if no element after POS."
 
 (defun sgml-read-element-name (prompt)
   (sgml-parse-to-here)
-  (cond ((and ;;sgml-buffer-eltype-map
+  (cond (sgml-markup-type
+	 (error "No elements allowed in markup"))
+	((and ;;sgml-buffer-eltype-map
 	      (not (eq sgml-current-state sgml-any)))
 	 (let ((tab
 		(mapcar (function (lambda (x) (cons (symbol-name x) nil)))
