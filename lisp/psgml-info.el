@@ -1,0 +1,351 @@
+;;;; psgml-info.el
+;;; Last edited: Sun Dec  4 20:54:52 1994 by lenst@lysistrate (Lennart Staflin)
+;;; $Id$
+
+;; Copyright (C) 1994 Lennart Staflin
+
+;; Author: Lennart Staflin <lenst@lysator.liu.se>
+
+;; This program is free software; you can redistribute it and/or
+;; modify it under the terms of the GNU General Public License
+;; as published by the Free Software Foundation; either version 2
+;; of the License, or (at your option) any later version.
+;; 
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;; 
+;; You should have received a copy of the GNU General Public License
+;; along with this program; if not, write to the Free Software
+;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+
+;;;; Commentary:
+
+;; This file is an addon to the PSGML package.  
+
+;; This file contains some commands to print out information about the
+;; current DTD.
+
+;; sgml-list-elements
+;;    Will list all elements and the attributes declared for the element.
+
+;; sgml-list-attributes
+;;    Will list all attributes declared and the elements that use them.
+
+;; sgml-list-terminals
+;;    Will list all elements that can contain data.
+
+;; sgml-list-occur-in-elements
+;;    Will list all element types and where it can occur.
+
+;; sgml-list-content-elements
+;;    Will list all element types and the element types that can occur
+;;    in its content.
+
+;;;; Code:
+
+(require 'psgml)
+(require 'psgml-parse)
+
+(defconst sgml-attr-col 18)
+
+
+;;;; Utility functions
+
+(defsubst sgml-add-to-table (row-index elem table)
+  (let ((p (assoc row-index table)))
+    (cond ((null p)
+	   (cons (list row-index elem) table))
+	  (t
+	   (nconc p (list elem))
+	   table))))
+
+(defsubst sgml-add-last-unique (x l)
+  (unless (memq x l)
+    (nconc l (list x))))
+
+(defun sgml-map-element-types (func)
+  (sgml-need-dtd)
+  (sgml-map-eltypes func
+		    (sgml-pstate-dtd sgml-buffer-parse-state)
+		    t))
+
+(defun sgml-eltype-refrenced-elements (eltype)
+  "List of element types referenced in the model of ELTYPE."
+  ;; Now with cache. Uses appdata prop re-cache.
+  (or
+   (sgml-eltype-appdata eltype 're-cache)
+   (let* ((res				; result list (eltypes)
+	   nil)
+	  (states			; list of states
+	   (list (sgml-eltype-model eltype)))
+	  (agenda			; point into states
+	   states))
+     (cond
+      ((not (sgml-model-group-p (car states)))
+       nil)
+      (t
+       (while agenda
+	 (cond
+	  ((sgml-normal-state-p (car agenda))
+	   (loop for m in (append (sgml-state-opts (car agenda))
+				  (sgml-state-reqs (car agenda)))
+		 do
+		 (pushnew (sgml-move-token m) res)
+		 (sgml-add-last-unique (sgml-move-dest m) states)))
+       
+	  (t				; &-node
+	   (sgml-add-last-unique (sgml-&node-next (car agenda)) states)
+	   (loop for dfa in (sgml-&node-dfas (car agenda)) do
+		 (sgml-add-last-unique dfa states))))
+	 (setq agenda (cdr agenda)))
+       (setf (sgml-eltype-appdata eltype 're-cache) res)
+       res)))))
+
+
+;;;; List elements
+
+(defun sgml-list-elements ()
+  "List the elements and their attributes in the current DTD."
+  (interactive)
+  (message "Creating table...")
+  (sgml-display-table
+   (sgml-map-element-types
+    (function
+     (lambda (eltype)
+       (cons (sgml-eltype-name eltype)
+	     (mapcar (function sgml-attdecl-name)
+		     (sgml-eltype-attlist eltype))))))
+   "Elements" "Element" "Attribute"))
+
+
+;;;; List attributes
+
+(defun sgml-list-attributes ()
+  "List the attributes and in which elements they occur."
+  (interactive)
+  (let ((attributes nil))
+    (message "Creating table...")
+    (sgml-map-element-types
+     (function
+      (lambda (eltype)
+	(loop for a in (sgml-eltype-attlist eltype) do
+	      (setq attributes
+		    (sgml-add-to-table (sgml-attdecl-name a)
+				       (sgml-eltype-name eltype)
+				       attributes))))))
+    (sgml-display-table attributes
+			"Attributes" "Attribute" "Element")))
+
+
+
+
+;;;; List terminals
+
+(defun sgml-list-terminals ()
+  "List the elements that can have data in their content."
+  (interactive)
+  (message "Creating table...")
+  (let ((data-models (list sgml-cdata sgml-rcdata sgml-any)))
+    (sgml-display-table
+     (delq nil
+	   (sgml-map-element-types
+	    (function
+	     (lambda (eltype)
+	       (if (or (sgml-eltype-mixed eltype)
+		       (memq (sgml-eltype-model eltype) data-models))
+		   (list (sgml-eltype-name eltype)
+			 (symbol-name
+			  (if (sgml-model-group-p (sgml-eltype-model eltype))
+			      'mixed
+			    (sgml-eltype-model eltype)))))))))
+     "Terminals" "Element" "Content")))
+
+
+;;;; Element cross reference list
+
+(defun sgml-list-content-elements ()
+  "List all element types and the element types that can occur in its content."
+  (interactive)
+  (message "Creating table...")
+  (sgml-display-table
+   (sgml-map-element-types
+    (function
+     (lambda (eltype)
+       (cons (sgml-eltype-name eltype)
+	     (mapcar (function sgml-eltype-name)
+		     (sgml-eltype-refrenced-elements eltype))))))
+   "Elements refrenced by elements"
+   "Element" "Content"))
+
+(defun sgml-list-occur-in-elements ()
+  "List all element types and where it can occur."
+  (interactive)
+  (message "Creating table...")
+  (let ((cross nil))
+    (sgml-map-element-types
+     (function
+      (lambda (eltype)
+	(loop for ref in (sgml-eltype-refrenced-elements eltype)
+	      do (setq cross (sgml-add-to-table ref
+						(sgml-eltype-name eltype)
+						cross))))))
+    (sgml-display-table
+     cross
+     "Cross referenced element types" "Element" "Can occur in")))
+
+
+;;;; Display table
+
+(defun sgml-display-table (table title col-title1 col-title2 &optional width)
+  (or width
+      (setq width sgml-attr-col))
+  (let ((buf (get-buffer-create (format "*%s*" title))))
+    (message "Preparing display...")
+    (set-buffer buf)
+    (erase-buffer)
+    (insert col-title1)
+    (indent-to width)
+    (insert col-title2 "\n")
+    (insert-char ?= (length col-title1))
+    (indent-to width)
+    (insert-char ?= (length col-title2))
+    (insert "\n")
+    (setq table (sort table (function (lambda (a b)
+					(string< (car a) (car b))))))
+    (loop for e in table do
+	  (insert (format "%s" (car e)))
+	  (loop for name in (sort (cdr e) (function string-lessp))
+		do
+		(when (> (+ (length name) (current-column))
+			 fill-column)
+		  (insert "\n"))
+		(when (< (current-column) sgml-attr-col)
+		  (indent-to width))
+		(insert  name " "))
+	  (insert "\n"))
+    (goto-char (point-min))
+    (display-buffer buf)
+    (message nil)))
+
+
+;;;; Describe entity
+
+(defun sgml-describe-entity (name)
+  "Describe the properties of an entity as declared in the current DTD."
+  (interactive
+   (let (default input)
+     (sgml-need-dtd)
+     (save-excursion
+       (sgml-with-parser-syntax
+	(unless (sgml-parse-delim "ERO")
+	  (skip-chars-backward "^&\"'= \t\n"))
+	(setq default (or (sgml-parse-name t) ""))))
+     (setq input (completing-read
+		  (format "Entity name (%s): " default)
+		  (sgml-entity-completion-table
+		   (sgml-dtd-entities
+		    (sgml-pstate-dtd sgml-buffer-parse-state)))))
+     (list
+      (if (equal "" input) default input))))
+  
+  (with-output-to-temp-buffer "*Help*"
+    (let ((entity (sgml-lookup-entity name
+				      (sgml-dtd-entities
+				       (sgml-pstate-dtd
+					sgml-buffer-parse-state)))))
+      (or entity (error "Undefined entity"))
+      (princ (format "Entity %s is %s\n"
+		     name
+		     (cond ((null entity)
+			    "undefined")
+			   (t
+			    (format "a %s entity"
+				    (sgml-entity-type entity))))))
+      (when entity
+	(let ((text (sgml-entity-text entity)))
+	  (cond ((stringp text)
+		 (princ "Defined to be:\n")
+		 (princ text))
+		(t
+		 (princ "With external identifier ")
+		 (princ (if (car text) "PUBLIC" "SYSTEM")) 
+		 (when (car text)
+		   (princ (format " '%s'" (car text))))
+		 (when (cdr text)
+		   (princ (format " '%s'" (cdr text)))))))))))
+
+
+
+;;;; Describe element type
+
+(defun sgml-describe-element-type (et-name)
+  "Describe the properties of an element type as declared in the current DTD."
+  (interactive
+   (let (default input)
+     (sgml-need-dtd)
+     (save-excursion
+       (sgml-with-parser-syntax
+	(unless (sgml-parse-delim "STAGO")
+	  (skip-syntax-backward "w_"))
+	(setq default (sgml-parse-name))
+	(unless (and default
+		     (sgml-eltype-defined (sgml-lookup-eltype default)))
+	  (setq default nil))))
+     (setq input (sgml-read-element-type (if default
+					     (format "Element type (%s): "
+						     default)
+					   "Element type: ")
+					 sgml-dtd-info
+					 default))
+
+     (list
+      (sgml-eltype-name input))))
+
+  (sgml-need-dtd)
+  (let ((et (sgml-lookup-eltype et-name)))
+    (with-output-to-temp-buffer "*Help*"
+      (princ (format "ELEMENT: %s\n\n" (sgml-eltype-name et)))
+      (princ (format " Start-tag is %s.\n End-tag is %s.\n"
+		     (if (sgml-eltype-stag-optional et)
+			 "optional" "required")
+		     (if (sgml-eltype-etag-optional et)
+			 "optional" "required")))
+      (princ "\nATTRIBUTES:\n")
+      (loop for attdecl in (sgml-eltype-attlist et) do
+	    (let ((name (sgml-attdecl-name attdecl))
+		  (dval (sgml-attdecl-declared-value attdecl))
+		  (defl (sgml-attdecl-default-value attdecl)))
+	      (when (listp dval)
+		(setq dval (concat (if (eq (first dval)
+					   'notation)
+				       "#NOTATION (" "(")
+				   (mapconcat (function identity)
+					      (second dval)
+					      "|")
+				   ")")))
+	      (cond ((sgml-default-value-type-p 'fixed defl)
+		     (setq defl (format "#FIXED '%s'"
+					(sgml-default-value-attval defl))))
+		    ((symbolp defl)
+		     (setq defl (upcase (format "#%s" defl))))
+		    (t
+		     (setq defl (format "'%s'"
+					(sgml-default-value-attval defl)))))
+	      (princ (format " %-9s %-30s %s\n" name dval defl))))
+      ;; ----
+      (let ((s (sgml-eltype-shortmap et)))
+	(when s
+	  (princ (format "\nUSEMAP: %s\n" s))))
+      ;; ----
+      (princ "\nOCCURS IN:\n\n")
+      (sgml-map-eltypes
+       (function (lambda (cand)
+		   (when (memq et (sgml-eltype-refrenced-elements cand))
+		     (princ (format " %s" (sgml-eltype-name cand))))))
+       (sgml-pstate-dtd sgml-buffer-parse-state)))))
+
+
+;;; psgml-info.el ends here
