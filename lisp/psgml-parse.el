@@ -1860,10 +1860,11 @@ is not already in upper case."
 
 (defstruct (sgml-entity
 	    (:type list)
-	    (:constructor sgml-make-entity (name type text)))
+	    (:constructor sgml-make-entity (name type text &optional notation)))
   name					; Name of entity (string)
   type					; Type of entity CDATA NDATA PI SDATA
   text					; string or external
+  notation                              ; Notation of external entity or nil  
   )
 
 (defun sgml-entity-data-p (entity)
@@ -1885,17 +1886,18 @@ is not already in upper case."
   (or (assoc name (cdr entity-table))
       (car entity-table)))
 
-(defun sgml-entity-declare (name entity-table type text)
+(defun sgml-entity-declare (name entity-table type text &optional notation)
   "Declare an entity with name NAME in table ENTITY-TABLE.
 TYPE should be the type of the entity (text|CDATA|NDATA|SDATA...).
 TEXT is the text of the entity, a string or an external identifier.
+NOTATION is the notation of an external entity, if present.
 If NAME is nil, this defines the default entity."
   (cond
    (name
     (unless (sgml-lookup-entity name entity-table)
       (sgml-debug "Declare entity %s %s as %S" name type text)
       (nconc entity-table
-	     (list (sgml-make-entity name type text)))))
+	     (list (sgml-make-entity name type text notation)))))
    (t
     (unless (car entity-table)
       (sgml-debug "Declare default entity %s as %S" type text)

@@ -1615,6 +1615,11 @@ argument INVERT to non-nil."
        (delete-region sgml-markup-start (point))
        (sgml-entity-insert-text entity)))))
 
+(defvar sgml-notation-handlers 
+  '((gif . "xv") 
+    (jpeg . "xv"))
+  "*An alist mapping notations to programs handling them")
+
 ;; Function contributed by Matthias Clasen <clasen@netzservice.de>
 (defun sgml-edit-external-entity ()
   "Open	a new window and display the external entity at the point."
@@ -1638,38 +1643,60 @@ argument INVERT to non-nil."
 	     (ppos nil))
        (unless entity
 	 (error "Undefined entity %s" ename))
-       (unless (and (eq (sgml-entity-type entity) 'text)               
-		    (not (stringp (sgml-entity-text entity))))
-	 (error "The entity %s is not an external text entity" ename))
 
-       ;; here I try to construct a useful value for
-       ;; `sgml-parent-element'.
-
-       ;; find sensible values for the HAS-SEEN-ELEMENT part
-       (let ((seen nil)
-	     (child (sgml-tree-content sgml-current-tree)))
-	 (while (and child
-		     (sgml-tree-etag-epos child)
-		     (<= (sgml-tree-end child) (point)))
-	   (push (sgml-element-gi child) seen)
-	   (setq child (sgml-tree-next child)))
-	 (push (nreverse seen) ppos))
+       (let* ((type (sgml-entity-type entity))
+	      (notation (sgml-entity-notation entity))
+	      (handler (cdr (assoc notation sgml-notation-handlers))))
+	 (case type
+	   (ndata 
+	    (if handler 
+		(progn
+		  (message (format "Using '%s' to handle notation '%s'."
+				   handler notation))
+		  (save-excursion
+		    (set-buffer (get-buffer-create "*SGML background*"))
+		    (erase-buffer)
+		    (let* ((file (sgml-external-file 
+				  (sgml-entity-text entity)
+				  type
+				  (sgml-entity-name entity)))
+			   (command (format "%s %s" handler file))
+			   (process (start-process 
+				     (format "%s background" handler)
+				     nil "/bin/sh" "-c" command)))
+		      (process-kill-without-query process))))
+	      (error "Don't know how to handle notation '%s'." notation)))
+	   (text (progn
        
-       ;; find ancestors
-       (let ((rover sgml-current-tree))
-	 (while (not (eq rover sgml-top-tree))
-	   (push (sgml-element-gi rover) ppos)
-	   (setq rover (sgml-tree-parent rover))))
-
-       (find-file-other-window
-	(sgml-external-file (sgml-entity-text entity)
-			    (sgml-entity-type entity)
-			    (sgml-entity-name entity)))
-       (goto-char (point-min))
-       (sgml-mode)
-       (setq sgml-parent-document (cons parent ppos))
-       ;; update the live element indicator of the new window
-       (sgml-parse-to-here)))))
+	    ;; here I try to construct a useful value for
+	    ;; `sgml-parent-element'.
+       
+	    ;; find sensible values for the HAS-SEEN-ELEMENT part
+	    (let ((seen nil)
+		  (child (sgml-tree-content sgml-current-tree)))
+	      (while (and child
+			  (sgml-tree-etag-epos child)
+			  (<= (sgml-tree-end child) (point)))
+		(push (sgml-element-gi child) seen)
+		(setq child (sgml-tree-next child)))
+	      (push (nreverse seen) ppos))
+	    
+	    ;; find ancestors
+	    (let ((rover sgml-current-tree))
+	      (while (not (eq rover sgml-top-tree))
+		(push (sgml-element-gi rover) ppos)
+		(setq rover (sgml-tree-parent rover))))
+	    
+	    (find-file-other-window
+	     (sgml-external-file (sgml-entity-text entity)
+				 (sgml-entity-type entity)
+				 (sgml-entity-name entity)))
+	    (goto-char (point-min))
+	    (sgml-mode)
+	    (setq sgml-parent-document (cons parent ppos))
+	    ;; update the live element indicator of the new window
+	    (sgml-parse-to-here)))
+	   (t (error "Can't edit entities of type '%s'." type))))))))
 
 ;;;; SGML mode: TAB completion
 

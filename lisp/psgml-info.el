@@ -273,7 +273,8 @@
 			    (format "a %s entity"
 				    (sgml-entity-type entity))))))
       (when entity
-	(let ((text (sgml-entity-text entity)))
+	(let ((text (sgml-entity-text entity))
+	      (notation (sgml-entity-notation entity)))
 	  (cond ((stringp text)
 		 (princ "Defined to be:\n")
 		 (princ text))
@@ -283,7 +284,9 @@
 		 (when (car text)
 		   (princ (format " '%s'" (car text))))
 		 (when (cdr text)
-		   (princ (format " '%s'" (cdr text)))))))))))
+		   (princ (format " '%s'" (cdr text))))
+		 (when notation
+		   (princ (format "\nand notation '%s'" notation))))))))))
 
 
 

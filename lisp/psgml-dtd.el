@@ -584,6 +584,7 @@ Case transformed for general names."
   (let (name				; Name of entity
 	dest				; Entity table
 	(type 'text)			; Type of entity
+	(notation nil)                  ; Notation of entity
 	text				; Text of entity
 	extid				; External id 
 	)
@@ -608,7 +609,10 @@ Case transformed for general names."
 					; 73 external identifier,
 					; (65 ps+, 109+ entity type)?
 	    (sgml-skip-ps)
-	    (setq type (or (sgml-parse-entity-type) 'text))
+	    (let ((tn (sgml-parse-entity-type)))
+	      (setq type (or (car tn) 'text))
+	      (unless (eq (cdr tn) "")
+		(setq notation (cdr tn))))
 	    extid)
 	   ((sgml-startnm-char-next)
 	    (let ((token (intern (sgml-check-case (sgml-check-name)))))
@@ -633,7 +637,7 @@ Case transformed for general names."
 		(concat "<!" (sgml-check-parameter-literal) ">")))))
 	   ((sgml-check-parameter-literal))))
     (when dest
-      (sgml-entity-declare name dest type text))))
+      (sgml-entity-declare name dest type text notation))))
 
 
 (defun sgml-parse-entity-type ()
@@ -642,7 +646,8 @@ Case transformed for general names."
   ;;                             65 ps+,
   ;;                             41 notation name,
   ;;                             149.2+ data attribute specification?)
-  (let ((type (sgml-parse-name)))
+  (let ((type (sgml-parse-name))
+	(notation nil))
     (when type
       (setq type (intern (downcase (sgml-check-case type))))
       (when (and sgml-xml-p (memq type '(subdoc cdata sdata)))
@@ -651,7 +656,9 @@ Case transformed for general names."
       (cond ((eq type 'subdoc))
 	    ((memq type '(cdata ndata sdata))
 	     (sgml-skip-ps)
-	     (sgml-check-name)
+	     (setq notation (sgml-parse-name))
+	     (when notation
+	       (setq notation (intern (downcase (sgml-check-case notation)))))
 	     ;;149.2+ data attribute specification
 	     ;;                      = 65 ps+, DSO,
 	     ;;                        31 attribute specification list,
@@ -662,7 +669,8 @@ Case transformed for general names."
 	       (sgml-parse-s)
 	       (sgml-check-delim DSC)))
 	    (t (sgml-error "Illegal entity type: %s" type))))
-    type))
+    (cons type notation)
+    ))
 
 
 ;;;; Parse doctype: Attlist

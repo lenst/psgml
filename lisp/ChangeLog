@@ -1,5 +1,10 @@
 Mon Jun 22 19:58:43 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* Installed patch from Matthias Clasen
+	<clasen@pong.mathematik.uni-freiburg.de>.
+	Adding notation to entities and a sgml-notation-handlers variable
+	used by sgml-edit-external-entity.
+
 	* psgml-edit.el (sgml-indent-line): Previous change of
 	sgml-indent-line did not work well with OMITTAG. Restore old
 	functionallity.
