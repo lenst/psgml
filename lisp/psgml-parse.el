@@ -1250,7 +1250,7 @@ If DEPENDENCIES contains the symbol t, FILE is not considered newer."
 The dtd will be constructed with the parameter entities set according
 to ENTS.  The bdtd will be left in the current buffer.  The current
 buffer is assumed to be empty to start with."
-  (sgml-log-message "Recompiling DTD file %s..." dtd-file)
+  (message "Recompiling DTD file %s..." dtd-file)
   (let* ((sgml-dtd-info (sgml-make-dtd nil))
 	 (parameters (sgml-dtd-parameters sgml-dtd-info))
 	 (sgml-parsing-dtd t))
@@ -1275,7 +1275,7 @@ buffer is assumed to be empty to start with."
 					    params2)))
 		   (unless (or (null other)
 			       (equal entity other))
-		     (sgml-log-message
+		     (message
 		      "Parameter %s in compiled DTD has wrong value;\
  is '%s' should be '%s'"
 		      (sgml-entity-name entity)
@@ -2162,12 +2162,18 @@ Returns nil if entity is not found."
 	(let ((file (sgml-external-file extid type name)))
 	  (and file (insert-file-contents file)))
 	(progn
-	  (sgml-log-warning "External entity %s not found" name)
-	  (when pubid
-	    (sgml-log-warning "  Public identifier %s" pubid))
-	  (when sysid
-	    (sgml-log-warning "  System identifier %s" sysid))
+          (sgml-warn-external-entity-not-found name pubid sysid)
 	  nil))))
+
+(defun sgml-warn-external-entity-not-found (name pubid sysid)
+  (sgml-log-warning "External entity not found: %s%s%s"
+                    name                    
+                    (if pubid
+                        (format " PUBLIC \"%s\"" pubid)
+                      "")
+                    (if sysid
+                        (format " SYSTEM \"%s\"" sysid)
+                      "")))
 
 
 ;; Parse a buffer full of catalogue entries.
@@ -2598,16 +2604,16 @@ overrides the entity type in entity look up."
 		    ;; Mark entity as not found
                     (setf (sgml-entity-marked-undefined-p entity) t)
 		    (if sgml-warn-about-undefined-entities
-			(sgml-log-warning "External entity %s not found"
-					  (sgml-entity-name entity)))
-		    (when pubid
-		      (sgml-log-warning "  Public identifier %s" pubid))
-		    (when sysid
-		      (sgml-log-warning "  System identifier %s" sysid))
+			(sgml-warn-external-entity-not-found
+                         (sgml-entity-name entity) pubid sysid))
 		    nil))))))))
      (t ;; internal entity
       (save-excursion
 	(insert (sgml-entity-text entity)))))))
+
+
+
+
 
 (defun sgml-pop-entity ()
   (cond ((and (boundp 'sgml-previous-buffer)
@@ -3271,14 +3277,6 @@ Where the latter represents end-tags."
       (setq sgml-log-last-size (save-excursion (set-buffer buf)
 					       (point-max))))))
 
-(defun sgml-log-warning (format &rest things)
-  (when sgml-throw-on-warning
-    (apply 'message format things)
-    (throw sgml-throw-on-warning t))
-  (when (or sgml-show-warnings sgml-parsing-dtd)
-    (apply 'sgml-message format things)
-    (apply 'sgml-log-message format things)))
-
 (defun sgml-log-message (format &rest things)
   (let ((mess (apply 'format format things))
 	(buf (get-buffer-create sgml-log-buffer-name))
@@ -3289,49 +3287,6 @@ Where the latter represents end-tags."
     (when (get-buffer-window buf)
       (setq sgml-log-last-size  (point-max)))
     (set-buffer cb)))
-
-(defun sgml-error (format &rest things)
-  (when sgml-throw-on-error
-    (throw sgml-throw-on-error nil))
-  (sgml-log-entity-stack)
-  (apply 'sgml-log-warning format things)
-  (apply 'error format things))
-
-(defun sgml-log-entity-stack ()
-  (save-excursion
-    (loop
-     do (sgml-log-message
-         "%s line %s col %s %s"
-         (or sgml-current-file (buffer-file-name) "-")
-         (count-lines (point-min) (point))
-         (current-column)
-         (let ((entity (if sgml-current-eref
-                           (sgml-eref-entity sgml-current-eref))))
-           (if (and entity (sgml-entity-type entity))
-               (format "entity %s" (sgml-entity-name entity))
-             "")))
-     while (and (boundp 'sgml-previous-buffer) sgml-previous-buffer)
-     do (set-buffer sgml-previous-buffer))))
-
-(defun sgml-parse-warning (format &rest things)
-  (sgml-log-entity-stack)
-  (apply 'sgml-log-warning format things))
-
-(defun sgml-parse-error (format &rest things)
-  (apply 'sgml-error
-	 (concat format "; at: %s")
-	 (append things (list (buffer-substring-no-properties
-			       (point)
-			       (min (point-max) (+ (point) 12)))))))
-
-(defun sgml-message (format &rest things)
-  (let ((buf (get-buffer sgml-log-buffer-name)))
-    (when (and buf
-	       (> (save-excursion (set-buffer buf)
-				  (point-max))
-		  sgml-log-last-size))
-      (sgml-display-log)))
-  (apply 'message format things))
 
 (defun sgml-reset-log ()
   (let ((buf (get-buffer sgml-log-buffer-name)))
@@ -3356,6 +3311,86 @@ clear and remove it if it is showing."
 	 (sgml-display-log))
 	(t
 	 (sgml-clear-log))))
+
+
+
+(defun sgml-log-entity-stack ()
+  (save-excursion
+    (loop
+     do (sgml-log-message
+         "%s line %s col %s %s"
+         (or sgml-current-file (buffer-file-name) "-")
+         (count-lines (point-min) (point))
+         (current-column)
+         (let ((entity (if sgml-current-eref
+                           (sgml-eref-entity sgml-current-eref))))
+           (if (and entity (sgml-entity-type entity))
+               (format "entity %s" (sgml-entity-name entity))
+             "")))
+     while (and (boundp 'sgml-previous-buffer) sgml-previous-buffer)
+     do (set-buffer sgml-previous-buffer))))
+
+
+
+(defvar sgml-warning-message-flag nil
+  "True if a warning message has been displayed.
+To avoid clearing message with out showing previous warning.")
+
+
+(defun sgml-log-warning (format &rest things)
+  (when sgml-throw-on-warning
+    (apply 'message format things)
+    (throw sgml-throw-on-warning t))
+  (when (or sgml-show-warnings sgml-parsing-dtd)
+    (apply 'sgml-message format things)
+    (setq sgml-warning-message-flag t)))
+
+
+(defun sgml-error (format &rest things)
+  (when sgml-throw-on-error
+    (throw sgml-throw-on-error nil))
+  (setq sgml-warning-message-flag nil)
+  (error "%s%s" (apply 'format format things )
+         (sgml-entity-stack)))
+
+
+(defun sgml-entity-stack-1 ()
+  (format
+   "\n %s line %s col %s %s%s"
+   (or sgml-current-file (buffer-file-name) "-")
+   (count-lines (point-min) (point))
+   (current-column)
+   (let ((entity (if sgml-current-eref
+                     (sgml-eref-entity sgml-current-eref))))
+     (if (and entity (sgml-entity-type entity))
+         (format "entity %s" (sgml-entity-name entity))
+       ""))
+   (if (and (boundp 'sgml-previous-buffer) sgml-previous-buffer)
+       (progn (set-buffer sgml-previous-buffer)
+              (sgml-entity-stack-1))
+     "")))
+
+(defun sgml-entity-stack ()
+  (save-excursion (sgml-entity-stack-1)))
+
+
+(defun sgml-parse-warning (format &rest things)
+  (message "%s%s" (apply 'format format things) (sgml-entity-stack))
+  (setq sgml-warning-message-flag t))
+
+(defun sgml-parse-error (format &rest things)
+  (apply 'sgml-error
+	 (concat format "; at: %s")
+	 (append things (list (buffer-substring-no-properties
+			       (point)
+			       (min (point-max) (+ (point) 12)))))))
+
+(defun sgml-message (format &rest things)
+  (unless (and (or (equal format "")
+                 (string-match "\\.\\.done$" format))
+             sgml-warning-message-flag)
+    (apply 'message format things)
+    (setq sgml-warning-message-flag nil)))
 
 
 
