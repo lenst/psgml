@@ -2131,7 +2131,7 @@ Returns nil if entity is not found."
 	(let ((file (sgml-external-file extid type name)))
 	  (and file (insert-file-contents file)))
 	(progn
-	  (sgml-log-warning "External entity %s not found." name)
+	  (sgml-log-warning "External entity %s not found" name)
 	  (when pubid
 	    (sgml-log-warning "  Public identifier %s" pubid))
 	  (when sysid
@@ -3725,7 +3725,7 @@ Returns a list of attspec (attribute specification)."
 						  eltype))))
 	    (t
 	     (sgml-log-warning
-	      "%s is not in any name group for element %s."
+	      "%s is not in any name group for element %s"
 	      val
 	      (sgml-eltype-name eltype))))
       ;; FIXME: What happens when eltype is nil ??
