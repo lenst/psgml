@@ -358,8 +358,9 @@ This variable is automatically local to the buffer.")
 (make-variable-buffer-local 'sgml-local-catalogs)
 (put 'sgml-local-catalogs 'sgml-type 'file-list)
 
-(defvar sgml-catalog-files (or (sgml-parse-colon-path
-				(getenv "SGML_CATALOG_FILES"))
+(defvar sgml-catalog-files (or (delete nil
+				       (sgml-parse-colon-path
+					(getenv "SGML_CATALOG_FILES")))
 			       '("catalog" "/usr/local/lib/sgml/catalog"))
   "*List of catalog entry files.
 The files are in the format defined in the SGML Open Draft Technical
@@ -1091,7 +1092,7 @@ All bindings:
 
   (set (make-local-variable 'paragraph-separate)
 	"^[ \t\n]*$\\|\
-^[ \t]*</?\\([A-Za-z]\\([-.A-Za-z0-9= \t\n]\\|\
+^[ \t]*</?\\([_A-Za-z]\\([-:._A-Za-z0-9= \t\n]\\|\
 \"[^\"]*\"\\|'[^']*'\\)*\\)?>$")
   (set (make-local-variable 'paragraph-start)
        paragraph-separate)
@@ -1173,7 +1174,7 @@ All bindings:
     0))
 
 (defconst sgml-start-tag-regex
-  "<[A-Za-z]\\([-.A-Za-z0-9= \n\t]\\|\"[^\"]*\"\\|'[^']*'\\)*"
+  "<[_A-Za-z]\\([-:.A-Za-z0-9= \n\t]\\|\"[^\"]*\"\\|'[^']*'\\)*"
   "Regular expression that matches a non-empty start tag.
 Any terminating > or / is not matched.")
 
@@ -1241,7 +1242,7 @@ Any terminating > or / is not matched.")
 		    ;; nor an unclosed start-tag.
 		    (looking-at (concat sgml-start-tag-regex "[/<]"))
 		    ;; Nor an unclosed end-tag.
-		    (looking-at "</[A-Za-z][-.A-Za-z0-9]*[ \t]*<"))
+		    (looking-at "</[A-Za-z][-:.A-Za-z0-9]*[ \t]*<"))
 		   (setq blinkpos nil)))
 	    (if blinkpos
 		()

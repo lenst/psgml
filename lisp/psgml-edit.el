@@ -1221,7 +1221,8 @@ Editing is done in a separate window."
     (let* ((start (point-marker))
 	   (asl (sgml-element-attribute-specification-list element))
 	   (cb (current-buffer))
-	   (quote sgml-always-quote-attributes))
+	   (quote sgml-always-quote-attributes)
+	   (xml-p sgml-xml-p))
        (switch-to-buffer-other-window
 	(sgml-attribute-buffer element asl))
        (sgml-edit-attrib-mode)
@@ -1230,7 +1231,9 @@ Editing is done in a separate window."
        (make-local-variable 'sgml-always-quote-attributes)
        (setq sgml-always-quote-attributes quote)
        (make-local-variable 'sgml-main-buffer)
-       (setq sgml-main-buffer cb))))
+       (setq sgml-main-buffer cb)
+       (make-local-variable 'sgml-xml-p)
+       (setq sgml-xml-p xml-p))))
 
 
 (defun sgml-effective-attlist (eltype)
@@ -1439,14 +1442,14 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 (defun sgml-edit-attrib-next ()
   "Move to next attribute value."
   (interactive)
-  (or (search-forward-regexp "^ *[.A-Za-z0-9---]+ *= ?" nil t)
+  (or (search-forward-regexp "^ *[_.:A-Za-z0-9---]+ *= ?" nil t)
       (goto-char (point-min))))
 
 
 ;;;; SGML mode: Hiding tags/attributes
 
 (defconst sgml-tag-regexp
-  "\\(</?>\\|</?[A-Za-z][---A-Za-z0-9.]*\\(\\([^'\"></]\\|'[^']*'\\|\"[^\"]*\"\\)*\\)>?\\)")
+  "\\(</?>\\|</?[_A-Za-z][---_:A-Za-z0-9.]*\\(\\([^'\"></]\\|'[^']*'\\|\"[^\"]*\"\\)*\\)>?\\)")
 
 (defun sgml-operate-on-tags (action &optional attr-p)
   (let ((buffer-modified-p (buffer-modified-p))
