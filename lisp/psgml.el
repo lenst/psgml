@@ -52,7 +52,7 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.3.2"
+(defconst psgml-version "1.3.3"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
