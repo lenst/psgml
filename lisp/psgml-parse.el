@@ -202,6 +202,10 @@ Only valid after `sgml-parse-to'.")
 (defvar sgml-markup-start nil
   "Start point of markup beeing parsed.")
 
+(defvar sgml-conref-flag nil
+  "This variable is set by `sgml-parse-attribute-specification-list'
+if a CONREF attribute is parsed.")
+
 (defvar sgml-no-elements nil
   "Number of declared elements.")
 
@@ -232,9 +236,6 @@ to point to the next scratch buffer.")
 					; a finite automaton.
 
 ;; Buffer local variables 
-
-(defvar sgml-document-element nil)
-(make-variable-buffer-local 'sgml-document-element)
 
 (defvar sgml-loaded-dtd nil
   "File name corresponding to current DTD.")
@@ -875,20 +876,6 @@ This may change ELTYPES1, ELTYPES2 is unchanged. Returns the new table."
 				  (copy-list (symbol-plist sym)))))))
        eltypes2)      
       eltypes1)))
-
-(defun sgml-copy-eltypes (eltypes)
-  (let ((new (sgml-make-eltypes-table)))
-    (mapatoms
-     (function (lambda (sym)
-		 (let ((et (intern (symbol-name sym) new)))
-		   (when (fboundp sym)
-		     (fset et (symbol-function sym)))
-		   (when (boundp sym)
-		     (set et (symbol-value sym)))
-		   (setf (symbol-plist et)
-			 (copy-list (symbol-plist sym))))))
-     eltypes)
-    new))
 
 (defun sgml-lookup-eltype (name &optional dtd)
   "Lookup the element defintion for NAME (string)."
@@ -2386,9 +2373,9 @@ overrides the entity type in entity look up."
 		  (sgml-parse-to (point-max) (function input-pending-p) t))))
 	  (error nil))))))
 
-(defun sgml-set-active-dtd-indicator ()
+(defun sgml-set-active-dtd-indicator (name)
   (set (make-local-variable 'sgml-active-dtd-indicator)
-       (list (format " [%s" (or sgml-document-element "ANY"))
+       (list (format " [%s" name)
 	     '(sgml-live-element-indicator ("/" sgml-current-element-name))
 	     "]"))
   (force-mode-line-update))
@@ -2409,25 +2396,21 @@ overrides the entity type in entity look up."
 (defsubst sgml-current-mixed-p ()
   (sgml-element-mixed sgml-current-tree))
 
-(defun sgml-set-initial-state (&optional dtd)
+(defun sgml-set-initial-state (dtd)
   "Set initial state of parsing"
   (make-local-variable 'before-change-function)
   (setq before-change-function 'sgml-note-change-at)
   (set (make-local-variable 'after-change-function)
        'sgml-set-face-after-change)
-  (or dtd (setq dtd (sgml-make-dtd "ANY")))
-  (setq sgml-document-element (sgml-dtd-doctype dtd))
-  (sgml-set-active-dtd-indicator)
+  (sgml-set-active-dtd-indicator (sgml-dtd-doctype dtd))
   (let ((top-type			; Fake element type for the top
 					; node of the parse tree
-	 (sgml-make-eltype "#DOC") ; was "Document (no element)"
+	 (sgml-make-eltype "#DOC")	; was "Document (no element)"
 	 ))
     (setf (sgml-eltype-model top-type)
-	  (if (equal sgml-document-element "ANY")
-	      sgml-any
-	    (sgml-make-primitive-content-token
-	     (sgml-eltype-token
-	      (sgml-lookup-eltype sgml-document-element dtd)))))
+	  (sgml-make-primitive-content-token
+	   (sgml-eltype-token
+	    (sgml-lookup-eltype (sgml-dtd-doctype dtd) dtd))))
     (setq sgml-buffer-parse-state
 	  (sgml-make-pstate dtd
 			    (sgml-make-tree top-type
@@ -2547,8 +2530,7 @@ entity hierarchy as possible."
 	  sgml-previous-tree nil)
     (assert sgml-current-state)
     (setq sgml-markup-tree sgml-current-tree)
-    (when (fboundp 'run-hook-with-args)
-      (run-hook-with-args 'sgml-open-element-hook sgml-current-tree asl))
+    (run-hook-with-args 'sgml-open-element-hook sgml-current-tree asl)
     (when (sgml-element-empty sgml-current-tree)
       (sgml-close-element after-tag after-tag))))
 
@@ -3132,10 +3114,6 @@ dtd or `ignore' if the declaration is to be ignored."
 
 ;;;; Parsing attribute values
 
-(defvar sgml-conref-flag nil
-  "This variable is set by `sgml-parse-attribute-specification-list'
-if a CONREF attribute is parsed.")
-
 (defun sgml-parse-attribute-specification-list (&optional eltype)
   "Parse an attribute specification list.
 Optional argument ELTYPE, is used to resolve omitted name=.
@@ -3194,8 +3172,6 @@ VALUE is a string.  Returns nil or an attdecl."
 				 (sgml-declared-value-token-group dv)))))
       (setq al (cdr al)))
     (if al (car al))))
-
-;¤¤\end{codeseg}
 
 
 ;;;; Parser driver
