@@ -61,7 +61,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "1.0a7"
+(defconst psgml-version "1.0a8"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -85,7 +85,7 @@
 ;;; User settable options:
 
 (defvar sgml-doctype nil
-  "*If set, this should be the namn of a file that contains the doctype
+  "*If set, this should be the name of a file that contains the doctype
 declaration to use.
 Setting this variable automatically makes it local to the current buffer.")
 (put 'sgml-doctype 'sgml-type 'string)
