@@ -75,6 +75,11 @@
 ;;;; Variables
 ;;; User settable options:
 
+(defvar sgml-tag-region-if-active nil
+  "*If non-nil, the Tags menu will tag a region if the region is 
+considered active by emacs.  If nil, region must be active and
+transient-mark-mode must be on for the region to be tagged.")
+
 (defvar sgml-normalize-trims t
   "*If non-nil, sgml-normalize will trim off white space from end of element
 when adding end tag.")
@@ -444,6 +449,7 @@ running the sgml-validate-command.")
 
 ;;; Key commands
 
+(define-key sgml-mode-map "\t" 'sgml-indent-or-tab)
 ;(define-key sgml-mode-map "<" 'sgml-insert-tag)
 (define-key sgml-mode-map ">" 'sgml-close-angle)
 (define-key sgml-mode-map "/" 'sgml-slash)
