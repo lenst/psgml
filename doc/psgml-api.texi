@@ -7,11 +7,10 @@
 @c $Id$
 
 @ifinfo
-@format
-START-INFO-DIR-ENTRY
+@dircategory Emacs
+@direntry
 * PSGML-API: (psgml-api).  PSGML, the API documentation.
-END-INFO-DIR-ENTRY
-@end format
+@end direntry
 @end ifinfo
 
 @ifinfo

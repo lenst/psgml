@@ -10,11 +10,10 @@
 @c $Id$
 
 @ifinfo
-@format
-START-INFO-DIR-ENTRY
+@dircategory Emacs
+@direntry
 * PSGML: (psgml).          PSGML, a major mode for SGML documents.
-END-INFO-DIR-ENTRY
-@end format
+@end direntry
 @end ifinfo
 
 @ifinfo
