@@ -40,6 +40,20 @@
   )
 
 
+;;;; Advise to do-auto-fill
+
+(defvar sgml-auto-fill-inhibit-function nil
+  "If non-nil, it should be a function of no arguments.
+The functions is evaluated before the standard auto-fill function,
+do-auto-fill, tries to fill a line. If the function returns a true
+value the auto-fill is inhibited.")
+
+;;(defadvice do-auto-fill (around disable-auto-fill-hook activate)
+;;  (or (and sgml-auto-fill-inhibit-function
+;;	   (funcall sgml-auto-fill-inhibit-function))
+;;      ad-do-it))
+
+
 ;;;; Variables
 
 ;;; Hooks
@@ -2992,8 +3006,8 @@ Where PAIRS is a list of (delim . ename)."
 	  (if (some (function
 		     (lambda (r) (aref map (sgml-shortref-index r))))
 		    '("\001B\n" "B\n" " " "BB"))
-	      "^<]/& \n\t\"#%'()*+,\\-:;+@[]\\^_{|}~"
-	    "^<]/&\n\t\"#%'()*+,\\-:;+@[]\\^_{|}~"))
+	      "^<]/& \n\t\"#%'()*+,\\-:;=@[]\\^_{|}~"
+	    "^<]/&\n\t\"#%'()*+,\\-:;=@[]\\^_{|}~"))
     map))
 
 (defun sgml-shortmap-skipstring (map)
@@ -3057,7 +3071,7 @@ Also move point.  Return nil, either if no shortref or undefined."
   (cdr (assoc name (cdr table))))
 
 (defun sgml-merge-shortmaps (tab1 tab2)
-  "Merge short reference map TAB2 into TAB1, modifying TAB1."
+  "Merge tables of short reference maps TAB2 into TAB1, modifying TAB1."
   (nconc tab1 (cdr tab2)))
 
 ;;;; Parse markup declarations
@@ -3354,7 +3368,8 @@ VALUE is a string.  Returns nil or an attdecl."
   (when (null sgml-buffer-parse-state)	; first parse in this buffer
     ;;(sgml-set-initial-state)		; fall back DTD
     (add-hook 'pre-command-hook 'sgml-reset-log)
-    (setq auto-fill-function 'sgml-do-auto-fill)
+    (make-local-variable 'sgml-auto-fill-inhibit-function)
+    (setq sgml-auto-fill-inhibit-function (function sgml-in-prolog-p))
     (if sgml-default-dtd-file
 	(sgml-load-dtd sgml-default-dtd-file)
       (let ((buf (and sgml-parent-document
@@ -3932,11 +3947,23 @@ This is a list of (attname value) lists."
   "True if ELEMENT is the pseudo element above the document element."
   (null (sgml-tree-parent element)))
 
-(defun sgml-do-auto-fill ()
-  (when (and (> (current-column) fill-column)
-	     (not (sgml-off-top-p (sgml-parse-to-here))))
-    (message "Fill element %s" (sgml-element-gi sgml-current-tree))
-    (do-auto-fill)))
+(defun sgml-safe-context-of (pos)
+  (let ((sgml-throw-on-error 'parse-error))
+    (catch sgml-throw-on-error
+      (sgml-find-context-of pos))))
+
+(defun sgml-safe-element-at (pos)
+  (let ((sgml-throw-on-error 'parse-error))
+    (catch sgml-throw-on-error
+      (if (= pos (point-max))
+	  (sgml-find-context-of pos)
+	(sgml-find-element-of pos)))))
+
+(defun sgml-in-prolog-p ()
+  (let ((el (sgml-safe-context-of (point))))
+    (or (null el)
+	(sgml-off-top-p el))))
+
 
 ;;;; Provide
 
