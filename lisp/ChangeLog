@@ -1,3 +1,17 @@
+2005-03-12  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-info.el (sgml-display-table): add buttons
+	(sgml-list-elements, sgml-list-attributes)
+	(sgml-list-content-elements, sgml-list-occur-in-elements): supply
+	button info
+	(sgml-eltype): new button type
+	(sgml-print-eltypes): new func
+	(sgml-describe-element-type): use sgml-print-eltypes where appropriate
+	(sgml-describe-dtd): add button for element types
+
+	* psgml.el (sgml-main-menu): adjust menu for new/renamed commands
+	sgml-load-doctype, sgml-describe-dtd
+
 2005-03-08  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el (psgml-version): bump version
