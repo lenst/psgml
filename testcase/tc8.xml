@@ -1,0 +1,12 @@
+<!DOCTYPE Foo
+[
+<!ELEMENT Foo (En·annan) >
+<!ELEMENT En·annan (#PCDATA) >
+<!ATTLIST En·annan xmlns CDATA #IMPLIED >
+<!ENTITY Yæ "Lennart">
+<!ENTITY _001 "First">
+]>
+
+<Foo>
+  <En·annan>Nisse och &Yæ;</En·annan>
+</Foo>
