@@ -696,4 +696,70 @@
 	       (overlay-put old-overlay 'sgml-type type)
 	       (overlay-put old-overlay 'face face))))))))
 
+;;;; New Right Button Menu
+
+(define-key sgml-mode-map [S-mouse-3] 'sgml-right-menu)
+
+(defun sgml-right-menu (event)
+  "Pop up a menu with valid tags and insert the choosen tag.
+If the variable sgml-balanced-tag-edit is t, also inserts the
+corresponding end tag. If sgml-leave-point-after-insert is t, the point
+is left after the inserted tag(s), unless the element has som required
+content.  If sgml-leave-point-after-insert is nil the point is left
+after the first tag inserted."
+  (interactive "*e")
+  (let ((end (sgml-mouse-region)))
+    (sgml-parse-to-here)
+    (cond
+     ((eq sgml-markup-type 'start-tag)
+      (sgml-right-stag-menu event))
+     (t
+      (let ((what
+	     (sgml-menu-ask event (if (or end sgml-balanced-tag-edit)
+                                      'element 'tags))))
+	(cond
+	 ((null what))
+	 (end
+	  (sgml-tag-region what (point) end))
+	 (sgml-balanced-tag-edit
+	  (sgml-insert-element what))
+	 (t
+	  (sgml-insert-tag what))))))))
+
+
+(defun sgml-right-stag-menu (event)
+  (let* ((el (sgml-find-attribute-element))
+         (attrib-menu (cons "Attributes"
+                            (or (ignore-errors (sgml-make-attrib-menu el))
+                                (list "-")))))
+    
+
+    (let* ((alt-gi (mapcar (function sgml-eltype-name)
+                           (progn
+                             (sgml-find-context-of (sgml-element-start el))
+                             (sgml-current-list-of-valid-eltypes))))
+           (change-menu
+            (cons "Change To"
+                  (loop for gi in alt-gi
+                        collect `(,gi (sgml-change-element-name ,gi))))))
+      (sgml-popup-multi-menu
+       event "Start Tag"
+       (list attrib-menu change-menu
+             `("Misc"
+               ("Edit attributes" (sgml-edit-attributes))
+               ("Normalize" (sgml-normalize-element))
+               ("Fill" (sgml-fill-element 
+                        (sgml-find-context-of (point))))
+               ("Splice" (sgml-untag-element))
+               ("Fold"   (sgml-fold-element))))))))
+
+
+
+
+
+
+
+
+
+
 ;¤¤\end{codeseg}
