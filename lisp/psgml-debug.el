@@ -258,7 +258,7 @@
     (with-output-to-temp-buffer "*Testing psgml*"
       (while
 	  (progn
-	    (setq file (format "/ni/src/sgmls-1.1/test/test%03d.sgm"
+	    (setq file (format "/u2/src/sgmls-1.1/test/test%03d.sgm"
 			       start))
 	    (file-exists-p file))
 	(princ (format "*** File test%03d ***\n" start))
