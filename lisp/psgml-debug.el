@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: 1998-11-15 22:02:29 lenst
+;;;\Last edited: 1998-12-06 22:38:03 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -372,6 +372,77 @@
 	  sgml-remove-redundant-states-1
 	  ))
   (elp-instrument-list))
+
+;;;; Structure Viewing and Navigating
 
+(require 'psgml-api)
+
+(defvar show-structure-buffer nil)
+(defvar show-structure-positions nil)
+(defvar show-structure-source-buffer nil)
+
+(defun show-structure ()
+  (interactive)
+  (let* ((source (current-buffer))
+         (result (get-buffer-create "*Struct*"))
+         (show-structure-buffer result))
+    (set-buffer result)
+    (erase-buffer)
+    (make-local-variable 'show-structure-positions)
+    (setq show-structure-positions nil)
+    (make-local-variable 'show-structure-source-buffer)
+    (setq show-structure-source-buffer source)
+    (use-local-map (make-sparse-keymap))
+    (local-set-key "\C-c\C-c" 'show-structure-goto)
+    (set-buffer source)
+    (show-element (sgml-top-element))
+    (display-buffer result)))
+
+
+(defun show-structure-goto ()
+  (interactive)
+  (beginning-of-line)
+  (let ((pos-pair (assoc (point) show-structure-positions)))
+    (when pos-pair
+      (switch-to-buffer show-structure-source-buffer)
+      (goto-char (cdr pos-pair)))))
+
+
+(defun show-struct-element-p (element)
+  (or (and (not (sgml-element-data-p element))
+           (not (sgml-element-empty element)))
+      (sgml-element-appdata element 'structure)))
+
+
+(defun show-element (element)
+  (cond ((show-struct-element-p element)
+         (let ((gi (sgml-element-gi element))
+               (level (sgml-element-level element)))
+           (save-excursion
+             (set-buffer show-structure-buffer)
+             (if (not (bolp))
+                 (insert "\n"))
+             (push (cons (point) (sgml-element-start element))
+                   show-structure-positions)
+             (insert (format "%s[%15s] " (make-string (- level 1) ? ) gi))))
+         (catch 'show-data-stop
+             (show-element-data element))
+         (sgml-map-content element #'show-element))))
+
+(defun show-element-data (element)
+  (sgml-map-content element #'show-element-data #'show-data)
+  (throw 'show-data-stop nil))
+
+(defun show-data (data)
+  (save-excursion
+    (set-buffer show-structure-buffer)
+    (let ((start (point)))
+      (insert data)
+      (let ((end (point)))
+        (subst-char-in-region start end ?\n ? )
+        (when (> (current-column) fill-column)
+          (move-to-column fill-column)
+          (delete-region (point) end)
+          (throw 'show-data-stop nil))))))
 
 ;¤¤\end{codeseg}
