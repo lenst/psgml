@@ -1583,9 +1583,9 @@ If it is something else complete with ispell-complete-word."
 			   (sgml-option-value-indicator var))
 		   var))))))
     (when var
-      (sgml-do-set-option var))))
+      (sgml-do-set-option var event))))
 
-(defun sgml-do-set-option (var)
+(defun sgml-do-set-option (var &optional event)
   (let ((type (sgml-variable-type var))
 	(val (symbol-value var)))
     (cond
