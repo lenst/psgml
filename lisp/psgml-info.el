@@ -1,5 +1,5 @@
 ;;;; psgml-info.el
-;;; Last edited: Mon Aug  7 23:00:54 1995 by lenst@katja.lysator.liu.se (Lennart Staflin)
+;;; Last edited: Wed Mar 20 21:24:16 1996 by lenst@triton.lstaflin.pp.se (Lennart Staflin)
 ;;; $Id$
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
@@ -97,10 +97,14 @@
 		 (sgml-add-last-unique (sgml-move-dest m) states)))
        
 	  (t				; &-node
-	   (sgml-add-last-unique (sgml-&node-next (car agenda)) states)
-	   (loop for dfa in (sgml-&node-dfas (car agenda)) do
+	   (sgml-add-last-unique (sgml-and-node-next (car agenda)) states)
+	   (loop for dfa in (sgml-and-node-dfas (car agenda)) do
 		 (sgml-add-last-unique dfa states))))
 	 (setq agenda (cdr agenda)))
+       (setq res (sort (set-difference
+			(union res (sgml-eltype-includes eltype))
+			(sgml-eltype-excludes eltype))
+		       (function string-lessp)))
        (setf (sgml-eltype-appdata eltype 're-cache) res)
        res)))))
 
@@ -345,11 +349,23 @@
 	  (princ (format "\nUSEMAP: %s\n" s))))
       ;; ----
       (princ "\nOCCURS IN:\n\n")
-      (sgml-map-eltypes
-       (function (lambda (cand)
-		   (when (memq et (sgml-eltype-refrenced-elements cand))
-		     (princ (format " %s" (sgml-eltype-name cand))))))
-       (sgml-pstate-dtd sgml-buffer-parse-state)))))
+      (let ((occurs-in ()))
+	(sgml-map-eltypes
+	 (function (lambda (cand)
+		     (when (memq et (sgml-eltype-refrenced-elements cand))
+		       (push cand occurs-in))))
+	 (sgml-pstate-dtd sgml-buffer-parse-state))
+
+	(loop with col = 0
+	      for occur-et in (sort occurs-in (function string-lessp))
+	      for name = (sgml-eltype-name occur-et)
+	      do
+	      (when (and (> col 0) (> (+ col (length name) 1) fill-column))
+		(princ "\n")
+		(setq col 0))
+	      (princ " ") (princ name)
+	      (incf col (length name))
+	      (incf col 1))))))
 
 
 ;;;; Print general info about the DTD.
