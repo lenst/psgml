@@ -15,7 +15,7 @@ psgml-api.info: psgml-api.texi
 
 dvi: psgml.dvi psgml-api.dvi
 
-psgml.dvi:
+psgml.dvi: $(srcdir)/psgml.texi
 	$(TEXI2DVI) $(srcdir)/psgml.texi
 
 psgml-api.dvi:
