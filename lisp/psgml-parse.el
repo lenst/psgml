@@ -984,7 +984,7 @@ remove it if it is showing."
 
 (defun sgml-pubid-parts (pubid)
   (string-match
-   "^\\(+//\\|-//\\)?\\(\\([^/]\\|/[^/]\\)+\\)//\\([^ ]*\\) \\(\\([^/]\\|/[^/]\\)*\\).*"
+   "^\\(+//\\|-//\\)?\\(\\([^/]\\|/[^/]\\)+\\)//\\([^ \t\n]*\\)[ \t\n]+\\(\\([^/]\\|/[^/]\\)*\\).*"
    pubid)
   (list
    (cons ?o (sgml-transliterate-file (sgml-matched-string pubid 2)))
@@ -1676,13 +1676,15 @@ Also sets sgml-current-tree, sgml-current-state and point."
 
 (defun sgml-find-element-of (pos)
   "Find the element containing character at POS."
+  (when (eq pos (point-max))
+    (error "End of buffer"))
   (save-excursion
     (sgml-parse-to (1+ pos))		; Ensures that the element is
 					; in the tree.
     ;;  Find p in u:
     ;;  assert p >= start(u)
     ;;  if next(u) and p >= start(next(u)): find p in next(u)
-    ;;  else if end(u) and p >= end(u): in parent(u)
+    ;;  else if end(u) and p >= end(u): in parent(u) unless u is top
     ;;  else if content:
     ;;    if p < start(content(u)): in u
     ;;    else find p in content(u)
@@ -1734,25 +1736,19 @@ Also sets sgml-current-tree, sgml-current-state and point."
   "Find the first element starting after POS.
 Returns parse tree; error if no element after POS."
   (save-excursion
-    (let ((bef (sgml-find-previous-element pos 'noerror))
-	  (this (sgml-find-context-of pos))
-	  (next nil))
-      (unless bef
-	(when (and (null (sgml-tree-content this))
-		   (null (sgml-tree-end this)))
-	  (sgml-parse-until-end-of t))
-	(setq next (sgml-tree-content this)))
-      (while (and (progn
-		    (and bef (setq next (sgml-element-next bef)))
-		    (null next))
-		  (/= pos (point-max))
-		  (= pos (sgml-element-end this)))
-	(setq bef this
-	      this (sgml-tree-parent this)))
+    (let ((next (sgml-find-element-of pos)))
+      (while (and next			; while next is actually parent
+		  (or (< (sgml-tree-start next) pos)
+		      (zerop (sgml-tree-stag-len next))))
+	(when (and (null (sgml-tree-content next)) ; make sure that if this element
+		   (null (sgml-tree-end next))) ; has some content the first element
+	  (sgml-parse-until-end-of t))	; of the content has been parsed
+	(setq next (sgml-tree-content next))
+	(while (and next (< (sgml-tree-start next) pos)) ; search content
+	  (setq next (sgml-element-next next))))
       (unless next
 	(sgml-message "")		; force display of log buffer
-	(error "No more elements in %s element"
-	       (element-name (sgml-tree-element this))))
+	(error "No more elements."))
       next)))
 
 (defun sgml-element-extent ()
@@ -2267,7 +2263,8 @@ Editing is done in a separate window."
 	    (asl (sgml-parse-attribute-specification-list
 		  (sgml-tree-element node)))
 	    (end (point-marker))
-	    (cb (current-buffer)))
+	    (cb (current-buffer))
+	    (quote sgml-always-quote-attributes))
        (switch-to-buffer-other-window
 	(sgml-attribute-buffer (sgml-tree-element node) asl))
        (sgml-edit-attrib-mode)
@@ -2275,6 +2272,8 @@ Editing is done in a separate window."
        (setq sgml-start-attributes start)
        (make-local-variable 'sgml-end-attributes)
        (setq sgml-end-attributes end)
+       (make-local-variable 'sgml-always-quote-attributes)
+       (setq sgml-always-quote-attributes quote)
        (make-local-variable 'sgml-main-buffer)
        (setq sgml-main-buffer cb)))))
 
@@ -2380,7 +2379,8 @@ To finsh edit use \\[sgml-edit-attrib-finish].
 	(subst-char-in-region start end ?\n ? )
 	(goto-char (point-min))
 	(delete-horizontal-space)
-	(cond ((looking-at "^[.A-Za-z0-9---]+$")) ; no need to quote
+	(cond ((and (not sgml-always-quote-attributes)
+		    (looking-at "^[.A-Za-z0-9---]+$"))) ; no need to quote
 	      ((not (search-forward "\"" nil t)) ; can use "" quotes
 	       (setq quote "\""))
 	      (t			; use '' quotes
@@ -2432,9 +2432,12 @@ To finsh edit use \\[sgml-edit-attrib-finish].
 		  ("Omittag transparent" . sgml-omittag-transparent)
 		  ("Leave point after insert" . sgml-leave-point-after-insert)
 		  ("Indent data" . sgml-indent-data)
+		  ("Always quote attribute values"
+		   . sgml-always-quote-attributes)
 		  ("Warn about undefined elements"
 		   . sgml-warn-about-undefined-elements)
-		  ("Debug" . sgml-debug)))
+		  ("Debug" . sgml-debug)
+		  ))
        (indents '(("None" . nil) ("0" . 0) ("1" . 1) ("2" . 2) ("3" . 3)
 		  ("4" . 4) ("5" . 5) ("6" . 6) ("7" . 7) ("8" . 8)))
        (maxlen 1)
