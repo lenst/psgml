@@ -1848,9 +1848,17 @@ the entity name."
   ;; extid is (pubid . sysid)
   (let ((pubid (car extid)))
     (when pubid (setq pubid (sgml-canonize-pubid pubid)))
-    (or (sgml-catalog-lookup sgml-current-localcat pubid type name)
+    (or (sgml-lookup-sysid-as-file (cdr extid))
+	(sgml-catalog-lookup sgml-current-localcat pubid type name)
 	(sgml-catalog-lookup sgml-catalog-files pubid type name)
 	(sgml-path-lookup extid type name))))
+
+(defun sgml-lookup-sysid-as-file (sysid)
+  (and sysid
+       (loop for pat in sgml-public-map
+	     never (string-match "%[Ss]" pat))
+       (file-readable-p sysid)
+       sysid))
 
 (defun sgml-insert-external-entity (extid &optional type name)
   "Insert the contents of an external entity at point.
