@@ -1,0 +1,36 @@
+TODO      [Time-stamp: "1998-11-28 12:10:37 lenst"]           -*- outline -*- 
+
+* Konstigt beteende när DOCTYPE specar en odefinierad elementtyp,
+speciellt om det är nästan samma som topelementet i instansen men
+skiljer sig i case.
+
+* Byt sgml-throw-on-warning till en handler
+
+* ofta fel av typen listp, ANY
+
+måste vara i ANY context...
+
+* Kanske sgml--add-before-p borde användas allmänt
+
+T.ex. av sgml-insert-element
+
+* Kolla #REQUIRED attribut
+
+i sgml-parse-attribute-specification-list
+
+    ;; Check all required attributes specified
+    (let ((unspecified
+           (loop for attdecl in attlist
+                 if (and (sgml-default-value-type-p
+                          'REQUIRED (sgml-attdecl-default-value attdecl))
+                         (not (sgml-lookup-attspec (sgml-attdecl-name attdecl)
+                                                   asl)))
+                 collect attdecl)))
+      (when unspecified
+        (sgml-log-warning "Missing required attributes: %s"
+                          (mapcar (function sgml-attdecl-name) unspecified))))
+
+
+måste också plocka bort optimering av start-tag utan asl.
+
+Hur mycket är funktionalliteten värd? Vad kostar den? 
