@@ -5,6 +5,7 @@
 prefix = @prefix@
 datadir = @datadir@
 lispdir = @lispdir@
+infodir = @infodir@
 srcdir = @srcdir@
 
 @SET_MAKE@
