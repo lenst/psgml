@@ -191,6 +191,7 @@ possible."
 Input attribute values in VALUES using attlist FROM is translated into
 a list using attlist TO."
   (let ((new-values nil)
+	(sgml-show-warnings t)
 	tem)
     (loop for attspec in values 
 	  as from-decl = (sgml-lookup-attdecl (sgml-attspec-name attspec) from)
@@ -410,19 +411,11 @@ is determined."
   (interactive)
   (push-mark)
   (sgml-note-change-at (point))		; Prune the parse tree
-  (sgml-parse-to-here)
-  (let ((sgml-suppress-warning t)
-	(sgml-last-trouble-spot (point))
-	sgml-throw-on-warning)
-    (or (catch 'trouble
-	  (sgml-parse-until-end-of
-	   nil
-	   (function (lambda ()
-		       (when (>= (point) sgml-last-trouble-spot)
-			 (setq sgml-last-trouble-spot (point-max)
-			       sgml-suppress-warning nil
-			       sgml-throw-on-warning 'trouble))
-		       nil))))
+  (sgml-parse-to (point))
+  (let ((sgml-last-trouble-spot (point))
+	(sgml-throw-on-warning 'trouble))
+    (or (catch sgml-throw-on-warning
+	  (sgml-parse-until-end-of nil t))
 	(message "Ok"))))
 
 
@@ -455,6 +448,9 @@ is determined."
 	     (terpri))
 	    (t
 	     (princ "Current element can not end here\n")))
+      (let ((s (sgml-tree-shortmap sgml-current-tree)))
+	(when s
+	  (princ (format "Current shortref map: %s\n" s))))
       (princ "Valid start-tags\n")
       (sgml-print-valid-tags "In current element:"
 			     sgml-current-tree sgml-current-state))))
@@ -588,7 +584,7 @@ after the first tag inserted."
 		     sgml-leave-point-after-insert))
   (let (stag-end			; position after start tag
 	element				; inserted element
-	(sgml-suppress-warning t))
+	(sgml-show-warnings nil))
     (when (and name (not (equal name "")))
       (sgml-insert-tag (sgml-start-tag-of name) 'silent)
       (forward-char -1)
