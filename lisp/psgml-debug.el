@@ -1,5 +1,5 @@
 ;;;;\filename psgml-debug.el
-;;;\Last edited: 2000-06-07 07:29:59 lenst
+;;;\Last edited: 2001-02-21 01:02:23 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -27,7 +27,7 @@
   (interactive)
   (setq sgml-dtd-info (sgml-pstate-dtd sgml-buffer-parse-state)
 	sgml-top-tree (sgml-pstate-top-tree sgml-buffer-parse-state))
-  (sgml-find-start-point (point))
+  (sgml-goto-start-point (point))
   (message "%s" (sgml-dump-node sgml-current-tree)))
 
 (defun sgml-dump-tree (arg)
@@ -663,14 +663,10 @@
     ;;--
     (cond
      (sgml-use-text-properties
-      (let ((inhibit-read-only t)
-	    (after-change-function nil)	; obsolete variable
-	    (before-change-function nil) ; obsolete variable
-	    (after-change-functions nil)
-	    (before-change-functions nil))
-	(put-text-property start end 'face face)
-        (when (< start end)
-          (put-text-property (1- end) end 'rear-nonsticky '(face)))))
+      (sgml-without-change-hooks
+       (put-text-property start end 'face face)
+       (when (< start end)
+         (put-text-property (1- end) end 'rear-nonsticky '(face)))))
      (t
       (let ((current (overlays-at start))
 	    (pos start)
