@@ -1,3 +1,11 @@
+2002-02-13  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-auto-insert-required-elements): doc fix.
+	(sgml-balanced-tag-edit): doc fix.
+
+	* psgml-edit.el (sgml-edit-attrib-default): don't make text read-only
+	(sgml-insert-tag): doc fix.
+
 2002-02-09  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el: Explicitly setup prefix keys

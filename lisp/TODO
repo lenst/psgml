@@ -1,5 +1,9 @@
-TODO      [Time-stamp: "2002-01-29 16:14:12 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2002-02-13 10:25:53 lenst"]           -*- outline -*- 
 
+
+* Cosider removing sgml-balanced-tag-edit
+Only affects sgml-tag-menu.
+Perhaps replace with a "context menu type" option.
 
 * Restore window config after edit-attr
 
