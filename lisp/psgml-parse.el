@@ -2809,14 +2809,16 @@ is determined."
 	    (princ str))
       (terpri))))
 
-(defun sgml-show-context (&optional el)
+(defun sgml-show-context (&optional element)
   "Display where the cursor is in the element hierarchy."
   (interactive)
-  (or el (setq el (sgml-last-element)))
-  (let* ((model (sgml-element-model el)))
+  (let* ((el (or element (sgml-last-element)))
+	 (model (sgml-element-model el)))
     (sgml-message "%s %s" 
 		  (cond
-		   (sgml-markup-type)
+		   ((and (null element)	; Don't trust sgml-markup-type if
+					; explicit element is given as argument
+			 sgml-markup-type))
 		   ((sgml-element-mixed el)
 		    "#PCDATA")
 		   ((not (sgml-model-group-p model))
