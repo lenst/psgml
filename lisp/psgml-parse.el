@@ -4008,6 +4008,7 @@ pointing to start of short ref and point pointing to the end."
 				     (point))))
   (sgml-set-markup-type nil))
 
+(defvar sgml-parser-loop-hook nil)
 (defun sgml-parser-loop (extra-cond)
   (let (tem
 	(sgml-signal-data-function (function sgml-pcdata-move)))
@@ -4052,6 +4053,8 @@ pointing to start of short ref and point pointing to the end."
        ((sgml-parse-delim "MS-END")	; end of marked section
 	(sgml-set-markup-type 'ms-end))
        ((sgml-parse-processing-instruction))
+       ((and sgml-parser-loop-hook
+             (run-hook-with-args-until-success 'sgml-parser-loop-hook)))
        (t
 	(sgml-do-pcdata))))))
 
