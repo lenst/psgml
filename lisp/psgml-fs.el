@@ -1,5 +1,5 @@
 ;;; psgml-fs.el --- Format a SGML-file according to a style file
-;; Copyright (C) 1995 Lennart Staflin
+;; Copyright (C) 1995, 2000 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Version: $Id$
@@ -8,7 +8,7 @@
 
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
-;;; the Free Software Foundation; either version 1, or (at your option)
+;;; the Free Software Foundation; either version 2, or (at your option)
 ;;; any later version.
 ;;;
 ;;; This program is distributed in the hope that it will be useful,
@@ -55,7 +55,7 @@
     (literal . nil)))
 
 (defvar fs-special-styles
-  '(top bottom before after hang-from text sub-style)
+  '(top bottom before after hang-from text sub-style title)
   "Style attribues that should not be entered in the characteristics table.")
 
 
@@ -86,6 +86,9 @@
 
 (defvar fs-vspace 0
   "Vertical space after last paragraph")
+
+(defvar fs-filename)
+(defvar fs-title)
 
 (defun fs-add-output (str &optional just)
   (save-excursion
@@ -159,7 +162,8 @@
   (sgml-pop-entity)
   (sit-for 0))
 
-(defun fs-element-content (e)
+(defun fs-element-content (&optional e)
+  (unless e (setq e (fs-element)))
   (let ((fs-para-acc "") fs-first-indent fs-left-indent)
     (sgml-map-content e
 		      (function fs-paraform-phrase)
@@ -250,6 +254,12 @@ The value can be the style-sheet list, or it can be a file name
                                (function fs-paraform-data)
                                nil
                                (function fs-paraform-entity)))))
+    (let ((title (getf style 'title)))
+      (when title
+        (setq title (eval title))
+        (save-excursion
+          (set-buffer fs-buffer)
+          (setq fs-title title))))
     (let ((after (getf style 'after)))
       (when after
 	(fs-do-style e after)))
@@ -269,8 +279,15 @@ The value can be the style-sheet list, or it can be a file name
   (let ((fs-style (fs-get-style fs-style))
         (fs-buffer (get-buffer-create "*Formatted*")))
     (save-excursion
-      (set-buffer fs-buffer)
-      (erase-buffer))
+      (let ((orig-filename (buffer-file-name (current-buffer))))
+        (set-buffer fs-buffer)
+        (erase-buffer)
+        (setq ps-left-header
+              '(fs-title fs-filename))
+        (make-local-variable 'fs-filename)
+        (setq fs-filename (file-name-nondirectory orig-filename))
+        (make-local-variable 'fs-title)
+        (setq fs-title "")))
     (display-buffer fs-buffer)
     (fs-engine (sgml-top-element))
     (fs-para)
