@@ -52,7 +52,7 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.0.2"
+(defconst psgml-version "1.1.0"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -952,7 +952,10 @@ actually only the state that persists between commands.")
 
 
 (defun sgml-command-post ()
-  (when (eq major-mode 'sgml-mode)
+  (when (or (memq major-mode '(sgml-mode xml-mode))
+	    (fboundp 'make-local-hook))
+    ;; Explanation if make-local-hook is defined then this is called
+    ;; from a local hook and need not check major-mode.
     (when (and (null sgml-buffer-parse-state)
 	       sgml-auto-activate-dtd
 	       (null sgml-auto-activate-dtd-tried)
@@ -1083,7 +1086,13 @@ All bindings:
   (when (setq sgml-default-dtd-file (sgml-default-dtd-file))
     (unless (file-exists-p sgml-default-dtd-file)
       (setq sgml-default-dtd-file nil)))
-  (add-hook 'post-command-hook 'sgml-command-post 'append)
+  (cond ((fboundp 'make-local-hook)
+	 ;; emacs>= 19.29
+	 (make-local-hook 'post-command-hook)
+	 (add-hook 'post-command-hook 'sgml-command-post 'append 'local))
+	(t
+	 ;; emacs< 19.29
+	 (add-hook 'post-command-hook 'sgml-command-post 'append)))
   (run-hooks 'text-mode-hook 'sgml-mode-hook)
   (sgml-build-custom-menus)
   (easy-menu-add sgml-main-menu)
@@ -1092,6 +1101,7 @@ All bindings:
   (easy-menu-add sgml-markup-menu)
   (easy-menu-add sgml-view-menu)
   (easy-menu-add sgml-dtd-menu))
+
 
 ;;;###autoload
 (define-derived-mode xml-mode sgml-mode "XML"
