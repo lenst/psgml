@@ -505,6 +505,30 @@ See `compilation-error-regexp-alist'.")
 	    (sgml-set-local-variable var (symbol-value var))))))
 
 
+;;;; Run hook with args
+
+(unless (fboundp 'run-hook-with-args)
+  (defun run-hook-with-args (hook &rest args)
+    "Run HOOK with the specified arguments ARGS.
+HOOK should be a symbol, a hook variable.  If HOOK has a non-nil
+value, that value may be a function or a list of functions to be
+called to run the hook.  If the value is a function, it is called with
+the given arguments and its return value is returned.  If it is a list
+of functions, those functions are called, in order,
+with the given arguments ARGS.
+It is best not to depend on the value return by `run-hook-with-args',
+as that may change."
+    (and (boundp hook)
+	 (symbol-value hook)
+	 (let ((value (symbol-value hook)))
+	   (if (and (listp value) (not (eq (car value) 'lambda)))
+	       (mapcar '(lambda (foo) (apply foo args))
+		       value)
+	     (apply value args))))))
+
+
+
+
 ;;;; SGML mode: template functions
 
 (defun sgml-markup (entry text)
