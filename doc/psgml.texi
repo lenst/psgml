@@ -875,9 +875,7 @@ Keyboard commands for inserting:
 Will ask, for the tag to insert, in the mini-buffer with completion on the 
 tags that are valid at point (@code{sgml-insert-tag}).
 
-If the option @code{sgml-balanced-tag-edit} is non-nil, inserting a
-start-tag will also insert the corresponding end-tag.  If, in addition,
-@code{sgml-auto-insert-required-elements} is non-nil, tags for elements
+If @code{sgml-auto-insert-required-elements} is non-nil, tags for elements
 required between the inserted tags will also be inserted.
 
 The list of valid tags, computed for a position in the buffer, will
@@ -885,10 +883,9 @@ contain:
 
 @enumerate
 @item
-The end-tag for the current element, if it can be ended at the position
-and @code{sgml-balanced-tag-edit} is nil.  Furthermore it will contain
-end-tags for enclosing elements if the necessary omissible end-tag
-declarations have been made in the DTD.
+The end-tag for the current element, if it can be ended at the position.
+Furthermore it will contain end-tags for enclosing elements if the
+necessary omissible end-tag declarations have been made in the DTD.
 
 @item
 The start-tags of all elements that could occur after point.  If
@@ -1069,8 +1066,8 @@ secondary selection in Emacs.
 @end enumerate
 
 @defopt sgml-balanced-tag-edit
-If non-nil, inserting a start-tag will also insert the corresponding
-end-tag.
+If non-nil, inserting a start-tag using the context menu will also
+insert the corresponding end-tag.
 @end defopt
 
 @defopt sgml-auto-insert-required-elements
