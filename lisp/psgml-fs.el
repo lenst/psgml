@@ -4,7 +4,6 @@
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Version: $Id$
 ;; Keywords: 
-;; Last edited: 1999-08-02 20:55:20 lenst
 
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -162,16 +161,6 @@
   (sgml-pop-entity)
   (sit-for 0))
 
-(defun fs-element-content (&optional e)
-  (unless e (setq e (fs-element)))
-  (let ((fs-para-acc "") fs-first-indent fs-left-indent)
-    (sgml-map-content e
-		      (function fs-paraform-phrase)
-		      (function fs-paraform-data)
-		      nil
-		      (function fs-paraform-entity))
-    fs-para-acc))
-
 (defun fs-paraform-phrase (e)
   (sgml-map-content e
 		    (function fs-paraform-phrase)
@@ -244,14 +233,14 @@ The value can be the style-sheet list, or it can be a file name
     (let ((before (getf style 'before)))
       (when before
 	(fs-do-style e before)))
-    (cond ((getf style 'text)
-	   (let ((text (eval (getf style 'text))))
-	     (when (stringp text)
-	       (fs-paraform-data text))))
-	  (t
-           (let ((fs-style
-                  (append (getf style 'sub-style)
-                          fs-style)))
+    (let ((fs-style
+           (append (getf style 'sub-style)
+                   fs-style)))
+      (cond ((getf style 'text)
+             (let ((text (eval (getf style 'text))))
+               (when (stringp text)
+                 (fs-paraform-data text))))
+            (t
              (sgml-map-content e
                                (function fs-engine)
                                (function fs-paraform-data)
@@ -311,6 +300,15 @@ The value can be the style-sheet list, or it can be a file name
         (child  (setq element (sgml-element-content element)))))
     element))
 
+(defun fs-element-content (&optional e)
+  (unless e (setq e (fs-element)))
+  (let ((fs-para-acc "") fs-first-indent fs-left-indent)
+    (sgml-map-content e
+		      (function fs-paraform-phrase)
+		      (function fs-paraform-data)
+		      nil
+		      (function fs-paraform-entity))
+    fs-para-acc))
 
 (defun fs-attval (name &optional element)
   (sgml-element-attval (if element element (fs-element))
@@ -346,6 +344,21 @@ The value can be the style-sheet list, or it can be a file name
                 (return-from func nil)))
           (setq element (sgml-element-next element)))))
     nil))
+
+
+(defun fs-split-tokens (s)
+  "Split a string S into a list of tokens."
+  (let ((result nil))
+    (sgml-push-to-string s)
+    (while (not (eobp))
+      (skip-syntax-forward "-")
+      (let ((start (point)))
+        (skip-syntax-forward "^-")
+        (when (/= start (point))
+          (push (buffer-substring-no-properties start (point))
+                result))))
+    (sgml-pop-entity)
+    (nreverse result)))
 
 
 ;;; fs.el ends here
