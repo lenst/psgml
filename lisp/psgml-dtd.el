@@ -871,7 +871,7 @@ FORMS should produce the binary coding of element in VAR."
     (sgml-map-eltypes			; Assign numbers to all tokens
      (function (lambda (et)
 		 (sgml-code-token-number (sgml-eltype-token et))))
-     dtd)
+     dtd nil t)
     (setq tot (length sgml-code-token-numbers))
     ;; Produce the counted sequence of element type names
     (sgml-code-sequence (pair (cdr sgml-code-token-numbers))
