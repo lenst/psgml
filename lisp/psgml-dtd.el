@@ -260,6 +260,44 @@ Syntax: var dfa-expr &body forms"
 
 ;;;; Parse doctype: General
 
+(defun sgml-skip-ts ()
+  ;; Skip over ts*
+  ;;70  ts   = 5 s | EE | 60+ parameter entity reference
+  ;;For simplicity I use ps*
+  ;;65  ps   = 5 s | EE | 60+ parameter entity reference | 92 comment
+  ;;*** some comments are accepted that shouldn't
+  (sgml-skip-ps))
+
+
+(defun sgml-parse-parameter-literal ()
+  (sgml-skip-ps)
+  (let ((qchar (following-char))
+	qregexp
+	value)
+    (cond ((memq qchar '(?\" ?\'))
+	   (forward-char 1)
+	   (setq qregexp (format "^%c%%" qchar))
+	   (setq value "")
+	   (while (not (sgml-parse-char qchar))
+	     (setq value (concat value
+				 (buffer-substring
+				  (point)
+				  (goto-char
+				   (progn (skip-chars-forward qregexp)
+					  (point))))))
+	     (cond ((sgml-parse-char ?%)	;parameter entity reference
+		    (if (sgml-startnm-char-next)
+			(sgml-push-to-param (sgml-check-entity-ref))
+		      (setq value (concat value "%"))))
+		   ((eobp)
+		    (or (sgml-pop-param)
+			(sgml-error "Parameter literal unterminated")))))
+	   value))))
+
+(defun sgml-check-parameter-literal ()
+  (or (sgml-parse-parameter-literal)
+      (sgml-parse-error "Parameter literal expected")))
+
 (defun sgml-parse-connector ()
   (sgml-skip-ps)
   (cond ((sgml-parse-char ?,)
@@ -274,6 +312,12 @@ Syntax: var dfa-expr &body forms"
 
 (defun sgml-parse-grpo ()
   (sgml-parse-char ?\())
+
+(defun sgml-check-dtgc ()
+  (sgml-check-char ?\]))
+
+(defun sgml-parse-dtgo ()
+  (sgml-parse-char ?\[))
 
 (defun sgml-parse-name-group ()
   (sgml-skip-ps)
@@ -308,11 +352,11 @@ Syntax: var dfa-expr &body forms"
   "Parse and check an element type (name)."
   (cond
    ((sgml-parse-grpo)
-    (sgml-skip-ps)			; *** should be ts*
+    (sgml-skip-ts)
     (let ((names (sgml-check-element-type)))
       (while (progn (sgml-skip-ps)
 		    (sgml-parse-connector))
-	(sgml-skip-ps)			; *** should be ts*
+	(sgml-skip-ts)
 	(nconc names (sgml-check-element-type)))
       (sgml-check-grpc)
       names))
@@ -360,27 +404,35 @@ Syntax: var dfa-expr &body forms"
 	((sgml-parse-char ??)
 	 (function sgml-make-opt))))
 
-(defun sgml-parse-model-group ()
+(defun sgml-check-model-group ()
   (sgml-skip-ps)
   (let (el mod)
     (cond
      ((sgml-parse-grpo)
-      (let ((subs (list (sgml-parse-model-group)))
+      (let ((subs (list (sgml-check-model-group)))
 	    (con1 nil)
 	    (con2 nil))
 	(while (setq con2 (sgml-parse-connector))
 	  (cond ((and con1
 		      (not (eq con1 con2)))
-		 (sgml-error "Mixed connectors")))
+		 (sgml-parse-error "Mixed connectors")))
 	  (setq con1 con2)
-	  (setq subs (nconc subs (list (sgml-parse-model-group)))))
+	  (setq subs (nconc subs (list (sgml-check-model-group)))))
 	(sgml-check-grpc)
 	(setq el (if con1
 		     (funcall con1 subs)
 		   (car subs)))))
-     ((sgml-parse-rni 'pcdata)
+     ((sgml-parse-rni 'pcdata)		; #PCDATA
       (setq sgml-used-pcdata t)
       (setq el (sgml-make-pcdata)))
+     ((sgml-parse-dtgo)			; data tag group
+      (sgml-skip-ts)
+      (let ((gi (sgml-check-name)))
+	(sgml-skip-ts) (sgml-check-char ?,) ;*** SEQ
+	(sgml-check-data-tag-pattern)
+	(sgml-skip-ts) (sgml-check-dtgc)
+	(setq el (sgml-make-conc (sgml-make-primitive-content-token gi)
+				 (sgml-make-pcdata)))))
      (t
       (setq el (sgml-make-primitive-content-token (sgml-check-name)))))
     (setq mod (sgml-parse-modifier))
@@ -388,13 +440,31 @@ Syntax: var dfa-expr &body forms"
 	(funcall mod el)
       el)))
 
-(defun sgml-parse-content-model ()
-  (sgml-parse-model-group))
+(defun sgml-check-data-tag-pattern ()
+  ;; 134  data tag pattern 
+  ;; template | template group
+  (cond ((sgml-parse-grpo)
+	 (sgml-skip-ts)
+	 (sgml-check-parameter-literal)	; data tag template,
+	 (while (progn (sgml-skip-ts)
+		       (sgml-parse-char ?|)) ; *** OR
+	   (sgml-skip-ts)
+	   (sgml-check-parameter-literal)) ; data tag template
+	 (sgml-skip-ts)
+	 (sgml-check-grpc))
+	(t
+	 (sgml-check-parameter-literal))) ; data tag template
+  (sgml-skip-ts)
+  (when (sgml-parse-char ?,)  ; *** SEQ
+    (sgml-check-parameter-literal)))	; data tag padding template
 
-(defun sgml-parse-content ()
+(defun sgml-check-content-model ()
+  (sgml-check-model-group))
+
+(defun sgml-check-content ()
   (sgml-skip-ps)
   (cond ((eq (following-char) ?\()
-	 (sgml-parse-content-model))
+	 (sgml-check-content-model))
 	(t
 	 (let ((dc (sgml-check-name)))	;CDATA or RCDATA or EMPTY
 	   (intern (upcase (symbol-name dc)))))))
@@ -410,7 +480,7 @@ Syntax: var dfa-expr &body forms"
 	 (stag-opt (sgml-parse-opt))
 	 (etag-opt (sgml-parse-opt))
 	 (sgml-used-pcdata nil)
-	 (model (sgml-parse-content))
+	 (model (sgml-check-content))
 	 (exclusions (sgml-parse-exeption ?-))
 	 (inclusions (sgml-parse-exeption ?+)))
     (sgml-skip-ps)
@@ -460,15 +530,15 @@ Syntax: var dfa-expr &body forms"
 	(sgml-skip-ps)
 	(cond
 	 ((memq token '(cdata sdata pi)) ; data text ***
-	  (sgml-parse-parameter-literal))
+	  (sgml-check-parameter-literal))
 	 ((eq token 'starttag)
-	  (sgml-start-tag-of (sgml-parse-parameter-literal)))
+	  (sgml-start-tag-of (sgml-check-parameter-literal)))
 	 ((eq token 'endtag)
-	  (sgml-end-tag-of (sgml-parse-parameter-literal)))	
+	  (sgml-end-tag-of (sgml-check-parameter-literal)))	
 	 ((eq token 'ms)		; marked section
-	  (concat "<![" (sgml-parse-parameter-literal) "]]>"))
+	  (concat "<![" (sgml-check-parameter-literal) "]]>"))
 	 ((eq token 'md)		; Markup declaration
-	  (concat "<!" (sgml-parse-parameter-literal) ">")))))
+	  (concat "<!" (sgml-check-parameter-literal) ">")))))
      ((sgml-parse-parameter-literal)))))
 
 (defun sgml-parse-entity-type ()
@@ -493,32 +563,6 @@ Syntax: var dfa-expr &body forms"
 	       (sgml-skip-s)
 	       (sgml-check-char ?\])))
 	    (t (sgml-error "Illegal entity type: %s" type))))))
-
-
-(defun sgml-parse-parameter-literal ()
-  (sgml-skip-ps)
-  (let ((qchar (following-char))
-	qregexp
-	value)
-    (cond ((memq qchar '(?\" ?\'))
-	   (forward-char 1)
-	   (setq qregexp (format "^%c%%" qchar))
-	   (setq value "")
-	   (while (not (sgml-parse-char qchar))
-	     (setq value (concat value
-				 (buffer-substring
-				  (point)
-				  (goto-char
-				   (progn (skip-chars-forward qregexp)
-					  (point))))))
-	     (cond ((sgml-parse-char ?%)	;parameter entity reference
-		    (if (sgml-startnm-char-next)
-			(sgml-push-to-param (sgml-check-entity-ref))
-		      (setq value (concat value "%"))))
-		   ((eobp)
-		    (or (sgml-pop-param)
-			(sgml-error "Parameter literal unterminated")))))
-	   value))))
 
 
 ;;;; Parse doctype: Attlist
