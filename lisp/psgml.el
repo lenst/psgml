@@ -63,7 +63,7 @@
 (defvar sgml-debug nil)
 
 (defmacro sgml-debug (&rest x)
-  (list 'if 'sgml-debug (cons 'sgml-log-message x)))
+  (list 'if 'sgml-debug (cons 'message x)))
 
 
 ;;;; Variables
@@ -852,7 +852,6 @@ as that may change."
 (define-key sgml-mode-map "\C-c\C-f\C-x" 'sgml-expand-element)
 (define-key sgml-mode-map "\C-c\C-i" 'sgml-add-element-to-element)
 (define-key sgml-mode-map "\C-c\C-k" 'sgml-kill-markup)
-(define-key sgml-mode-map "\C-c\C-l" 'sgml-show-or-clear-log)
 (define-key sgml-mode-map "\C-c\r"   'sgml-split-element)
 (define-key sgml-mode-map "\C-c\C-n" 'sgml-up-element)
 (define-key sgml-mode-map "\C-c\C-o" 'sgml-next-trouble-spot)
@@ -977,7 +976,6 @@ as that may change."
    ["Show Context"	sgml-show-context t]
    ["What Element"	sgml-what-element t]
    ["List Valid Tags"	sgml-list-valid-tags t]
-   ["Show/Hide Warning Log"  sgml-show-or-clear-log t]
    ["Validate"		sgml-validate t]
    ("File Options"   "---")
    ("User Options"   "---")
