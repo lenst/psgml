@@ -1351,11 +1351,12 @@ Editing is done in a separate window."
 	   (sgml-insert '(category sgml-default rear-nonsticky (category)
                                    read-only sgml-default)
 			"#DEFAULT"))
-	  ((not (null cur-value))
+	  (t
            (sgml-insert '(read-only t category sgml-form
                                     rear-nonsticky (read-only category))
                         " ")
-	   (sgml-insert nil "%s" (sgml-attspec-attval cur-value))))
+           (when (not (null cur-value))
+             (sgml-insert nil "%s" (sgml-attspec-attval cur-value)))))
 	 (sgml-insert
 	  '(read-only 1)
 	  "\n\t-- %s: %s --\n"
