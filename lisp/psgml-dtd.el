@@ -296,8 +296,7 @@ Syntax: var dfa-expr &body forms"
 	  "")
 	 (original-buffer		; Buffer (entity) where lit started
 	  (current-buffer))
-	 temp
-	 )
+	 temp)
     (cond
      ((or (sgml-parse-delim "LIT")
 	  (setq lita (sgml-parse-delim "LITA")))
@@ -316,14 +315,13 @@ Syntax: var dfa-expr &body forms"
 	      (t
 	       (setq value
 		     (concat value
-			     (buffer-substring
+			     (buffer-substring-no-properties
 			      (point)
 			      (progn (forward-char 1)
 				     (if lita
 					 (sgml-skip-upto ("LITA" "PERO" "CRO"))
 				       (sgml-skip-upto ("LIT" "PERO" "CRO")))
-				     (point)))))))
-	)
+				     (point))))))))
       value))))
 
 (defun sgml-check-parameter-literal ()
