@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: Fri Nov 25 18:30:01 1994 by lenst@dell (Lennart Staflin)
+;;;\Last edited: Sun Mar 24 19:17:42 1996 by lenst@triton.lstaflin.pp.se (Lennart Staflin)
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -9,13 +9,14 @@
 (require 'psgml)
 (require 'psgml-parse)
 (require 'psgml-edit)
-;;(require 'psgml-dtd)
+(require 'psgml-dtd)
 (autoload 'sgml-translate-model "psgml-dtd" "" nil)
 
 ;;;; Debugging
 
 (define-key sgml-mode-map "\C-c," 'sgml-goto-cache)
 (define-key sgml-mode-map "\C-c\C-x" 'sgml-dump-tree)
+(define-key sgml-mode-map "\C-c."   'sgml-shortref-identify)
 
 (defun sgml-this-element ()
   (interactive)
@@ -27,7 +28,7 @@
   (setq sgml-dtd-info (sgml-pstate-dtd sgml-buffer-parse-state)
 	sgml-top-tree (sgml-pstate-top-tree sgml-buffer-parse-state))
   (sgml-find-start-point (point))
-  (message "%s" (sgml-element-context-string sgml-top-tree)))
+  (message "%s" (sgml-dump-node sgml-current-tree)))
 
 (defun sgml-dump-tree (arg)
   (interactive "P")
@@ -36,6 +37,27 @@
   (with-output-to-temp-buffer "*Dump*"
     (sgml-dump-rec (sgml-pstate-top-tree sgml-buffer-parse-state))))
 
+(defun sgml-auto-dump ()
+  (let ((standard-output (get-buffer-create "*Dump*"))
+	(cb (current-buffer)))
+
+    (when sgml-buffer-parse-state
+      (unwind-protect
+	  (progn (set-buffer standard-output)
+		 (erase-buffer))
+	(set-buffer cb))
+    
+      (sgml-dump-rec (sgml-pstate-top-tree sgml-buffer-parse-state))
+
+      ))
+  )
+
+(defun sgml-start-auto-dump ()
+  (interactive)
+  (add-hook 'post-command-hook
+	    (function sgml-auto-dump)
+	    'append))
+
 (defun sgml-comepos (epos)
   (if (sgml-strict-epos-p epos)
       (format "%s:%s"
@@ -43,20 +65,41 @@
 	      (sgml-epos-pos epos))
     (format "%s" epos)))
 
+(defun sgml-dump-node (u)
+  (format
+   "%s%s start:%s(%s) end:%s(%s) epos:%s/%s net:%s\n"
+   (make-string (sgml-tree-level u) ?. )
+   (sgml-element-gi u)
+   (sgml-element-start u) (sgml-tree-stag-len u)
+   (if (sgml-tree-etag-epos u) (sgml-tree-end u)) (sgml-tree-etag-len u)
+   (sgml-comepos (sgml-tree-stag-epos u))
+   (sgml-comepos (sgml-tree-etag-epos u))
+   (sgml-tree-net-enabled u)))
+
 (defun sgml-dump-rec (u)
   (while u
-    (princ
-     (format
-      "%s%s start:%s(%s) end:%s(%s) epos:%s/%s net:%s\n"
-      (make-string (sgml-tree-level u) ?. )
-      (sgml-element-gi u)
-      (sgml-element-start u) (sgml-tree-stag-len u)
-      (if (sgml-tree-etag-epos u) (sgml-tree-end u)) (sgml-tree-etag-len u)
-      (sgml-comepos (sgml-tree-stag-epos u))
-      (sgml-comepos (sgml-tree-etag-epos u))
-      (sgml-tree-net-enabled u)))
+    (princ (sgml-dump-node u))
     (sgml-dump-rec (sgml-tree-content u))
     (setq u (sgml-tree-next u))))
+
+(defun sgml-shortref-identify ()
+  (interactive)
+  (sgml-find-context-of (point))
+  (let* ((nobol (eq (point) sgml-rs-ignore-pos))
+	 (tem (sgml-deref-shortmap sgml-current-shortmap nobol)))
+    (message "%s (%s)" tem nobol)))
+
+(defun sgml-lookup-shortref-name (table map)
+  (car (rassq map (cdr table))))
+
+(defun sgml-show-current-map ()
+  (interactive)
+  (sgml-find-context-of (point))
+  (let ((name (sgml-lookup-shortref-name
+	       (sgml-dtd-shortmaps sgml-dtd-info)
+	       sgml-current-shortmap)))
+    (message "Current map: %s"
+	     (or name "#EMPTY"))))
 
 ;;;; For edebug
 
@@ -65,12 +108,18 @@
 ;;(put 'push 'edebug-form-hook '(form sexp))
 ;;(put 'setf 'edebug-form-hook '(sexp form))
 
+(setq edebug-print-level 3
+      edebug-print-length 5
+      edebug-print-circle nil
+)
+
 (eval-when (load)
-  (def-edebug-spec sgml-with-parser-syntax (&rest form))
-  (def-edebug-spec sgml-skip-upto (sexp))
-  (def-edebug-spec sgml-check-delim (sexp &optional sexp))
-  (def-edebug-spec sgml-parse-delim (sexp &optional sexp))
-  (def-edebug-spec sgml-is-delim (sexp &optional sexp sexp sexp)))
+  (unless sgml-running-lucid
+    (def-edebug-spec sgml-with-parser-syntax (&rest form))
+    (def-edebug-spec sgml-skip-upto (sexp))
+    (def-edebug-spec sgml-check-delim (sexp &optional sexp))
+    (def-edebug-spec sgml-parse-delim (sexp &optional sexp))
+    (def-edebug-spec sgml-is-delim (sexp &optional sexp sexp sexp))))
 
 ;;;; dump
 
@@ -129,11 +178,11 @@
 			   (make-string indent ? ) i
 			   (sgml-untangel-moves (sgml-state-opts (car x)))
 			   (sgml-untangel-moves (sgml-state-reqs (car x))))))
-	   (t				; &node
-	    (princ (format "%s%d: &node next=%d\n"
+	   (t				; and-node
+	    (princ (format "%s%d: and-node next=%d\n"
 			   (make-string indent ? ) i
-			   (sgml-code-xlate (sgml-&node-next (car x)))))
-	    (loop for m in (sgml-&node-dfas (car x))
+			   (sgml-code-xlate (sgml-and-node-next (car x)))))
+	    (loop for m in (sgml-and-node-dfas (car x))
 		  do (sgml-dp-model m (+ indent 2))))))))
 
 (defun sgml-untangel-moves (moves)
@@ -211,7 +260,7 @@
 
 (defun profile-sgml (&optional file)
   (interactive)
-  (or file (setq file (expand-file-name "~/src/psgml/test/shortref.sgml")))
+  (or file (setq file (expand-file-name "~/src/psgml/0/test/shortref.sgml")))
   (find-file file)
   (sgml-need-dtd)
   (sgml-instrument-parser)
