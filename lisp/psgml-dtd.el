@@ -286,7 +286,7 @@ Syntax: var dfa-expr &body forms"
 
 (defun sgml-parse-nametoken-group ()
   (sgml-skip-ps)
-  (let ((name nil))
+  (let ((names nil))
     (cond
      ((sgml-parse-char ?\()
       (while (progn
