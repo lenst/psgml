@@ -841,7 +841,8 @@ of then current element."
   "Insert a DTD declaration from the sgml-custom-dtd alist."
   (interactive
    (list (completing-read "Insert DTD: " sgml-custom-dtd nil t)))
-  (apply 'sgml-doctype-insert (cdr (assoc doctype sgml-custom-dtd))))
+  (let ((entry (assoc doctype sgml-custom-dtd)))
+    (sgml-doctype-insert (second entry) (cddr entry))))
 
 (defun sgml-custom-markup (markup)
   "Insert markup from the sgml-custom-markup alist."
