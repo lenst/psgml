@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: Fri Aug 19 04:12:13 1994 by lenst@lysita (Lennart Staflin)
+;;;\Last edited: Thu Aug 25 00:23:55 1994 by lenst@dell (Lennart Staflin)
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -7,6 +7,7 @@
 ;;\begin{codeseg}
 (require 'psgml)
 (require 'psgml-parse)
+(require 'psgml-edit)
 ;;(require 'psgml-dtd)
 (autoload 'sgml-translate-model "psgml-dtd" "" nil)
 
@@ -58,11 +59,17 @@
 
 ;;;; For edebug
 
-(put 'when 'edebug-form-hook t)
-(put 'unless 'edebug-form-hook t)
-(put 'push 'edebug-form-hook '(form sexp))
-(put 'setf 'edebug-form-hook '(sexp form))
+;;(put 'when 'edebug-form-hook t)
+;;(put 'unless 'edebug-form-hook t)
+;;(put 'push 'edebug-form-hook '(form sexp))
+;;(put 'setf 'edebug-form-hook '(sexp form))
 
+(eval-when (load)
+  (def-edebug-spec sgml-with-parser-syntax (&rest form))
+  (def-edebug-spec sgml-skip-upto (sexp))
+  (def-edebug-spec sgml-check-delim (sexp &optional sexp))
+  (def-edebug-spec sgml-parse-delim (sexp &optional sexp))
+  (def-edebug-spec sgml-is-delim (sexp &optional sexp sexp sexp)))
 
 ;;;; dump
 
@@ -84,13 +91,23 @@
 
 
 (defun sgml-dp-element (el)
-  (princ (format "Element %s:\n" (sgml-eltype-name el)))
+  (princ (format "Element %s %s %s:\n"
+		 (sgml-eltype-name el)
+		 (if (sgml-eltype-stag-optional el) "O" "-")
+		 (if (sgml-eltype-etag-optional el) "O" "-")))
   (cond
    ((sgml-model-group-p (sgml-eltype-model el))
     (sgml-dp-model (sgml-eltype-model el)))
    (t
     (prin1 (sgml-eltype-model el))
-    (terpri))))
+    (terpri)))
+  (princ (format "Exeptions: +%s -%s\n"
+		 (sgml-eltype-includes el)
+		 (sgml-eltype-excludes el)))
+  (princ (format "Attlist: %S\n" (sgml-eltype-attlist el)))
+  (princ (format "Plist: %S\n" (symbol-plist el)))
+  (terpri))
+
 
 (defun sgml-dp-model (model &optional indent)
   (or indent (setq indent 0))
@@ -121,26 +138,29 @@
 (defun sgml-build-autoloads ()
   (interactive)
   (with-output-to-temp-buffer "*autoload*"
-    (set-buffer (find-file-noselect "psgml-parse.el"))
-    (goto-char (point-min))
-    (while (and
-	    (not (eobp))
-	    (re-search-forward "^(defun +\\([^ ]+\\)" nil t))
-      (let ((name (buffer-substring (match-beginning 1)
-				    (match-end 1)))
-	    doc)
-	(forward-sexp 1)		; skip argument list
-	(skip-chars-forward " \n\t")
-	(when (eq ?\" (following-char))	; doc string
-	  (setq doc (buffer-substring (point)
-				      (progn (forward-sexp 1)
-					     (point)))))
-	(skip-chars-forward " \n\t")
-	(when (looking-at "(interactive")
-	  (if (null doc)
-	      (message "No doc for %s" name))
-	  (princ (format
-		  "(autoload '%s \"psgml-parse\" %s t)\n"
-		  name doc)))))))
+    (loop
+     for file in '("psgml-parse" "psgml-edit" "psgml-dtd")
+     do
+     (set-buffer (find-file-noselect (concat file ".el")))
+     (goto-char (point-min))
+     (while (and
+	     (not (eobp))
+	     (re-search-forward "^(defun +\\([^ ]+\\)" nil t))
+       (let ((name (buffer-substring (match-beginning 1)
+				     (match-end 1)))
+	     doc)
+	 (forward-sexp 1)		; skip argument list
+	 (skip-chars-forward " \n\t")
+	 (when (eq ?\" (following-char)) ; doc string
+	       (setq doc (buffer-substring (point)
+					   (progn (forward-sexp 1)
+						  (point)))))
+	 (skip-chars-forward " \n\t")
+	 (when (looking-at "(interactive")
+	       (if (null doc)
+		   (message "No doc for %s" name))
+	       (princ (format
+		       "(autoload '%s \"%s\" %s t)\n"
+		       name file doc))))))))
 
 ;¤¤\end{codeseg}

@@ -1166,7 +1166,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
       (switch-to-buffer (marker-buffer start))
       (kill-buffer cb)
       (goto-char start)
-      (let ((element (sgml-find-attribute-element)))
+      (let ((element (sgml-find-element-of start)))
 	;; *** Should the it be verified that this element
 	;; is the one edited?
 	(sgml-change-start-tag element asl)))))
