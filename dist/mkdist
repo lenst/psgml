@@ -1,6 +1,6 @@
 #! /bin/sh
 
-VERSION=1.3.0
+VERSION=1.3.1
 
 PSGML_SRC="ChangeLog psgml.el psgml-parse.el psgml-edit.el psgml-dtd.el \
 	psgml-info.el psgml-charent.el psgml-api.el \
