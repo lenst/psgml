@@ -1,5 +1,5 @@
 ;;;;\filename psgml-debug.el
-;;;\Last edited: 2000-05-26 23:47:53 lenst
+;;;\Last edited: 2000-06-07 07:29:59 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -455,12 +455,20 @@
 ;;;; Show current element type
 ;; Candidate for C-c C-t
 
+(autoload 'sgml-princ-names "psgml-info")
+
+(define-key sgml-mode-map "\C-c\C-t" 'sgml-show-current-element-type)
+
 (defun sgml-show-current-element-type ()
   (interactive)
   (let* ((el (sgml-find-context-of (point)))
          (et (sgml-element-eltype el)))
     (with-output-to-temp-buffer "*Help*"
-      (princ (format "ELEMENT: %s\n" (sgml-eltype-name et)))
+      (princ (format "ELEMENT: %s%s\n" (sgml-eltype-name et)
+                     (let ((help-text (sgml-eltype-appdata et 'help-text)))
+                       (if help-text
+                           (format " -- %s" help-text)
+                           ""))))
       (when sgml-omittag
         (princ (format "\n Start-tag is %s.\n End-tag is %s.\n"
                        (if (sgml-eltype-stag-optional et)
@@ -564,6 +572,117 @@
       (princ ")")
       (when (sgml-final state)
         (princ "?"))))))
+
+;;;; Adding appdata to element types
+;;; Candidate for PI PSGML processing
 
+(defvar sgml-psgml-pi-enable-outside-dtd nil)
+
+(defun sgml-eval-psgml-pi ()
+  (interactive)
+  (let ((sgml-psgml-pi-enable-outside-dtd t))
+    (sgml-parse-to-here)))
+
+(define-key sgml-mode-map "\e\C-x" 'sgml-eval-psgml-pi)
+
+(defun sgml--pi-element-handler ()
+  (sgml-skip-ps)
+  (let ((eltype (sgml-lookup-eltype (sgml-parse-name)))
+        name value)
+    (sgml-skip-ps)
+    (while (setq name (sgml-parse-name))
+      ;; FIXME: check name not reserved
+      (sgml-skip-ps)
+      (cond ((sgml-parse-delim "VI")
+             (sgml-skip-ps)
+             (setq value
+                   (if (looking-at "['\"]")
+                       (sgml-parse-literal)
+                     (read (current-buffer)))))
+            (t
+             (setq value t)))
+      (message "%s = %S" name value)
+      (setf (sgml-eltype-appdata eltype (intern (downcase name))) value)
+      (sgml-skip-ps))))
+
+
+(defun sgml-do-processing-instruction (in-declaration)
+  (let ((start (point)))
+    (when (and (or in-declaration
+                   sgml-psgml-pi-enable-outside-dtd)
+               (eq ?P (following-char))
+	       (looking-at "PSGML +\\(\\sw+\\) *"))
+      (let* ((command (format "%s" (downcase (match-string 1))))
+             (flag-command (assoc command
+                                  '(("nofill"      . nofill)
+                                    ("breakafter"  . break-after-stag)
+                                    ("breakbefore" . break-before-stag)
+                                    ("structure"   . structure)))))
+	(goto-char (match-end 0))
+	(cond (flag-command
+               (sgml-parse-set-appflag (cdr flag-command)))
+              ((equal command "element")
+               (sgml--pi-element-handler))
+              (t
+               (sgml-log-warning "Unknown processing instruction for PSGML: %s"
+                                 command)))))
+    (if sgml-xml-p
+	(sgml-skip-upto "XML-PIC")
+      (sgml-skip-upto "PIC"))
+    (when sgml-pi-function
+      (funcall sgml-pi-function
+	       (buffer-substring-no-properties start (point)))))
+  (if sgml-xml-p
+      (sgml-check-delim "XML-PIC")
+    (sgml-check-delim "PIC"))
+  (unless in-declaration
+    (sgml-set-markup-type 'pi))
+  t)
+
+;;;; Possible modification to allow setting face on content:
+(defun sgml-set-face-for (start end type)
+  (let ((face (cdr (assq type sgml-markup-faces))))
+    ;;++
+    (if (and (null type) sgml-current-tree) 
+        (setq face (sgml-element-appdata sgml-current-tree 'face)))
+    ;;--
+    (cond
+     (sgml-use-text-properties
+      (let ((inhibit-read-only t)
+	    (after-change-function nil)	; obsolete variable
+	    (before-change-function nil) ; obsolete variable
+	    (after-change-functions nil)
+	    (before-change-functions nil))
+	(put-text-property start end 'face face)
+        (when (< start end)
+          (put-text-property (1- end) end 'rear-nonsticky '(face)))))
+     (t
+      (let ((current (overlays-at start))
+	    (pos start)
+	    old-overlay)
+	(while current
+	  (cond ((and (null old-overlay)
+                      type
+		      (eq type (overlay-get (car current) 'sgml-type)))
+		 (setq old-overlay (car current)))
+		((overlay-get (car current) 'sgml-type)
+		 ;;(message "delov: %s" (overlay-get (car current) 'sgml-type))
+		 (delete-overlay (car current))))
+	  (setq current (cdr current)))
+	(while (< (setq pos (next-overlay-change pos))
+		  end)
+	  (setq current (overlays-at pos))
+	  (while current
+	    (when (overlay-get (car current) 'sgml-type)
+	      (delete-overlay (car current)))
+	    (setq current (cdr current))))
+	(cond (old-overlay
+	       (move-overlay old-overlay start end)
+	       (if (null (overlay-get old-overlay 'face))
+		   (overlay-put old-overlay 'face face)))
+	      (face
+	       (setq old-overlay (make-overlay start end))
+	       (overlay-put old-overlay 'sgml-type type)
+	       (overlay-put old-overlay 'face face))))))))
 
 ;¤¤\end{codeseg}
