@@ -1392,7 +1392,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
       (sgml-entity-insert-text entity)
       (setq sgml-goal (point-max))	; May have changed size of buffer
       ;; now parse the entity text
-      (goto-char (setq sgml-last-start-pos sgml-markup-start))))))
+      (goto-char (setq sgml-rs-ignore-pos sgml-markup-start))))))
 
 (defun sgml-expand-shortref-to-entity (name)
   (let ((end (point))
@@ -1403,7 +1403,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
     (delete-region sgml-markup-start end)	   
     (insert "&" name (if re-found "\n" ";"))
     (setq sgml-goal (point-max))	; May have changed size of buffer
-    (goto-char (setq sgml-last-start-pos sgml-markup-start))))
+    (goto-char (setq sgml-rs-ignore-pos sgml-markup-start))))
 
 (defun sgml-expand-all-shortrefs (to-entity)
   "Expand all short references in the buffer.
