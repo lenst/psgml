@@ -348,52 +348,80 @@ This uses the selective display feature."
 
 ;;;; SGML mode: indentation and movement
 
+(defvar sgml-content-indent-function 'sgml-indent-according-to-level)
+(defvar sgml-attribute-indent-function 'sgml-indent-according-to-stag)
+
+(defun sgml-indent-according-to-level (element)
+  (* sgml-indent-step
+     (sgml-element-level element)))
+
+(defun sgml-indent-according-to-stag (element)
+  (save-excursion
+    (goto-char (sgml-element-start element))
+    (+ (current-column) sgml-indent-step)))
+
+(defun sgml-indent-according-to-stag-end (element)
+  (save-excursion
+    (goto-char (sgml-element-start element))
+    (+ 
+     (current-column)
+     (length (sgml-element-gi element))
+     2)))
+
+
+;;(setq sgml-content-indent-function 'sgml-indent-according-to-stag)
+
 (defun sgml-indent-line (&optional col element)
   "Indent line, calling parser to determine level unless COL or ELEMENT
 is given.  If COL is given it should be the column to indent to.  If
 ELEMENT is given it should be a parse tree node, from which the level
-is determined."
+is determined.
+Deprecated: ELEMENT"
+  (sgml-debug "-> sgml-indent-line %s %s"
+              col (if element (sgml-element-gi element)))
   (when sgml-indent-step
-    (let ((here (point-marker)))
+    (let ((here (point-marker))
+          ;; Where the indentation goes, i.e., will this be data
+          element-insert                
+          ;; Where we compute indentation, where the thing we ident is.
+          ;; Can be different from above if end-tag is omitted.
+          element-level)
       (back-to-indentation)
-      (unless (or col element)
+      (unless col
 	;; Determine element
-	(setq element
+	(setq element-insert
 	      (let ((sgml-throw-on-error 'parse-error))
 		(catch sgml-throw-on-error
                   ;; This used to be (sgml-find-element-of (point))
                   ;; Why? Possibly to handle omitted end-tags
-                  (sgml-find-context-of (point))))))
-      ;; Fix for omitted end-tag
-      (while (and (not (eobp))
-                  (= (point) (sgml-element-end element)))
-        (setq element (sgml-element-parent element)))
-
-      (when (eq element sgml-top-tree)	; not in a element at all
-	(setq element nil)		; forget element
+                  (sgml-debug "-- sgml-indent-line find context")
+                  (sgml-find-context-of (point)))))
+        (setq element-level element-insert)
+        ;; Fix for omitted end-tag
+        (while (and (not (eobp))
+                    element-level
+                    ;; FIXME: possibly expensive if element is big,
+                    ;;  introduce sgml-element-end-pos-p pos
+                    ;;  that can be given a more efficient low-level impl.
+                    (= (point) (sgml-element-end element-level)))
+          (setq element-level (sgml-element-parent element-level))))
+      (when (eq element-level sgml-top-tree)	; not in a element at all
+	(setq element-level nil)		; forget element
 	(goto-char here))		; insert normal tab insted)
-      (when element
+      (when element-level
 	(sgml-with-parser-syntax
 	 (let ((stag (sgml-is-start-tag))
 	       (etag (sgml-is-end-tag)))
-           (cond ((and (> (point) (sgml-element-start element))
-                       (< (point) (sgml-element-stag-end element))
-                       (not (sgml-element-data-p (sgml-element-parent element))))
+           (cond ((and (> (point) (sgml-element-start element-insert))
+                       (< (point) (sgml-element-stag-end element-insert))
+                       (not (sgml-element-data-p (sgml-element-parent element-insert))))
                   (setq col
-                        (+ (save-excursion
-                             (goto-char (sgml-element-start element))
-                             (current-column))
-                           (length (sgml-element-gi element))
-                           2)))
+                        (funcall sgml-attribute-indent-function element-insert)))
                  ((or sgml-indent-data
-                      (not (sgml-element-data-p
-                            (if stag
-                                (sgml-element-parent element)
-                              element))))
+                      (not (sgml-element-data-p element-insert)))
                   (setq col
-                        (* sgml-indent-step
-                           (+ (if (or etag) -1 0)
-                              (sgml-element-level element)))))))))
+                        (- (funcall sgml-content-indent-function element-level)
+                           (if etag sgml-indent-step 0))))))))
       (when (and col (/= col (current-column)))
 	(beginning-of-line 1)    
 	(delete-horizontal-space)
@@ -665,6 +693,7 @@ after the first tag inserted."
 	(forward-char 1))
       (when (sgml-break-after-stag-p name)
         (sgml-insert-break))
+      (setq element (sgml-find-element-of (point)))
       (when (not (sgml-element-empty element))
 	(when (and sgml-auto-insert-required-elements
 		   (sgml-model-group-p sgml-current-state))
@@ -678,7 +707,7 @@ after the first tag inserted."
 	      (insert "\n")
 	      (when sgml-insert-missing-element-comment
 		(insert (format "<!-- one of %s -->" tem))
-		(sgml-indent-line nil element)))))
+		(sgml-indent-line)))))
 	(setq newpos (or newpos (point)))
 	(when sgml-insert-end-tag-on-new-line
 	  (insert "\n"))
