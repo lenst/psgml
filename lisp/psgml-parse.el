@@ -31,6 +31,12 @@
 
 ;;;; Variables
 
+(defvar sgml-parent-document nil
+  "*File name (a string) of a file containing a DOCTYPE declaration to use,
+or a list (FILENAME DOCTYPENAME), where FILENAME is a file name of a file '
+containing a DOCTYPE declaration to use with the modification that the
+document type name is DOCTYPENAME.")
+
 ;;; Internal variables
 ;;; See also parser state
 
@@ -78,6 +84,7 @@ Tested by sgml-close-element to see if the parse should be ended.")
 (defvar sgml-param-entities nil)	; assoc list of parameter entities
 (defvar sgml-used-pcdata nil)		; True if model group built is mixed
 (defvar sgml-entities nil)		; List of general entity names
+(defvar sgml-doctype nil)		; Top level state machine
 
 ;; Buffer local variables 
 
@@ -102,6 +109,23 @@ Tested by sgml-close-element to see if the parse should be ended.")
 (defvar sgml-loaded-dtd nil
   "File name corresponding to current DTD.")
 (make-variable-buffer-local 'sgml-loaded-dtd)
+
+
+;;;; Variable manipulation
+
+(defun sgml-set-global ()
+  "Copy the buffer local DTD data structures to global variables."
+  (setq sgml-element-map sgml-buffer-element-map
+	sgml-entities sgml-buffer-entities
+	sgml-param-entities sgml-buffer-param-entities
+	sgml-doctype sgml-buffer-doctype)))
+
+(defun sgml-set-local ()
+  "Copy the global DTD data structures to buffer local variables."
+  (setq sgml-buffer-element-map sgml-element-map
+	sgml-buffer-entities sgml-entities
+	sgml-buffer-param-entities sgml-param-entities)
+  (sgml-set-doctype sgml-doctype))
 
 
 ;;;; Build parser syntax table
@@ -572,9 +596,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (sgml-define-element-attlist name attlist)))
 
 (defun sgml-read-dtd (buffer)
-  "Decode the saved DTD in BUFFER."
+  "Decode the saved DTD in BUFFER, set global variabels."
   (let ((gc-cons-threshold (max gc-cons-threshold 500000))
-	(doctype nil)
 	(cb (current-buffer))
 	temp)
     (setq sgml-buffer-element-map nil
@@ -586,7 +609,6 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (set-buffer buffer)
     (goto-char (point-min))
     (setq temp (sgml-read-sexp))		; file-version
-    (assert (equal (car temp) 'sgml-saved-dtd-version))
     (cond ((equal temp '(sgml-saved-dtd-version 1))
 	   (setq sgml-single-octet-threshold 255))
 	  ((equal temp '(sgml-saved-dtd-version 2))
@@ -598,13 +620,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (loop repeat (sgml-read-number) do (sgml-read-element))
     (setq sgml-param-entities (sgml-read-sexp))
     (setq sgml-entities (sgml-read-sexp))
-    (setq doctype (sgml-read-sexp))
-    (set-buffer cb)
-    (setq sgml-buffer-element-map sgml-element-map
-	  sgml-buffer-entities sgml-entities
-	  sgml-buffer-param-entities sgml-param-entities)
-    (sgml-set-doctype doctype)
-    nil))
+    (setq sgml-doctype (sgml-read-sexp))
+    (set-buffer cb)))
 
 (defun sgml-load-dtd (file)
   "Load a saved DTD from FILE."
@@ -630,16 +647,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
       (setq l (cdr l)))
     (cond
      (tem				; loaded DTD found
-      (setq sgml-element-map sgml-buffer-element-map
-	    sgml-entities sgml-buffer-entities
-	    sgml-param-entities sgml-buffer-param-entities
-	    doctype sgml-buffer-doctype)
-      (set-buffer cb)
-      (setq sgml-buffer-element-map sgml-element-map
-	    sgml-buffer-entities sgml-entities
-	    sgml-buffer-param-entities sgml-param-entities)
-      (sgml-set-doctype doctype))
-     
+      (sgml-set-global))
      (t					; load DTD from file
       (set-buffer cb)
       (setq tem (generate-new-buffer " *saveddtd*"))
@@ -653,6 +661,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	    (message "Loading DTD from %s...done" file))
 	(kill-buffer tem))))
     (set-buffer cb)
+    (sgml-set-local)
     (setq sgml-default-dtd-file file)
     (setq sgml-loaded-dtd file)))
 
@@ -784,6 +793,13 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	 (make-element :name "Document (no element)"
 		       :model model)
 	 0 0 nil 0 nil nil nil nil)))
+
+
+(autoload 'sgml-make-primitive-content-token "psgml-dtd")
+
+(defun sgml-set-doctype-element (element-name)
+  (sgml-set-doctype
+   (sgml-make-primitive-content-token element-name)))
 
 (defun sgml-reset-parse-state ()
   (setf (sgml-tree-content sgml-top-tree) nil) ; do I need this?
@@ -1600,13 +1616,32 @@ or if nil, until end of buffer."
   (forward-char 1)
   (skip-chars-forward "^<]/"))
 
+(defun sgml-setup-dtd ()
+  (sgml-set-doctype sgml-any)		; fall back DTD
+  (cond ((and sgml-default-dtd-file
+	      (file-exists-p sgml-default-dtd-file))
+	 (sgml-load-dtd sgml-default-dtd-file))
+	((null sgml-parent-document)
+	 (sgml-parse-prolog))
+	(t				; get DTD from parent document
+	 (save-excursion
+	   (set-buffer (find-file-noselect
+			(if (listp sgml-parent-document)
+			    (car sgml-parent-document)
+			  sgml-parent-document)))
+	   (sgml-need-dtd)
+	   (sgml-set-global))
+	 (sgml-set-local)
+	 (if (listp sgml-parent-document)
+	     (let ((doctypename (second sgml-parent-document)))
+	       (if (symbolp doctypename)
+		   (setq doctypename (symbol-name doctypename)))
+	       (sgml-set-doctype-element
+		(sgml-gname-symbol doctypename)))))))
+
 (defun sgml-parse-to (sgml-goal)
   (when (null sgml-top-tree)		; first parse in this buffer
-    (if (and sgml-default-dtd-file
-	     (file-exists-p sgml-default-dtd-file))
-	(sgml-load-dtd sgml-default-dtd-file)
-      (sgml-set-doctype sgml-any)
-      (sgml-parse-prolog)))
+    (sgml-setup-dtd))
   (unless (and (boundp 'pre-command-hook)
 	       (not (null pre-command-hook)))
     (make-local-variable 'pre-command-hook)
@@ -1616,7 +1651,7 @@ or if nil, until end of buffer."
   (let ((bigparse (> (- sgml-goal (point)) 10000))
 	(sgml-param-entities sgml-buffer-param-entities))
     (when bigparse
-	(sgml-message "Parsing..."))
+      (sgml-message "Parsing..."))
     (sgml-with-parser-syntax
      (sgml-parser-loop))
     (when bigparse
