@@ -287,7 +287,8 @@ The value can be the style-sheet list, or it can be a file name
     (while moves
       (case (pop moves)
         (parent (setq element (sgml-element-parent element)))
-        (next   (setq element (sgml-element-next element)))))
+        (next   (setq element (sgml-element-next element)))
+        (child  (setq element (sgml-element-content element)))))
     element))
 
 
