@@ -40,6 +40,13 @@
 
 ;;; Hooks
 
+(defvar sgml-open-element-hook nil
+  "The hook run by `sgml-open-element'.
+Theses functions are called with two arguments, the first argument is
+the opened element and the second argument is the attribute specification
+list.  It is probably best not to refer to the content or the end-tag of 
+the element.")
+
 (defvar sgml-close-element-hook nil
   "The hook run by `sgml-close-element'.
 These functions are invoked with `sgml-current-tree' bound to the
@@ -108,6 +115,18 @@ Tested by sgml-close-element to see if the parse should be ended.")
 Called with the entity as argument.  The start and end of the 
 short reference is `sgml-markup-start' and point.")
 
+(defvar sgml-data-function nil
+  "Function called with parsed data.")
+
+(defvar sgml-pi-function nil
+  "Function called with parsed process instruction.")
+
+(defvar sgml-signal-data-function nil
+  "Called when some data characters are conceptually parsed,
+e.g. a data entity reference.")
+
+(defvar sgml-throw-on-element-change nil
+  "Throw tag.")
 
 ;;; Global variables active during parsing
 
@@ -176,8 +195,6 @@ Only valid after `sgml-parse-to'.")
 ;; Vars used in *param* buffers
 
 (defvar sgml-previous-buffer nil)
-
-(defvar sgml-parameter-name nil)
 
 (defvar sgml-current-eref nil
   "This is the entity reference used to enter current entity.
@@ -1209,7 +1226,7 @@ in any of them."
 	   (eq ?_ (char-syntax c)))))
 
 (defun sgml-is-end-tag ()
-  (sgml-is-delim "ETAGO" nmstart))
+  (sgml-is-delim "ETAGO" gi))
 
 (defsubst sgml-is-enabled-net ()
   (and (sgml-is-delim "NET")
@@ -1232,7 +1249,10 @@ in any of them."
       (sgml-do-processing-instruction)))
 
 (defun sgml-do-processing-instruction ()
-  (sgml-skip-upto "PIC")
+  (let ((start (point)))
+    (sgml-skip-upto "PIC")
+    (when sgml-pi-function
+	  (funcall sgml-pi-function (buffer-substring start (point)))))
   (sgml-check-delim "PIC")
   (sgml-set-markup-type 'pi)
   t)
@@ -1292,33 +1312,42 @@ in any of them."
   (or (sgml-parse-nametoken)
       (sgml-parse-error "Name token expected")))
 
-(defun sgml-gname-symbol (string)
-  "Convert a string to a general name/nametoken/numbertoken."
-  (intern (sgml-general-case string)))
+;;(defun sgml-gname-symbol (string)
+;;  "Convert a string to a general name/nametoken/numbertoken."
+;;  (intern (sgml-general-case string)))
 
-(defun sgml-ename-symbol (string)
-  "Convert a string to an entity name."
-  (intern (sgml-entity-case string)))
+;;(defun sgml-ename-symbol (string)
+;;  "Convert a string to an entity name."
+;;  (intern (sgml-entity-case string)))
 
 (defsubst sgml-parse-general-entity-ref ()
   (if (sgml-parse-delim "ERO" nmstart)
       (sgml-do-general-entity-ref)))
 
 (defun sgml-do-general-entity-ref ()
-  (let* ((name (sgml-parse-name t))
-	 (ent (sgml-lookup-entity name
-				  (sgml-dtd-entities sgml-dtd-info))))
-    (or (sgml-parse-delim "REFC")
-	(sgml-parse-RE))
-    (sgml-set-markup-type 'entity)
-    (cond ((null ent)
+  (sgml-do-entity-ref
+   (prog1 (sgml-parse-name t)
+     (or (sgml-parse-delim "REFC")
+	 (sgml-parse-RE))
+     (sgml-set-markup-type 'entity)))
+  t)
+
+(defun sgml-do-entity-ref (name)
+  (let ((entity
+	 (sgml-lookup-entity name
+			     (sgml-dtd-entities sgml-dtd-info))))
+    (cond ((null entity)
 	   (sgml-log-warning
 	    "Undefined entity %s" name))
-	  ((sgml-entity-data-p ent)
-	   (sgml-pcdata-move))
+	  ((sgml-entity-data-p entity)
+	   (when sgml-signal-data-function
+	     (funcall sgml-signal-data-function))
+	   (when sgml-data-function
+	     (sgml-push-to-entity entity sgml-markup-start)
+	     (funcall sgml-data-function (buffer-string))
+	     (sgml-pop-entity)))
 	  (t
-	   (sgml-push-to-entity ent sgml-markup-start)))
-    t))
+	   (sgml-push-to-entity entity sgml-markup-start)))))
 
 (defsubst sgml-parse-parameter-entity-ref ()
   "Parse and push to a parameter entity, return nil if no ref here."
@@ -1429,13 +1458,6 @@ a RNI must be followed by NAME."
 				     (point))))
 		     spaced ""))))
       value))))
-
-(defun sgml-skip-cdata ()
-  "Move point forward until there is a end-tag open after point."
-  (while (progn (skip-chars-forward "^</")
-		(not (or (sgml-is-end-tag)
-			 (sgml-is-enabled-net))))
-    (forward-char 1)))
 
 (defun sgml-skip-tag ()
   (when (sgml-parse-char ?<)
@@ -1766,23 +1788,11 @@ PTYPE can be 'param if this is a parameter entity."
 (defvar sgml-last-entity-buffer nil)
 
 (defun sgml-push-to-entity (entity &optional ref-start type)
-  (when (and sgml-last-entity-buffer
-	     (not (eq (current-buffer)
-		      sgml-last-entity-buffer))
-	     (buffer-name sgml-last-entity-buffer)
-	     (not (eq sgml-last-entity-buffer sgml-scratch-buffer)))
-    (let ((cb (current-buffer)))
-      (set-buffer sgml-last-entity-buffer)
-      (assert (null sgml-previous-buffer))
-      (set-buffer cb)))
   (unless (and sgml-scratch-buffer
 	       (buffer-name sgml-scratch-buffer))
     (setq sgml-scratch-buffer (generate-new-buffer " *entity*")))
   (let ((cb (current-buffer))
 	(dd default-directory)
-	(buf (if (null sgml-current-eref) ; First entity ref uses scratch buf
-		 sgml-scratch-buffer
-	       (generate-new-buffer " *entity*")))
 	eref
 	file)
     ;;*** should eref be argument to fun?
@@ -1790,8 +1800,11 @@ PTYPE can be 'param if this is a parameter entity."
 		entity
 		(sgml-epos (or ref-start (point)))
 		(sgml-epos (point))))
-    (set-buffer buf)
-    (setq sgml-last-entity-buffer buf)
+    (set-buffer sgml-scratch-buffer)
+    (when (eq sgml-scratch-buffer (default-value 'sgml-scratch-buffer))
+      (make-local-variable 'sgml-scratch-buffer)
+      (setq sgml-scratch-buffer nil))
+    (setq sgml-last-entity-buffer (current-buffer))
     (erase-buffer)
     (setq default-directory dd)
     (make-local-variable 'sgml-current-eref)
@@ -1799,8 +1812,6 @@ PTYPE can be 'param if this is a parameter entity."
     (set-syntax-table sgml-parser-syntax)
     (make-local-variable 'sgml-previous-buffer)
     (setq sgml-previous-buffer cb)
-    (make-local-variable 'sgml-parameter-name)
-    (setq sgml-parameter-name entity)
     (setq sgml-last-start-pos
 	  (if (stringp (sgml-entity-text entity))
 	      (point)
@@ -1814,11 +1825,7 @@ PTYPE can be 'param if this is a parameter entity."
 	      (bufferp sgml-previous-buffer))
 	 (sgml-debug "Exit entity")
 	 (setq sgml-last-entity-buffer sgml-previous-buffer)
-	 (cond ((eq (current-buffer) sgml-scratch-buffer)
-		(set-buffer sgml-previous-buffer))
-	       (t
-		(kill-buffer (prog1 (current-buffer)
-			       (set-buffer sgml-previous-buffer)))))
+	 (set-buffer sgml-previous-buffer)
 	 (setq sgml-last-start-pos (point))
 	 t)))
 
@@ -1839,11 +1846,17 @@ PTYPE can be 'param if this is a parameter entity."
   (while (sgml-pop-entity)))
 
 (defun sgml-cleanup-entities ()
-  (let ((cb (current-buffer)))
-    (when (and (bufferp sgml-last-entity-buffer)
-	       (buffer-name sgml-last-entity-buffer))
-      (set-buffer sgml-last-entity-buffer)
-      (sgml-pop-all-entities))
+  (let ((cb (current-buffer))
+	(n 0))
+    (while (and sgml-scratch-buffer (buffer-name sgml-scratch-buffer))
+      (set-buffer sgml-scratch-buffer)
+      (assert (not (eq sgml-scratch-buffer
+		       (default-value 'sgml-scratch-buffer))))
+      (incf n))
+    (while (> n 10)
+      (set-buffer (prog1 sgml-previous-buffer
+		    (kill-buffer (current-buffer))))
+      (decf n))
     (set-buffer cb)))
 
 (defun sgml-any-open-param/file ()
@@ -2112,12 +2125,14 @@ or from after TREE if WHERE is after."
 			  (sgml-bpos-p (sgml-tree-stag-epos tree)))
 		     'start-tag)
 		 sgml-markup-start (sgml-element-start sgml-current-tree))
-	   (goto-char (sgml-element-stag-end sgml-current-tree)))
+	   (sgml-goto-epos (sgml-tree-stag-epos sgml-current-tree))
+	   (forward-char (sgml-tree-stag-len sgml-current-tree)))
 	  (t
 	   (setq sgml-current-state (sgml-tree-pstate sgml-current-tree)
 		 sgml-current-shortmap (sgml-tree-pshortmap sgml-current-tree)
 		 sgml-previous-tree sgml-current-tree)
-	   (goto-char (sgml-tree-end sgml-current-tree))
+	   (sgml-goto-epos (sgml-tree-etag-epos sgml-current-tree))
+	   (forward-char (sgml-tree-etag-len sgml-current-tree))
 	   (setq sgml-markup-type (if empty 'start-tag 'end-tag)
 		 sgml-markup-start (- (point)
 				      (sgml-tree-etag-len sgml-current-tree)))
@@ -2152,6 +2167,8 @@ or from after TREE if WHERE is after."
   "Return an entity position for start of region START END.
 If region is empty, choose return an epos as high in the 
 entity hierarchy as possible."
+;; This does not work if the entity is entered by a shortref that
+;; only is active in the current element.
   (let ((epos (sgml-epos start)))
     (when (= start end)
       (while (and (sgml-strict-epos-p epos)
@@ -2159,7 +2176,7 @@ entity hierarchy as possible."
 	(setq epos (sgml-eref-start (sgml-epos-eref epos)))))
     epos))
 
-(defun sgml-open-element (eltype conref before-tag after-tag)
+(defun sgml-open-element (eltype conref before-tag after-tag &optional asl)
   (let* ((emap (sgml-eltype-shortmap eltype))
 	 (newmap (if emap
 		     (if (eq 'empty emap)
@@ -2205,6 +2222,8 @@ entity hierarchy as possible."
 	  sgml-previous-tree nil)
     (assert sgml-current-state)
     (setq sgml-markup-tree sgml-current-tree)
+    (when (fboundp 'run-hook-with-args)
+      (run-hook-with-args 'sgml-open-element-hook sgml-current-tree asl))
     (when (sgml-element-empty sgml-current-tree)
       (sgml-close-element after-tag after-tag))))
 
@@ -2223,8 +2242,11 @@ entity hierarchy as possible."
   (when (or (eq sgml-close-element-trap t)
 	    (eq sgml-close-element-trap sgml-current-tree))
     (setq sgml-goal (point)))
+  (when sgml-throw-on-element-change
+    (throw sgml-throw-on-element-change 'end))
   (setf (sgml-tree-etag-epos sgml-current-tree)
-	(sgml-promoted-epos before-tag after-tag))
+	;;(sgml-promoted-epos before-tag after-tag)
+	(sgml-epos before-tag))
   (setf (sgml-tree-etag-len sgml-current-tree) (- after-tag before-tag))
   (run-hooks 'sgml-close-element-hook)
   (setq sgml-markup-tree sgml-current-tree)
@@ -2383,9 +2405,11 @@ The symbols are the tokens used in the DFAs."
 
 (defun sgml-error (format &rest things)
   (while (and (boundp 'sgml-previous-buffer) sgml-previous-buffer)
-    (when sgml-parameter-name
-      (sgml-log-message "Line %s in %S "
-			(count-lines (point-min) (point)) sgml-parameter-name))
+    (when sgml-current-eref
+      (sgml-log-message
+       "Line %s in %S "
+       (count-lines (point-min) (point))
+       (sgml-entity-name (sgml-eref-entity sgml-current-eref))))
     (sgml-pop-entity))
   (apply 'sgml-log-warning format things)
   (apply 'error format things))
@@ -2429,6 +2453,17 @@ remove it if it is showing."
 	 (sgml-display-log))
 	(t
 	 (sgml-clear-log))))
+
+
+
+;;; This has noting to do with warnings...
+
+(defvar sgml-lazy-time 0)
+
+(defun sgml-lazy-message (&rest args)
+  (unless (= sgml-lazy-time (second (current-time)))
+    (apply 'message args)
+    (setq sgml-lazy-time (second (current-time)))))
 
 ;;;; Shortref maps
 
@@ -2601,6 +2636,40 @@ Assumes starts with point inside a markup declaration."
 	   (sgml-skip-upto-mdc))))
   (setq sgml-markup-type 'doctype))
 
+(defun sgml-do-data (type &optional marked-section)
+  "Move point forward until there is an end-tag open after point."
+  (let ((start (point))
+	(done nil)
+	(eref sgml-current-eref)
+	sgml-signal-data-function)
+    (while (not done)
+      (cond (marked-section
+	     (skip-chars-forward (if (eq type sgml-cdata) "^]" "^&]"))
+	     (when sgml-data-function
+	       (funcall sgml-data-function (buffer-substring start (point))))
+	     (setq done (sgml-parse-delim "MS-END")))
+	    (t
+	     (skip-chars-forward (if (eq type sgml-cdata) "^</" "^</&"))
+	     (when sgml-data-function
+	       (funcall sgml-data-function (buffer-substring start (point))))
+	     (setq done (or (sgml-is-delim "ETAGO" gi)
+			    (sgml-is-enabled-net)))))
+      (cond
+       (done)
+       ((eobp)
+	(when (eq eref sgml-current-eref)
+	  (sgml-error "Unterminated %s %s"
+		      type (if marked-section "marked section")))
+	(sgml-pop-entity)
+	(setq start (point)))
+       ((null sgml-data-function)
+	(forward-char 1))
+       ((sgml-parse-general-entity-ref)
+	(setq start (point)))
+       (t
+	(forward-char 1))))))
+
+
 (defun sgml-do-marked-section ()
   (let ((status nil))
     (while (progn (sgml-skip-ps)
@@ -2613,9 +2682,11 @@ Assumes starts with point inside a markup declaration."
       (sgml-set-markup-type 'ignored))
      ((or (member "cdata" status)
 	  (member "rcdata" status))
-      (or (search-forward "]]>" nil t)
-	  (sgml-error "CDATA marked section not terminated"))
-      (sgml-set-markup-type sgml-cdata))
+      (when sgml-signal-data-function
+	(funcall sgml-signal-data-function))
+      (let ((type (if (member "cdata" status) sgml-cdata sgml-rcdata)))
+	(sgml-do-data type t)
+      (sgml-set-markup-type type)))
      (t
       (sgml-set-markup-type 'ms-start)))))
   
@@ -2895,12 +2966,18 @@ pointing to start of short ref and point pointing to the end."
 (defsubst sgml-do-pcdata ()
   ;; Parse pcdata
   (sgml-pcdata-move)
+  ;;*** assume sgml-markup-start = point
+  ;;*** should perhaps handle &#nn;?
   (forward-char 1)
   (sgml-parse-pcdata)
+  (when sgml-data-function
+	(funcall sgml-data-function (buffer-substring sgml-markup-start
+						      (point))))
   (sgml-set-markup-type nil))
 
 (defun sgml-parser-loop (extra-cond)
-  (let (tem)
+  (let (tem
+	(sgml-signal-data-function (function sgml-pcdata-move)))
     (while (and (eq sgml-current-tree sgml-top-tree)
 		(or (< (point) sgml-goal) sgml-current-eref)
 		(progn (setq sgml-markup-start (point)
@@ -2920,7 +2997,7 @@ pointing to start of short ref and point pointing to the end."
 	(if (or (sgml-parse-delim "ETAGO" gi)
 		(sgml-is-enabled-net))
 	    (sgml-do-end-tag)
-	  (sgml-skip-cdata)))
+	  (sgml-do-data sgml-current-state)))
        ((and sgml-current-shortmap
 	     (or (setq tem (sgml-deref-shortmap sgml-current-shortmap
 						(eq (point)
@@ -2928,10 +3005,7 @@ pointing to start of short ref and point pointing to the end."
 		 ;; Restore position, to consider the delim for S+ or data
 		 (progn (goto-char sgml-markup-start)
 			nil)))
-	(funcall sgml-shortref-handler 
-		 (or (sgml-lookup-entity tem (sgml-dtd-entities sgml-dtd-info))
-		     (sgml-error "Entity %s undefined (referenced by shortref)"
-				 tem))))
+	(funcall sgml-shortref-handler tem))
        ((and (not (sgml-current-mixed-p))
 	     (sgml-parse-s sgml-current-shortmap)))
        ((or (sgml-parse-delim "ETAGO" gi)
@@ -2947,13 +3021,14 @@ pointing to start of short ref and point pointing to the end."
        (t
 	(sgml-do-pcdata))))))
 
-(defun sgml-handle-shortref (entity)
+(defun sgml-handle-shortref (name)
   (sgml-set-markup-type 'shortref)
-  (unless (sgml-entity-data-p entity)
-    (sgml-push-to-entity entity sgml-markup-start)))
+  (sgml-do-entity-ref name))
 
 (defun sgml-do-start-tag ()    
   ;; Assume point after STAGO
+  (when sgml-throw-on-element-change
+    (throw sgml-throw-on-element-change 'start))
   (setq sgml-conref-flag nil)
   (let (temp net-enabled et asl)
     (setq et (if (sgml-is-delim "TAGC")	; empty start-tag
@@ -2985,7 +3060,7 @@ pointing to start of short ref and point pointing to the end."
 	 ((sgml-do-implied
 	   (format "%s start-tag" (sgml-eltype-name et))))))
     (sgml-set-markup-type 'start-tag)
-    (sgml-open-element et sgml-conref-flag sgml-markup-start (point))
+    (sgml-open-element et sgml-conref-flag sgml-markup-start (point) asl)
     (when net-enabled
       (setf (sgml-tree-net-enabled sgml-current-tree) t))))
 
@@ -3009,7 +3084,8 @@ pointing to start of short ref and point pointing to the end."
 	  for current = sgml-current-tree then (sgml-tree-parent current)
 	  for parent  = (sgml-tree-parent current)
 	  do;; Search for a parent with a child before current
-	  (when (eq parent sgml-top-tree) (sgml-error "No previously closed element"))
+	  (when (eq parent sgml-top-tree) 
+		(sgml-error "No previously closed element"))
 	  (unless (eq current (sgml-tree-content parent))
 	    ;; Search content of u for element before current
 	    (loop for c = (sgml-tree-content parent) then (sgml-tree-next c)
@@ -3095,6 +3171,8 @@ pointing to start of short ref and point pointing to the end."
 	 (null (cdr temp)))
     (setq sgml-current-state
 	  (sgml-get-move sgml-current-state (car temp)))
+    (when sgml-throw-on-element-change
+      (throw sgml-throw-on-element-change 'start))
     (sgml-open-element (sgml-token-eltype (car temp))
 		       nil sgml-markup-start sgml-markup-start)
     (unless (and sgml-current-omittag
