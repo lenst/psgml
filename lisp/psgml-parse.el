@@ -151,6 +151,35 @@ Tested by sgml-close-element to see if the parse should be ended.")
 	 (set-syntax-table normal-syntax-table)))))
 (put 'sgml-with-parser-syntax 'edebug-form-hook '(&rest form))
 
+;;;; Set face of markup
+
+(defun sgml-set-face-for (start end type)
+  (let ((inhibit-read-only t)
+	before-change-function
+	after-change-function)
+    (cond
+     ((null window-system))
+     ((null type)			; data
+      (remove-text-properties start end '(face nil)))
+     (t
+      (put-text-property start end
+			 'face (cdr (assq
+				     type
+				     '((start-tag . bold)
+				       (end-tag . bold)
+				       (comment . italic)
+				       (pi . bold)
+				       (sgml . bold)
+				       (doctype . bold)))))))))
+
+(defun sgml-set-face-after-change (start end &optional pre-len)
+  (when sgml-set-face
+    (let (before-change-function
+	  after-change-function
+	  (bm (buffer-modified-p)))
+      (remove-text-properties start end '(face t))
+      (set-buffer-modified-p bm))))
+
 ;;;; State machine
 
 ;; From the parsers POV a state is a mapping from tokens (in sgml it
@@ -939,6 +968,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (setq sgml-buffer-doctype model)
   (make-local-variable 'before-change-function)
   (setq before-change-function 'sgml-note-change-at)
+  (set (make-local-variable 'after-change-function)
+       'sgml-set-face-after-change)
   (setq sgml-document-element (and (sgml-model-group-p model)
 				   (sgml-move-token
 				    (car (sgml-state-reqs model)))))
@@ -1839,13 +1870,18 @@ or if nil, until end of buffer."
   (sgml-find-start-point (min sgml-goal (point-max)))
   (assert sgml-current-tree)
   (let ((bigparse (> (- sgml-goal (point)) 10000))
-	(sgml-param-entities sgml-buffer-param-entities))
+	(sgml-param-entities sgml-buffer-param-entities)
+	(bm (buffer-modified-p)))
     (when bigparse
       (sgml-message "Parsing..."))
     (sgml-with-parser-syntax
      (sgml-parser-loop))
     (when bigparse
-      (sgml-message ""))))
+      (sgml-message ""))
+    ;; Restore buffer modification status -- in case face change has
+    ;; modified the buffer.
+    (set-buffer-modified-p bm)))
+
 
 (defun sgml-parser-loop ()
   (while (< (point) sgml-goal)
@@ -1885,7 +1921,9 @@ or if nil, until end of buffer."
      ((sgml-parse-marked-section-end)	; end of marked section
       (setq sgml-markup-type 'ms-end))
      (t
-      (sgml-do-pcdata)))))
+      (sgml-do-pcdata)))
+    (when (and sgml-set-face sgml-markup-type)
+      (sgml-set-face-for sgml-markup-start (point) sgml-markup-type))))
 
 (defun sgml-is-goal-after-start (goal tree)
   (and tree
@@ -2589,6 +2627,7 @@ is determined."
   (interactive)
   (push-mark)
   (sgml-note-change-at (point))		; Prune the parse tree
+  (sgml-set-face-after-change (point) (point-max))
   (sgml-parse-to-here)
   (let ((sgml-throw-on-warning 'trouble))
     (or (catch sgml-throw-on-warning
