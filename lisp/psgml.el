@@ -434,6 +434,15 @@ running the sgml-validate-command.")
 (define-key sgml-mode-map "\C-c\C-s" 'sgml-unfold-line)
 (define-key sgml-mode-map "\C-c\C-t" 'sgml-list-valid-tags)
 
+(define-key sgml-mode-map "\C-c\C-f\C-e" 'sgml-fold-element)
+(define-key sgml-mode-map "\C-c\C-f\C-r" 'sgml-fold-region)
+(define-key sgml-mode-map "\C-c\C-f\C-s" 'sgml-fold-subelement)
+(define-key sgml-mode-map "\C-c\C-f\C-x" 'sgml-expand-element)
+
+(define-key sgml-mode-map "\C-c\C-u\C-e" 'sgml-unfold-element)
+(define-key sgml-mode-map "\C-c\C-u\C-a" 'sgml-unfold-all)
+(define-key sgml-mode-map "\C-c\C-u\C-l" 'sgml-unfold-line)
+
 (define-key sgml-mode-map "\e\C-a"   'sgml-beginning-of-element)
 (define-key sgml-mode-map "\e\C-e"   'sgml-end-of-element)
 (define-key sgml-mode-map "\e\C-f"   'sgml-forward-element)
