@@ -51,6 +51,8 @@ commands.")
     sgml-backward-element
     sgml-forward-element
     sgml-down-element
+    sgml-show-context
+    sgml-next-data-field
     )
   "List of commands that set the sgml-last-element variable.")
 
@@ -556,7 +558,8 @@ The actual value is a string. Return nil if no actual value."
 ;;; attspec representation = (symbol . string)
 
 (defun sgml-make-attspec (name attval)
-  "Create an attspec from NAME and ATTVAL."
+  "Create an attspec from NAME and ATTVAL.
+Special case, if ATTVAL is nil this is an implied attribute."
   (cons name attval))
 
 ;; sgml-attspec-name: attspec -> name
@@ -812,6 +815,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	(sgml-set-global))
        (t				; load DTD from file
 	(set-buffer cb)
+	(or (file-exists-p real-file)
+	    (error "DTD file %s not found" real-file))
 	(setq tem (generate-new-buffer " *saveddtd*"))
 	(unwind-protect
 	    (progn
@@ -1018,11 +1023,11 @@ or from after TREE if WHERE is after."
   (or (not (sgml-model-group-p state))
       (sgml-final state)))
 
-(defun sgml-current-element-contains-data ()
-  "Retrun true if the current open element is either mixed or is (r)cdata."
-  (or (eq sgml-cdata sgml-current-state)
-      (eq sgml-rcdata sgml-current-state)
-      (sgml-current-mixed-p)))
+;(defun sgml-current-element-contains-data ()
+;  "Retrun true if the current open element is either mixed or is (r)cdata."
+;  (or (eq sgml-cdata sgml-current-state)
+;      (eq sgml-rcdata sgml-current-state)
+;      (sgml-current-mixed-p)))
 
 (defun sgml-current-element-content-class ()
   "Return a string describing the type of content in the current element.
@@ -1090,14 +1095,6 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	       sgml-current-tree (sgml-tree-parent sgml-current-tree)))))
 
 
-(defun sgml-context-as-string ()
-  (format "%s %s"
-	  (if (sgml-model-group-p sgml-current-state)
-	      (sgml-current-element-content-class)
-	    sgml-current-state)
-	  (if (eq sgml-current-tree sgml-top-tree)
-	      "in empty context"
-	    (sgml-element-context-string sgml-current-tree))))
 
 (defun sgml-list-of-elements (tree state)
   (let* ((req (if (sgml-model-group-p state)
@@ -1504,7 +1501,7 @@ remove it if it is showing."
        (eq ?/ (char-after (1+ (point))))
        (sgml-startnm-char (char-after (+ 2 (point))))))
 
-(defun sgml-is-enabled-net ()		;*** inline
+(defsubst sgml-is-enabled-net ()
   (and sgml-shorttag
        (sgml-tree-net-enabled sgml-current-tree)
        (eq ?/ (following-char))))
@@ -1717,6 +1714,16 @@ a RNI must be followed by NAME."
     (when (sgml-parse-marked-section-start)
       (search-forward "[")
       (sgml-skip-marked-section))))
+
+(defun sgml-skip-tag ()
+  (when (sgml-parse-char ?<)
+    (sgml-parse-char ?/)
+    (unless (search-forward-regexp
+	       "\\([^\"'<>/]\\|\"[^\"]*\"\\|'[^']*'\\)*"
+	       nil t)
+      (sgml-error "Invalid tag"))
+    (or (sgml-parse-char ?>)
+	(sgml-parse-char ?/))))
 
 ;;;; Parsing attribute values
 
@@ -1781,7 +1788,7 @@ VALUE is a string.  Returns nil or a string."
 ;; 5) To find the previous element.
 
 ;; These tasks are done by a combination of parsing and traversing
-;; the partial parse tree.  The primite parse operation is to parse
+;; the partial parse tree.  The primitive parse operation is to parse
 ;; until a goal point in the buffer has been passed.  In addition to
 ;; this it is possible to "trap" closing of elements.  Either for a
 ;; specific element or for any element.  When the trap is sprung the
@@ -1791,8 +1798,29 @@ VALUE is a string.  Returns nil or a string."
 
 (defun sgml-need-dtd ()
   "Make sure that an eventual DTD is parsed or loaded."
-  (save-excursion (sgml-parse-to (point-min))))
+  (when (null sgml-top-tree)		; first parse in this buffer
+    (sgml-set-doctype sgml-any)		; fall back DTD
+    (add-hook 'pre-command-hook 'sgml-reset-log)
+    (if sgml-default-dtd-file
+	(sgml-load-dtd sgml-default-dtd-file)
+      (let ((buf (and sgml-parent-document
+		      (find-file-noselect (if (consp sgml-parent-document)
+					      (car sgml-parent-document)
+					    sgml-parent-document)))))
+	(if (or (null buf) (eq buf (current-buffer)))
+	    (save-excursion (sgml-parse-prolog))
+	  ;; get DTD from parent document
+	  (save-excursion
+	    (set-buffer buf) (sgml-need-dtd) (sgml-set-global))
+	  (sgml-set-local)
+	  (if (consp sgml-parent-document)
+	      (let ((doctypename (second sgml-parent-document)))
+		(if (symbolp doctypename)
+		    (setq doctypename (symbol-name doctypename)))
+		(sgml-set-doctype-element
+		 (sgml-gname-symbol doctypename)))))))))
 
+  
 (defun sgml-parse-until-end-of (sgml-close-element-trap)
   "Parse until the SGML-CLOSE-ELEMENT-TRAP has ended,
 or if it is t, any additional element has ended,
@@ -1805,6 +1833,20 @@ or if nil, until end of buffer."
 		       (eq sgml-close-element-trap sgml-current-tree)
 		       (eq sgml-current-tree sgml-top-tree)))
 	     (sgml-implied-end-tag "buffer end" (point) (point))))))
+
+(defun sgml-parse-to (sgml-goal)
+  (sgml-need-dtd)
+  (sgml-find-start-point (min sgml-goal (point-max)))
+  (assert sgml-current-tree)
+  (let ((bigparse (> (- sgml-goal (point)) 10000))
+	(sgml-param-entities sgml-buffer-param-entities))
+    (when bigparse
+      (sgml-message "Parsing..."))
+    (sgml-with-parser-syntax
+     (sgml-parser-loop))
+    (when bigparse
+      (sgml-message ""))))
+
 
 (defsubst sgml-do-pcdata ()
   ;; Parse pcdata
@@ -1827,44 +1869,6 @@ or if nil, until end of buffer."
 	 ((sgml-do-implied "data character")))))
   (forward-char 1)
   (skip-chars-forward "^<]/"))
-
-(defun sgml-setup-dtd ()
-  (sgml-set-doctype sgml-any)		; fall back DTD
-  (cond (sgml-default-dtd-file
-	 ;;(and (file-exists-p sgml-default-dtd-file))
-	 (sgml-load-dtd sgml-default-dtd-file))
-	((null sgml-parent-document)
-	 (sgml-parse-prolog))
-	(t				; get DTD from parent document
-	 (save-excursion
-	   (set-buffer (find-file-noselect
-			(if (listp sgml-parent-document)
-			    (car sgml-parent-document)
-			  sgml-parent-document)))
-	   (sgml-need-dtd)
-	   (sgml-set-global))
-	 (sgml-set-local)
-	 (if (listp sgml-parent-document)
-	     (let ((doctypename (second sgml-parent-document)))
-	       (if (symbolp doctypename)
-		   (setq doctypename (symbol-name doctypename)))
-	       (sgml-set-doctype-element
-		(sgml-gname-symbol doctypename)))))))
-
-(defun sgml-parse-to (sgml-goal)
-  (when (null sgml-top-tree)		; first parse in this buffer
-    (sgml-setup-dtd))
-  (add-hook 'pre-command-hook 'sgml-reset-log)
-  (sgml-find-start-point (min sgml-goal (point-max)))
-  (assert sgml-current-tree)
-  (let ((bigparse (> (- sgml-goal (point)) 10000))
-	(sgml-param-entities sgml-buffer-param-entities))
-    (when bigparse
-      (sgml-message "Parsing..."))
-    (sgml-with-parser-syntax
-     (sgml-parser-loop))
-    (when bigparse
-      (sgml-message ""))))
 
 (defun sgml-parser-loop ()
   (while (< (point) sgml-goal)
@@ -2137,9 +2141,11 @@ type."
     (sgml-parse-to pos)
     (cond ((and (> (point) pos)
 		sgml-markup-type)
-	   (setq sgml-current-state sgml-markup-type)
+	   ;;(setq sgml-current-state sgml-markup-type)
 	   (cond ((memq sgml-markup-type '(start-tag end-tag))
-		  (setq sgml-current-tree sgml-markup-tree)))))
+		  (setq sgml-current-tree sgml-markup-tree))))
+	  (t
+	   (setq sgml-markup-type nil)))
     sgml-current-tree))
 
 (defun sgml-parse-to-here ()
@@ -2306,7 +2312,9 @@ This is a list of (attname value) lists."
 	    (sgml-parse-attribute-specification-list element))))))
 
 (defun sgml-find-attribute-element ()
-  (let ((el (sgml-find-context-of (point))))
+  "Return the element to which an attribute editing command should be applied."
+  (let ((el (sgml-find-element-of (point))))
+    (sgml-parse-to-here)
     ;; If after a start-tag of an empty element return that element
     ;; instead of current element
     (if (eq sgml-markup-type 'start-tag)
@@ -2322,42 +2330,42 @@ This is a list of (attname value) lists."
 
 ;;;; SGML mode: structure editing
 
+(defun sgml-last-element ()
+  (setq sgml-markup-type nil)
+  (if (memq last-command sgml-users-of-last-element)
+      sgml-last-element
+    (setq sgml-last-element (sgml-find-context-of (point))))  )
+
+(defun sgml-set-last-element (&optional el)
+  (if el (setq sgml-last-element el))
+  (sgml-show-context sgml-last-element))
+
 (defun sgml-beginning-of-element ()
   "Move to after the start-tag of the current element.
 If the start-tag is implied, move to the start of the element."
   (interactive)
-  (goto-char
-   (sgml-element-stag-end
-    (if (memq last-command sgml-users-of-last-element)
-	sgml-last-element
-      (setq sgml-last-element (sgml-find-context-of (point)))))))
+  (goto-char (sgml-element-stag-end (sgml-last-element)))
+  (sgml-set-last-element))
 
 (defun sgml-end-of-element ()
   "Move to before the end-tag of the current element."
   (interactive)
-  (goto-char
-   (sgml-element-etag-start
-    (if (memq last-command sgml-users-of-last-element)
-	sgml-last-element
-      (setq sgml-last-element (sgml-find-context-of (point)))))))
+  (goto-char (sgml-element-etag-start (sgml-last-element)))
+  (sgml-set-last-element))
 
 (defun sgml-backward-up-element ()
   "Move backward out of this element level.
 That is move to before the start-tag or where a start-tag is implied."
   (interactive)
-  (unless (memq last-command sgml-users-of-last-element)
-    (setq sgml-last-element (sgml-find-context-of (point))))
-  (goto-char (sgml-element-start sgml-last-element))
-  (setq sgml-last-element (sgml-element-parent sgml-last-element)))
+  (goto-char (sgml-element-start (sgml-last-element)))
+  (sgml-set-last-element (sgml-element-parent sgml-last-element)))
 
 (defun sgml-up-element ()
   "Move forward out of this element level.
 That is move to after the end-tag or where an end-tag is implied."
   (interactive)
-  (unless (memq last-command sgml-users-of-last-element)
-    (setq sgml-last-element (sgml-find-context-of (point))))
-  (goto-char (sgml-element-end sgml-last-element))
-  (setq sgml-last-element (sgml-element-parent sgml-last-element)))
+  (goto-char (sgml-element-end (sgml-last-element)))
+  (sgml-set-last-element (sgml-element-parent sgml-last-element)))
 
 (defun sgml-forward-element ()
   "Move forward over next element."
@@ -2368,7 +2376,7 @@ That is move to after the end-tag or where an end-tag is implied."
 	  (if (memq last-command sgml-users-of-last-element)
 	      sgml-last-element))))
     (goto-char (sgml-element-end next))
-    (setq sgml-last-element (sgml-element-parent next))))
+    (sgml-set-last-element (sgml-element-parent next))))
 
 (defun sgml-backward-element ()
   "Move backward over previous element at this level.
@@ -2380,7 +2388,7 @@ With implied tags this is ambigous."
 	  (if (memq last-command sgml-users-of-last-element)
 	      sgml-last-element))))
     (goto-char (sgml-element-start prev))
-    (setq sgml-last-element (sgml-element-parent prev))))
+    (sgml-set-last-element (sgml-element-parent prev))))
 
 (defun sgml-down-element ()
   "Move forward and down one level in the element structure."
@@ -2391,7 +2399,11 @@ With implied tags this is ambigous."
 	  (sgml-find-element-after
 	   (point)
 	   (if (memq last-command sgml-users-of-last-element)
-	       sgml-last-element))))))
+	       sgml-last-element)))))
+  (sgml-set-last-element
+   (if (sgml-element-empty sgml-last-element)
+       (setq sgml-last-element (sgml-element-parent sgml-last-element))
+     sgml-last-element)))
 
 (defun sgml-kill-element ()
   "Kill the element following the cursor."
@@ -2509,11 +2521,10 @@ a list using attlist TO."
     (sgml-with-parser-syntax
      (sgml-skip-s)
      (setq sgml-markup-start (point))
-     (cond ((sgml-is-start-tag) (sgml-down-element))
-	   ((sgml-is-end-tag)   (sgml-up-element))
-	   ((sgml-skip-doctype))
+     (cond ((sgml-skip-doctype))
 	   ((sgml-parse-mdo)    (sgml-skip-markup-declaration))
-	   ((sgml-skip-processing-instruction)))
+	   ((sgml-skip-processing-instruction))
+	   ((sgml-skip-tag)))
      (kill-region start (point)))))
 
 
@@ -2525,7 +2536,11 @@ If called from a program first two arguments are start and end of
 region. And optional third argument true unhides."
   (interactive "r\nP")
   (let ((mp (buffer-modified-p))
-	(buffer-read-only nil)
+	(inhibit-read-only t)		;
+	(buffer-read-only nil)		; should not need this, but
+					; perhaps some old version of
+					; emacs does not understand
+					; inhibit-read-only
 	(before-change-function nil)
 	(after-change-function nil))
     (setq selective-display t)
@@ -2655,11 +2670,16 @@ is determined."
   (interactive)
   (let ((sgml-throw-on-warning 'next-data))
     (catch sgml-throw-on-warning
-      (while (and (progn (skip-chars-forward "^<")
-			 (not (eobp)))
-		  (progn (sgml-parse-to (1+ (point)))
-			 (not (sgml-current-element-contains-data)))))
-      (sgml-message "%s" (sgml-current-element-content-class)))))
+      (while (progn
+	       (sgml-parse-to (1+ (point)))
+	       (setq sgml-last-element
+		     (if (not (eq ?< (following-char)))
+			 (sgml-find-element-of (point))
+		       sgml-current-tree))
+	       (not (and (sgml-element-data-p sgml-last-element)
+			 (eq (point)
+			     (sgml-element-stag-end sgml-last-element))))))
+      (sgml-set-last-element))))
 
 (defun sgml-next-trouble-spot ()
   "Move forward to next point where something is amiss with the structure."
@@ -2702,11 +2722,9 @@ is determined."
 	     (terpri))
 	    (t
 	     (princ "Current element can not end here\n")))
-      (princ "Valid start-tags:\n")
+      (princ "Valid start-tags\n")
       (sgml-print-valid-tags "In current element:"
-			     sgml-current-tree sgml-current-state)
-      )))
-
+			     sgml-current-tree sgml-current-state))))
 
 (defun sgml-print-valid-tags (prompt tree state &optional exclude omitted-stag)
   (if (not (sgml-model-group-p state))
@@ -2765,11 +2783,22 @@ is determined."
 	    (princ str))
       (terpri))))
 
-(defun sgml-show-context ()
+(defun sgml-show-context (&optional el)
   "Display where the cursor is in the element hierarchy."
   (interactive)
-  (sgml-parse-to-here)
-  (sgml-message "%s" (sgml-context-as-string)))
+  (or el (setq el (sgml-last-element)))
+  (let* ((model (sgml-element-model el)))
+    (sgml-message "%s %s" 
+		  (cond
+		   (sgml-markup-type)
+		   ((sgml-element-mixed el)
+		    "#PCDATA")
+		   ((not (sgml-model-group-p model))
+		    model)
+		   (t ""))
+		  (if (eq el sgml-top-tree)
+		      "in empty context"
+		    (sgml-element-context-string el)))))
 
 (defun sgml-what-element ()
   "Display what element is under the cursor."
@@ -2799,10 +2828,8 @@ after the first tag inserted."
   (interactive 
    (list
     (completing-read "Tag: " (sgml-completion-table) nil t "<" )))
-  ;; 
-  (sgml-parse-to-here)			; get context information
   ;; Fix white-space before tag
-  (unless (sgml-current-element-contains-data)
+  (unless (sgml-element-data-p (sgml-parse-to-here))
     (skip-chars-backward " \t")
     (cond ((bolp)
 	   (if (looking-at "^\\s-*$")
@@ -2813,8 +2840,7 @@ after the first tag inserted."
   (sgml-indent-line)  
   (unless no-nl-after
     (save-excursion
-      (sgml-parse-to-here)
-      (unless (sgml-current-element-contains-data)
+      (unless (sgml-element-data-p (sgml-parse-to-here))
 	(unless (eolp)
 	  (save-excursion (insert "\n"))))))
   (or silent (sgml-show-context)))
@@ -2935,7 +2961,7 @@ AVL should be a assoc list mapping symbols to strings."
     (sgml-error "Can`t end element here"))
    (t
     (when (and sgml-indent-step
-	       (not (sgml-current-element-contains-data)))
+	       (not (sgml-element-data-p sgml-current-tree)))
       (delete-horizontal-space)
       (unless (bolp)
 	(insert "\n")))
@@ -2985,6 +3011,12 @@ AVL should be a assoc list mapping symbols to strings."
     (if (and curvalue (equal value ""))
 	curvalue value)))
 
+(defun sgml-non-fixed-attributes (attlist)
+  (loop for attdecl in attlist
+	unless (sgml-default-value-type-p 'fixed 
+					  (sgml-attdecl-default-value attdecl))
+	collect attdecl))
+
 (defun sgml-insert-attribute (name value)
   "Read attribute name and value from minibuffer and insert attribute spec."
   (interactive
@@ -2996,7 +3028,8 @@ AVL should be a assoc list mapping symbols to strings."
 			   (lambda (a)
 			     (list (symbol-name
 				    (sgml-attdecl-name a)))))
-			  (sgml-element-attlist el))
+			  (sgml-non-fixed-attributes
+			   (sgml-element-attlist el)))
 		  nil t))))
      (list
       name
@@ -3005,11 +3038,11 @@ AVL should be a assoc list mapping symbols to strings."
        (sgml-element-attval el name)))))
   ;; Body
   (assert (symbolp name))
-  (assert (stringp value))
+  (assert (or (null value) (stringp value)))
   (let* ((el (sgml-find-attribute-element))
 	 (asl (cons (sgml-make-attspec name value)
 		    (sgml-element-attribute-specification-list el))))
-    (sgml-change-start-tag el asl)))
+    (save-excursion (sgml-change-start-tag el asl))))
 
 (defun sgml-split-element ()
   "Split the current element at point.
@@ -3096,7 +3129,7 @@ tag inserted."
 (defun sgml-menu-ask (event type)
   (sgml-parse-to-here)
   (let (tab
-	(title (symbol-name type)))
+	(title (capitalize (symbol-name type))))
     (cond
      ((eq type 'element)
 	   (setq tab
@@ -3176,8 +3209,10 @@ buffers local variables list."
 \(or the element whith start-tag before point)."
   (interactive "e")
   (let* ((el (sgml-find-attribute-element))
-	 (attlist (sgml-element-attlist el))
+	 (attlist (sgml-non-fixed-attributes (sgml-element-attlist el)))
 	 tokens menu other)
+    (or attlist
+	(error "No non-fixed attributes for element"))
     (loop for attdecl in attlist
 	  do (setq tokens
 		   (or (sgml-declared-value-token-group
@@ -3188,15 +3223,20 @@ buffers local variables list."
 	   (tokens
 	    (push (cons
 		   (symbol-name (sgml-attdecl-name attdecl))
-		   (loop for val in tokens
-			 do (setq val (symbol-name val))
-			 collect			  
-			 (cons val (cons (sgml-attdecl-name attdecl)
-					 val))))
+		   (append
+		    (loop for val in tokens
+			  do (setq val (symbol-name val))
+			  collect			  
+			  (cons val (cons (sgml-attdecl-name attdecl)
+					  val)))
+		    (if (sgml-default-value-type-p
+			 'implied (sgml-attdecl-default-value attdecl))
+			(list ""
+			      (list "#IMPLIED" (sgml-attdecl-name attdecl))))))
 		  menu))
 	   (t;; No tokens
 	    (push (cons (symbol-name (sgml-attdecl-name attdecl))
-			(list (sgml-attdecl-name attdecl)))
+			(cons (sgml-attdecl-name attdecl) t))
 		  other))))
     (setq menu (cons "Attributes"
 		     (append menu
@@ -3205,10 +3245,11 @@ buffers local variables list."
       (and result
 	   (sgml-insert-attribute
 	    (car result)
-	    (or (cdr result)
+	    (if (eq t (cdr result))
 		(sgml-read-attribute-value
 		 (sgml-lookup-attdecl (car result) attlist)
-		 (sgml-element-attval el (car result)))))))))
+		 (sgml-element-attval el (car result)))
+	      (cdr result)))))))
 
 ;;;; SGML mode: Fill 
 
@@ -3536,7 +3577,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 	(cond
 	 ((eq action 'show)
 	  (remove-text-properties (point-min) (point-max)
-				  '(read-only t invisible t)))
+				  '( read-only t invisible t)))
 	 (t
 	  (save-excursion
 	    (goto-char (point-min))
@@ -3554,7 +3595,8 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 	      (= start end))
     (add-text-properties
      start end
-     '(invisible t read-only t rear-nonsticky (invisible read-only face)))))
+     '(invisible t read-only t 
+		 rear-nonsticky (intangible invisible read-only face)))))
 
 (defun sgml-hide-tags ()
   (interactive)
@@ -3609,7 +3651,7 @@ elements with omitted end-tags."
       (setq element (car content))
       ;; Progress report
       (message "Normalizing %d%% left"
-	       (/ (* 100.0 (point)) (point-max)))
+	       (/ (point) (/ (point-max) 100)))
       ;; Fix the end-tag
       (sgml-normalize-end-tag element)
       ;; Fix tags of content
@@ -3637,7 +3679,7 @@ elements with omitted end-tags."
 
 (defun sgml-make-character-reference (&optional invert)
   "Convert character after point into a character reference.
-If called with a numeric argument, convert a charactyer reference back
+If called with a numeric argument, convert a character reference back
 to a normal character.  If called from a program, set optional
 argument INVERT to non-nil."
   (interactive "*P")
