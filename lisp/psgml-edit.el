@@ -585,6 +585,9 @@ after the first tag inserted."
 	  (save-excursion (insert "\n"))))))
   (or silent (sgml-show-context)))
 
+(defvar sgml-new-attribute-list-function
+  (function sgml-default-asl))
+
 (defun sgml-insert-element (name &optional after silent)
   "Reads element name from minibuffer and inserts start and end tags."
   (interactive (list (sgml-read-element-name "Element: ")
@@ -596,7 +599,9 @@ after the first tag inserted."
       (sgml-insert-tag (sgml-start-tag-of name) 'silent)
       (forward-char -1)
       (setq element (sgml-find-element-of (point)))
-      (sgml-insert-attributes nil (sgml-element-attlist element))
+      (sgml-insert-attributes (funcall sgml-new-attribute-list-function
+				       element)
+			      (sgml-element-attlist element))
       (forward-char 1)
       (setq stag-end (point))
       (when (not (sgml-element-empty element))
@@ -618,6 +623,15 @@ after the first tag inserted."
 	  (sgml-end-of-element))
 	(unless silent (sgml-show-context)))
       stag-end)))
+
+(defun sgml-default-asl (element)
+  (loop for attdecl in (sgml-element-attlist element)
+	when (sgml-default-value-type-p (sgml-attdecl-default-value attdecl)
+					'required)
+	collect
+	(sgml-make-attspec
+	 (sgml-attdecl-name attdecl)
+	 (sgml-read-attribute-value attdecl nil))))
 
 (defun sgml-tag-region (element start end)
   "Reads element name from minibuffer and inserts start and end tags."
@@ -729,6 +743,9 @@ AVL should be a assoc list mapping symbols to strings."
 			   (eq t (sgml-element-net-enabled element)))))
 
 (defun sgml-read-attribute-value (attdecl curvalue)
+  "Return the attribute value read from user.
+ATTDECL is the attribute declaration for the attribute to read.
+CURVALUE is nil or a string that will be used as default value."
   (assert attdecl)
   (let* ((name (sgml-attdecl-name attdecl))
 	 (dv (sgml-attdecl-declared-value attdecl))
@@ -1436,7 +1453,7 @@ elements with omitted end-tags."
       (setq element (car content))
       ;; Progress report
       (sgml-lazy-message "Normalizing %d%% left"
-			 (/ (point) (/ (point-max) 100)))
+			 (/ (point) (/ (+ (point-max) 100) 100)))
       ;; Fix the end-tag
       (sgml-normalize-end-tag element)
       ;; Fix tags of content
