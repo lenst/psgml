@@ -38,10 +38,6 @@
 (defvar sgml-used-pcdata nil
   "True if model group built is mixed")
 
-(defvar sgml-dtd-shortmaps nil
-  "List of short reference maps.
-Used while parsing the DTD.")
-
 
 ;;;; Constructing basic
 
@@ -526,13 +522,14 @@ Case transformed for general names."
 	      (sgml-check-name-group))))
 
 (defun sgml-before-eltype-modification ()
-  (let ((merged (sgml-dtd-merged sgml-dtd-info)))
-    (when (and merged
-	       (eq (sgml-dtd-eltypes sgml-dtd-info)
-		   (sgml-dtd-eltypes (cdr merged))))
-      (setf (sgml-dtd-eltypes sgml-dtd-info)
-	    (sgml-merge-eltypes (sgml-make-eltypes-table)
-				(sgml-dtd-eltypes sgml-dtd-info))))))
+;;;  (let ((merged (sgml-dtd-merged sgml-dtd-info)))
+;;;    (when (and merged
+;;;	       (eq (sgml-dtd-eltypes sgml-dtd-info)
+;;;		   (sgml-dtd-eltypes (cdr merged))))
+;;;      (setf (sgml-dtd-eltypes sgml-dtd-info)
+;;;	    (sgml-merge-eltypes (sgml-make-eltypes-table)
+;;;				(sgml-dtd-eltypes sgml-dtd-info)))))
+  )
 
 (defun sgml-declare-element ()
   (let* ((names (sgml-check-element-type))
@@ -701,7 +698,6 @@ Case transformed for general names."
       (sgml-skip-ps)
       (setq name (sgml-check-name t))
       (push (cons literal name) mappings))
-    ;;(push (cons mapname mappings) sgml-dtd-shortmaps)
     (sgml-add-shortref-map
      (sgml-dtd-shortmaps sgml-dtd-info)
      mapname
@@ -863,6 +859,8 @@ FORMS should produce the binary coding of element in VAR."
 
 (defun sgml-code-dtd (dtd)
   "Produce the binary coding of the current DTD into the current buffer."
+  (sgml-code-sexp (sgml-dtd-dependencies dtd))
+  (sgml-code-sexp (sgml-dtd-parameters dtd))
   (sgml-code-sexp (sgml-dtd-doctype dtd))
   (let ((done 0)			; count written elements
 	tot)
@@ -881,11 +879,10 @@ FORMS should produce the binary coding of element in VAR."
       (setq done (1+ done))
       (sgml-code-element (car pair))
       (sgml-lazy-message "Saving DTD %d%% done" (/ (* 100 done) tot)))
-    (sgml-code-sexp (sgml-dtd-parameters dtd))
     (sgml-code-sexp (sgml-dtd-entities dtd))
     (sgml-code-sexp (sgml-dtd-shortmaps dtd))
-    (sgml-code-sexp (sgml-dtd-notations dtd))
-    (sgml-code-sexp (sgml-dtd-dependencies dtd))))
+    (sgml-code-sexp (sgml-dtd-notations dtd))))
+
 
 ;;;; Save DTD
 
@@ -903,8 +900,9 @@ FORMS should produce the binary coding of element in VAR."
   (when (equal file (buffer-file-name))
     (error "Would clobber current file"))
   (sgml-need-dtd)
-  (sgml-write-dtd (sgml-pstate-dtd sgml-buffer-parse-state)
-		  file)
+  (sgml-push-to-entity (sgml-make-entity "#SAVE" nil ""))
+  (sgml-write-dtd sgml-dtd-info file)
+  (sgml-pop-entity)
   (setq sgml-default-dtd-file
 	(if (equal (expand-file-name default-directory)
 		   (file-name-directory file))
@@ -913,20 +911,13 @@ FORMS should produce the binary coding of element in VAR."
   (setq sgml-loaded-dtd file))
 
 (defun sgml-write-dtd (dtd file)
-  "Save the parsed dtd on FILE."
-  (let ((tem (generate-new-buffer " *savedtd*"))
-	(cb (current-buffer)))
-    (unwind-protect
-	(progn
-	  (set-buffer tem)
-	  (erase-buffer)
-	  (insert
-	   ";;; This file was created by psgml on " (current-time-string) "\n"
-	   "(sgml-saved-dtd-version 5)\n")
-	  (sgml-code-dtd dtd)
-	  (write-region (point-min) (point-max) file)
-	  (set-buffer cb))
-      (kill-buffer tem))))
+  "Save the parsed dtd on FILE.
+Construct the binary coded DTD (bdtd) in the current buffer."
+  (insert
+   ";;; This file was created by psgml on " (current-time-string) "\n"
+   "(sgml-saved-dtd-version 6)\n")
+  (sgml-code-dtd dtd)
+  (write-region (point-min) (point-max) file))
 
 
 ;;; psgml-dtd.el ends here
