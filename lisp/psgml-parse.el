@@ -367,27 +367,164 @@ If this is not possible, but all DFAS are final, move by TOKEN in NEXT."
          (sgml-state-final-p (sgml-&state-next state)))))
 
 
-;;;; List of attributes
-;;; An attribute is <name, declared-value, default-value>
+;;;; Attribute Types
 
-(defun sgml-make-attribute (name dcl-value default-value)
+;;; Basic Types
+;; name = symbol	attribute names are lisp symbols
+;; attval = string	attribute values are lisp strings
+
+;;; Attribute Declaration Type 
+;; attdecl = <name, declared-value, default-value>
+
+;; This is the result of the ATTLIST declarations in the DTD.
+;; All attribute declarations for an element is the elements
+;; attlist.
+
+;;; Attribute Declaration Operations
+;; sgml-make-attdecl: name declared-value default-value -> attdecl
+;; sgml-attdecl-name: attdecl -> name
+;; sgml-attdecl-declared-value: attdecl -> decl-value
+;; sgml-attdecl-default-value: attdecl -> default-value
+
+;;; Attribute Declaration List Type
+;; attlist = attdecl*
+
+;;; Attribute Declaration List Operations
+;; sgml-lookup-attdecl: name x attlist -> attspec
+
+;;; Declared Value Type
+;; declared-value = (token-group | notation | simpel)
+;; token-group = nametoken+
+;; notation = nametoken+
+;; simple = symbol		lisp symbol correspoinding to SGML type
+
+;;; Declared Value Operations
+;; sgml-declared-value-token-group: declared-value -> list of symbols
+;; sgml-declared-value-notation: declared-value -> list of symbols
+;; (empty list if not token-group/notation)
+
+;;; Default Value Type
+;; default-value = (required | implied | conref | specified )
+;; implied, conref = constant symbol
+;; specified = (fixed | normal)
+;; fixed, normal = attval
+
+;;; Default Value Operations
+;; sgml-default-value-attval: default-value -> (attval | nil)
+;; sgml-default-value-type-p: type x default-value -> cond
+
+;;; Attribute Specification Type
+;; attspec = <name, attval>
+
+;; This is the result of parsing an attribute specification.
+
+;; sgml-make-attspec: name x attval -> attspec
+;; sgml-attspec-name: attspec -> name
+;; sgml-attspec-attval: attspec -> attval
+
+
+;;; Attribute Specification List Type
+;; asl = attspec*
+
+;; aka. attribute value list
+
+
+;;; Code
+
+;;; attdecl representation = (name declared-value default-value)
+
+(defun sgml-make-attdecl (name dcl-value default-value)
   (list name dcl-value default-value))
 
-(defun sgml-attribute-name (attrib)
-  (car attrib))
+(defun sgml-attdecl-name (attdecl)
+  (car attdecl))
 
-(defun sgml-attribute-declared-value (attrib)
-  "The declared value of ATTRIB.
+(defun sgml-attdecl-declared-value (attdecl)
+  "The declared value of ATTDECL.
 It may be a symbol or (name-token-group (NAME1 ... NAMEn))
 or (notation  (NOT1 ... NOTn))"
-  (cadr attrib))
+  (cadr attdecl))
 
-(defun sgml-attribute-default-value (attrib)
-  "The default value of ATTRIB.
+(defun sgml-attdecl-default-value (attdecl)
+  "The default value of ATTDECL.
 The default value is either a symbol (required | implied | current |
 conref) or a list with first element nil or symbol 'fixed' and second
 element the value."
-  (caddr attrib))
+  (caddr attdecl))
+
+
+;;; attlist representation = (attspec*)
+
+(defun sgml-lookup-attdecl (name attlist)
+  "Return the attribute declaration for NAME in ATTLIST."
+  (assq name attlist))
+
+
+;;; declared-value representation
+;; token-group = (name-token (symbol+))
+;; notation = (notation (symbol+))
+;; simple = symbol		lisp symbol correspoinding to SGML type
+
+(defun sgml-make-declared-value (type &optional names)
+  "Make a declared-value of TYPE.
+TYPE should be a symbol.  If TYPE is name-token-group or notation
+NAMES should be a list of symbols."
+  (if (consp names)
+      (list type names)
+    type))
+
+(defun sgml-declared-value-token-group (declared-value)
+  "Return the name token group for the DECLARED-VALUE.
+This applies to name token groups.  For other declared values nil is
+returned."
+  (and (consp declared-value)
+       (eq 'name-token-group (car declared-value))
+       (cadr declared-value)))
+
+(defun sgml-declared-value-notation (declared-value)
+  "Return the list of notation names for the DECLARED-VALUE.
+This applies to notation declared value.  For other declared values
+nil is returned."
+  (and (consp declared-value)
+       (eq 'notation (car declared-value))
+       (cadr declared-value)))
+
+;;; default-value representation = symbol | ((nil | 'fixed) attval)
+
+(defun sgml-make-default-value (type &optional attval)
+  (if attval
+      (list type attval)
+    type))
+
+(defun sgml-default-value-attval (default-value)
+  "Return the actual default value of the declared DEFAULT-VALUE.
+The actual value is a string. Return nil if no actual value."
+  (and (consp default-value)
+       (cadr default-value)))
+
+(defun sgml-default-value-type-p (type default-value)
+  (or (eq type default-value)
+      (and (consp default-value)
+	   (eq type (car default-value)))))
+
+
+;;; attspec representation = (symbol . string)
+
+(defun sgml-make-attspec (name attval)
+  "Create an attspec from NAME and ATTVAL."
+  (cons name attval))
+
+;; sgml-attspec-name: attspec -> name
+(defun sgml-attspec-name (attspec)
+  (car attspec))
+
+;; sgml-attspec-attval: attspec -> attval
+(defun sgml-attspec-attval (attspec)
+  "Return the value of attribute specification ATTSPEC.
+If ATTSPEC is nil, nil is returned."
+  (cdr attspec))
+
+;;; avl representaion = (attspec*)
 
 
 ;;;; Element content types
@@ -461,10 +598,10 @@ element the value."
       (push bp sgml-element-map)))
     (while attlist			; Find any conref attribute
       (cond				; and set conref regexp
-       ((eq (sgml-attribute-default-value (car attlist))
+       ((eq (sgml-attdecl-default-value (car attlist))
 	    'conref)
 	(setf (element-conref-regexp (cdr bp))
-	      (format "\\b%s[ \t\r\n]*=" (sgml-attribute-name (car attlist))))
+	      (format "\\b%s[ \t\r\n]*=" (sgml-attdecl-name (car attlist))))
 	(setq attlist nil))
        (t
 	(setq attlist (cdr attlist)))))
@@ -481,7 +618,7 @@ element the value."
 	(make-element :name name :model sgml-any))))
 
 (defun sgml-start-tag-of (element)
-  "Return the start tag for ELEMENT (token or element)."
+  "Return the start-tag for ELEMENT (token or element)."
   (format "<%s>"
 	  (if (vectorp element)
 	      (if (element-p element)
@@ -490,7 +627,7 @@ element the value."
 	    element)))
 
 (defun sgml-end-tag-of (element)
-  "Return the end tag for ELEMENT (token or element)."
+  "Return the end-tag for ELEMENT (token or element)."
   (format "</%s>"
 	  (if (vectorp element)
 	      (if (element-p element)
@@ -667,8 +804,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   element				; element object
   start					; start point in buffer
   end					; end point in buffer
-  stag-len				; length of start tag
-  etag-len				; length of end tag
+  stag-len				; length of start-tag
+  etag-len				; length of end-tag
   parent				; parent tree
   level					; depth of this node
   excludes				; current excluded elements
@@ -697,8 +834,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (sgml-alias-fields sgml-tree sgml-element
   eltype				; element object
   start					; start point in buffer
-  stag-len				; length of start tag
-  etag-len				; length of end tag
+  stag-len				; length of start-tag
+  etag-len				; length of end-tag
   parent				; parent tree
   level					; depth of this node
   excludes				; current excluded elements
@@ -725,7 +862,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (element-attlist (sgml-tree-element element)))
 
 (defun sgml-element-stag-end (element)
-  "Position after start tag of ELEMENT."
+  "Position after start-tag of ELEMENT."
   (+ (sgml-tree-start element)
      (sgml-tree-stag-len element)))
 
@@ -920,7 +1057,7 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
     (while ex
       (setq elems (delq (car ex) elems))
       (setq ex (cdr ex)))
-    ;; Check for omitable start tags
+    ;; Check for omitable start-tags
     (when (and sgml-omittag-transparent
 	       (not (sgml-final-p state))
 	       req
@@ -961,6 +1098,23 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	       (sgml-element-etag-optional sgml-current-tree))
 	  (sgml-required-tokens
 	   (sgml-tree-pstate sgml-current-tree))))))
+
+(defun sgml-current-list-of-endable-elements ()
+  (let* ((elems nil)
+	 (tree sgml-current-tree)
+	 (state sgml-current-state))
+    (while
+	(and (sgml-final-p state)
+	     (not (eq tree sgml-top-tree))
+	     (progn
+	       (setq elems
+		     (nconc elems
+			    (list (element-name (sgml-tree-element tree))))) 
+	       sgml-omittag)
+	     (element-etag-optional (sgml-tree-element tree)))
+      (setq state (sgml-tree-pstate tree)
+	    tree (sgml-tree-parent tree)))
+    elems))
 
 (defun sgml-stags-of-names (names)
   (mapcar (function sgml-start-tag-of) names))
@@ -1519,8 +1673,7 @@ a RNI must be followed by NAME."
 (defun sgml-parse-attribute-specification-list (&optional element)
   "Parse an attribute specification list.
 Optional argument ELEMENT, is used to resolve omitted name=.
-Returns a list ((name val) ...).
-Where name is a symbol and val is a string."
+Returns a list of attspec (attribute specification)."
   (let (name val asl)
     (while (setq name (progn (sgml-skip-s)
 			     (sgml-parse-nametoken-string)))
@@ -1529,15 +1682,19 @@ Where name is a symbol and val is a string."
 	     (setq val (sgml-parse-attribute-value-specification)))
 	    ((null element)
 	     (sgml-parse-error "Expecting a ="))
-	    ((setq name (sgml-find-name-for-value (setq val name)
-						  element)))
+	    ((progn
+	       (unless sgml-shorttag
+		 (sgml-log-warning
+		  "Must have attribute name when SHORTTAG NO"))
+	       (setq name (sgml-find-name-for-value (setq val name)
+						      element))))
 	    (t
 	     (sgml-log-warning
 	      "%s is not in any name group for element %s."
 	      val
 	      (sgml-element-name element))))
       (when (not (null name))
-	(push (list (sgml-gname-symbol name) val) asl)))
+	(push (sgml-make-attspec (sgml-gname-symbol name) val) asl)))
     asl))
 
 (defun sgml-parse-attribute-value-specification ()
@@ -1553,12 +1710,12 @@ VALUE is a string.  Returns nil or a string."
   (let ((al (sgml-element-attlist element))
 	dv)
     (while (and al
-		(or (atom (setq dv (sgml-attribute-declared-value (car al))))
-		    (not (eq (car dv) 'name-token-group))
-		    (not (memq value (cadr dv)))))
+		(or (atom (setq dv (sgml-attdecl-declared-value (car al))))
+		    (not (memq value
+			       (sgml-declared-value-token-group dv)))))
       (setq al (cdr al)))
     (if al
-	(symbol-name (sgml-attribute-name (car al))))))
+	(symbol-name (sgml-attdecl-name (car al))))))
 
 ;;;; Parser driver
 
@@ -1666,10 +1823,12 @@ or if nil, until end of buffer."
       (cond
        ((and (sgml-parse-char ?/)
 	     (or (sgml-startnm-char-next)
-		 (eq ?> (following-char)))) ; empty end tag
+		 (and (eq ?> (following-char))
+		      sgml-shorttag)))	; empty end-tag
 	(sgml-parse-end-tag))
        ((or (sgml-startnm-char-next)
-	    (eq ?> (following-char)))	; empty start tag
+	    (and sgml-shorttag
+		 (eq ?> (following-char)))) ; empty start-tag
 	(sgml-parse-start-tag))
        ((memq (following-char) '(?! ??))
 	(forward-char -1)
@@ -1696,7 +1855,7 @@ or if nil, until end of buffer."
 	       (> goal (sgml-tree-start (sgml-tree-next u))))
 	  (setq u (sgml-tree-next u)))
 	 ((and (sgml-tree-end u)
-	       (if (> (sgml-tree-etag-len u) 0) ; if threre is an end tag
+	       (if (> (sgml-tree-etag-len u) 0) ; if threre is an end-tag
 		   (>= goal (sgml-tree-end u))  ; precisely after is after
 		 (> goal (sgml-tree-end u))))   ; else it could possibly
 					      ; becom part of the element
@@ -1713,8 +1872,8 @@ or if nil, until end of buffer."
   ;; Assume point after <
   (setq sgml-markup-type 'start-tag)
   (let* ((gi
-	  (if (eq ?> (following-char))	; empty start tag
-	      (if sgml-omittag ; if omittag use current open element
+	  (if (eq ?> (following-char))	; empty start-tag
+	      (if sgml-omittag		; if omittag use current open element
 		  (if (eq sgml-current-tree sgml-top-tree)
 		      sgml-document-element ; or document element if
 					; no element is open
@@ -1726,24 +1885,26 @@ or if nil, until end of buffer."
       (unless (search-forward-regexp
 	       "\\([^\"'<>/]\\|\"[^\"]*\"\\|'[^']*'\\)*"
 	       nil t)
-	(sgml-error "Invalid start tag"))
-      (or (sgml-parse-char ?>)
-	  (eq ?< (following-char))
-	  (if (sgml-parse-char ?/)
-	      (setq net-enabled t))
-	  (sgml-parse-error "Invalid character in markup %c"
-			    (following-char))))
+	(sgml-error "Invalid start-tag"))
+      (or
+       (if (sgml-parse-char ?/)
+	   (prog1 (setq net-enabled t)
+	     (or sgml-shorttag
+		 (sgml-log-warning
+		  "NET enabling start-tag is not allowed with SHORTTAG NO"))))
+       (sgml-check-tag-close)))
     (while				; Until token accepted
 	(cond
-	 ((memq gi (sgml-excludes))
+	 ((memq gi (sgml-excludes))	;*** can excluded tags imply
+					;start-tags?
 	  (sgml-log-warning "Excluded element %s" gi)
 	  nil)
 	 ((eq sgml-current-state sgml-any) nil)
-	 ((memq gi (sgml-includes)) nil)
 	 ((setq temp (sgml-get-move sgml-current-state gi))
 	  (setq sgml-current-state temp)
 	  nil)
-	 ((sgml-do-implied (format "%s start tag" gi)))))
+	 ((memq gi (sgml-includes)) nil)
+	 ((sgml-do-implied (format "%s start-tag" gi)))))
     (sgml-open-element gi sgml-markup-start (point))
     (when net-enabled
       (setf (sgml-tree-net-enabled sgml-current-tree) t))))
@@ -1775,29 +1936,43 @@ or if nil, until end of buffer."
 (defun sgml-parse-end-tag ()
   "Assume point after </ or at / in a NET"
   (setq sgml-markup-type 'end-tag)
-  (let ((gi (if (or (sgml-parse-char ?>) ; empty end tag
-		    (sgml-parse-char ?/)) ; net
-		(sgml-element-name sgml-current-tree)
-	      (prog1 (sgml-check-name)
-		(sgml-skip-s)
-		(or (eq ?< (following-char))	;unclosed end tag
-		    (sgml-check-char ?>))))))
-    (while
-	(progn
-	  (unless (sgml-final-p sgml-current-state)
-	    (sgml-log-warning
-	     "%s element can't end here, need one of %s; %s end tag out of context"
-	     (sgml-element-name sgml-current-tree)
-	     (sgml-required-tokens sgml-current-state)
-	     gi))
-	  (when (eq sgml-current-tree sgml-top-tree)
-	    (sgml-error
-	     "%s end tag ended document and parse" gi))
-	  (not (eq gi (sgml-element-name sgml-current-tree))))
-      (sgml-implied-end-tag (format "%s end tag" gi)
-			    sgml-markup-start sgml-markup-start))
-    (sgml-close-element sgml-markup-start (point))))
+  (let ((gi "Null")			; Name of element to end or "NET"
+	found)				; Set to true when found element to end
+    (cond ((sgml-parse-char ?>)		; empty end-tag
+	   (setq gi (sgml-element-name sgml-current-tree)))
+	  ((sgml-parse-char ?/))	; NET
+	  (t
+	   (setq gi (prog1 (sgml-check-name)))
+	   (sgml-skip-s)
+	   (sgml-check-tag-close)))
+    (while (not found)
+      (unless (sgml-final-p sgml-current-state)
+	(sgml-log-warning
+	 "%s element can't end here, need one of %s; %s end-tag out of context"
+	 (sgml-element-name sgml-current-tree)
+	 (sgml-required-tokens sgml-current-state)
+	 gi))
+      (when (eq sgml-current-tree sgml-top-tree)
+	(sgml-error
+	 "%s end-tag ended document and parse" gi))
+      (setq found (or (eq gi (sgml-element-name sgml-current-tree))
+		      (and (stringp gi)
+			   (eq t (sgml-tree-net-enabled sgml-current-tree)))))
+      (unless found
+	(sgml-implied-end-tag (format "%s end-tag" gi)
+			      sgml-markup-start sgml-markup-start))))
+  (sgml-close-element sgml-markup-start (point)))
 
+(defun sgml-check-tag-close ()
+  (or
+   (sgml-parse-char ?>)
+   (if (eq ?< (following-char))		; Unclosed tag
+       (or sgml-shorttag
+	   (sgml-log-warning
+	    "Unclosed tag is not allowed with SHORTTAG NO")))
+   (sgml-error "Invalid character in markup %c"
+	       (following-char))))
+  
 (defun sgml-do-implied (type &optional temp)
   (cond
    ((sgml-final-p sgml-current-state)
@@ -1808,9 +1983,10 @@ or if nil, until end of buffer."
     (setq sgml-current-state
 	  (sgml-get-move sgml-current-state (car temp)))
     (sgml-open-element (car temp) sgml-markup-start sgml-markup-start)
-    (unless (sgml-element-stag-optional sgml-current-tree)
+    (unless (and sgml-omittag
+		 (sgml-element-stag-optional sgml-current-tree))
       (sgml-log-warning
-       "%s start tag implied by %s; not minimizable"
+       "%s start-tag implied by %s; not minimizable"
        (car temp) type))
     t)
    (t (sgml-log-warning "%s out of context" type)
@@ -1821,9 +1997,11 @@ or if nil, until end of buffer."
 	 (unless (eobp)
 	   (sgml-error
 	    "document ended by %s" type)))
-	((not (sgml-element-etag-optional sgml-current-tree))
+	((not
+	  (and sgml-omittag
+	       (sgml-element-etag-optional sgml-current-tree)))
 	 (sgml-log-warning
-	  "%s end tag implied by %s; not minimizable"
+	  "%s end-tag implied by %s; not minimizable"
 	  (sgml-element-name sgml-current-tree)
 	  type)))
   (sgml-close-element start end))
@@ -2004,29 +2182,53 @@ Returns parse tree; error if no element after POS."
 				   (and (null (cdr tab)) (caar tab)))))))
 	(t
 	 (read-from-minibuffer prompt))))
+
+(defun sgml-element-attribute-specification-start (element)
+  "Return the attribute specification list start for ELEMENT.
+This nil for elements with omitted start-tag or empty start-tag."
+  (cond
+   ((> (sgml-element-stag-len element)	; has proper start tag?
+       2)
+    (save-excursion
+      (sgml-with-parser-syntax
+       (goto-char (sgml-element-start element))       
+       (forward-char 1)
+       (sgml-check-name)
+       (point))))))
+
+(defun sgml-element-attribute-specification-list (element)
+  "Return the attribute specification list for ELEMENT.
+This is a list of (attname value) lists."
+  (let ((start (sgml-element-attribute-specification-start element)))
+    (and start
+	 (save-excursion
+	   (goto-char start)
+	   (sgml-with-parser-syntax
+	    (sgml-parse-attribute-specification-list element))))))
+
 
 ;;;; SGML mode: structure editing
 
 (defun sgml-beginning-of-element ()
-  "Move to after the start tag of the current element.
-If the start tag is implied, move to the start of the element."
+  "Move to after the start-tag of the current element.
+If the start-tag is implied, move to the start of the element."
   (interactive)
   (goto-char (sgml-element-stag-end (sgml-find-context-of (point)))))
 
 (defun sgml-end-of-element ()
-  "Move to before the end tag of the current element."
+  "Move to before the end-tag of the current element."
   (interactive)
   (goto-char (sgml-element-etag-start (sgml-find-context-of (point)))))
 
 (defun sgml-backward-up-element ()
   "Move backward out of this element level.
-That is move to before the start tag or where a start tag is implied."
+That is move to before the start-tag or where a start-tag is implied."
   (interactive)
   (goto-char (sgml-element-start (sgml-find-context-of (point)))))
 
 (defun sgml-up-element ()
   "Move forward out of this element level.
-That is move to after the end tag or where an end tag is implied."
+That is move to after the end-tag or where an end-tag is implied."
   (interactive)
   (goto-char (sgml-element-end (sgml-find-context-of (point)))))
 
@@ -2237,9 +2439,9 @@ is determined."
 (defun sgml-next-trouble-spot ()
   "Move forward to next point where something is amiss with the structure."
   (interactive)
-  (sgml-parse-to-here)
   (push-mark)
   (sgml-note-change-at (point))		; Prune the parse tree
+  (sgml-parse-to-here)
   (let ((sgml-throw-on-warning 'trouble))
     (or (catch sgml-throw-on-warning
 	  (sgml-parse-until-end-of nil))
@@ -2278,22 +2480,132 @@ is determined."
 	     (cond ((eq el sgml-top-tree)
 		    "outside document element")
 		   ((< (point) (sgml-element-stag-end el))
-		    "start tag")
+		    "start-tag")
 		   ((>= (point) (sgml-element-etag-start el))
-		    "end tag")
+		    "end-tag")
 		   (t
 		    "content"))
 	     (sgml-element-context-string el))))
 
-;;;; SGML mode: inserting
+;;;; SGML mode: keyboard inserting
 
-(defun sgml-doctype-insert (doctype saved-dtd)
-  (when doctype
-    (sgml-insert-markup doctype))
-  (when saved-dtd
-    (setq sgml-default-dtd-file saved-dtd)
-    (sgml-set-local-variable 'sgml-default-dtd-file saved-dtd))
-  (setq sgml-top-tree nil))
+(defun sgml-insert-tag (tag &optional silent no-nl-after)
+  "Insert a tag, reading tag name in minibuffer with completion.
+If the variable sgml-balanced-tag-edit is t, also inserts the
+corresponding end tag. If sgml-leave-point-after-insert is t, the point
+is left after the inserted tag(s), unless the element has som required
+content.  If sgml-leave-point-after-insert is nil the point is left
+after the first tag inserted."
+  (interactive 
+   (list
+    (completing-read "Tag: " (sgml-completion-table) nil t "<" )))
+  ;; 
+  (sgml-parse-to-here)
+  (unless (sgml-current-element-contains-data)
+    (skip-chars-backward " \t")
+    (unless (bolp)
+      (insert "\n")))
+  (insert tag)
+  (sgml-indent-line)  
+  (unless no-nl-after
+    (save-excursion
+      (sgml-parse-to-here)
+      (unless (sgml-current-element-contains-data)
+	(unless (eolp)
+	  (insert "\n")))))
+  (or silent (sgml-show-context)))
+
+(defun sgml-insert-element (name &optional after silent)
+  "Reads element name from minibuffer and inserts start and end tags."
+  (interactive (list (sgml-read-element-name "Element: ")
+		     sgml-leave-point-after-insert))
+  (let (stag-end			; position after start tag
+	element				; inserted element
+	(sgml-suppress-warning t))
+    (when (and name (not (equal name "")))
+      (sgml-insert-tag (sgml-start-tag-of name) 'silent 'no-nl-after)
+      (forward-char -1)
+      (setq element (sgml-find-element-of (point)))
+      (sgml-insert-attributes nil (sgml-element-attlist element))
+      (forward-char 1)
+      (setq stag-end (point))
+      (when (not (sgml-element-empty element))
+	(when (and sgml-auto-insert-required-elements
+		   (sgml-model-group-p sgml-current-state))
+	  (let (tem newpos)
+	    (while (and (setq tem (sgml-required-tokens sgml-current-state))
+			(null (cdr tem)))
+	      (setq tem (sgml-insert-element (car tem) t t))
+	      (setq newpos (or newpos tem))
+	      (sgml-parse-to-here))
+	    (when tem			; more than one req elem
+	      (insert (format "\n<!-- one of %s -->" tem))
+	      (sgml-indent-line nil element))
+	    (if newpos (setq stag-end newpos))))
+	(sgml-insert-tag (sgml-end-tag-of name) 'silent)
+	(unless after (goto-char stag-end))
+	(unless silent (sgml-show-context)))
+      stag-end)))
+
+(defun sgml-tag-region (element start end)
+  "Reads element name from minibuffer and inserts start and end tags."
+  (interactive
+   (list
+    (save-excursion (goto-char (region-beginning))
+		    (sgml-read-element-name "Tag region with element: "))
+    (region-beginning)
+    (region-end)))
+  (save-excursion
+    (when (and element (not (equal element "")))
+      (goto-char end)
+      (insert (sgml-end-tag-of element))
+      (goto-char start)
+      (sgml-insert-tag (sgml-start-tag-of element)))))
+
+(defun sgml-insert-attributes (avl attlist)
+  "Insert the attributes with values AVL and declarations ATTLIST.
+AVL should be a assoc list mapping symbols to strings."
+  (let (name val dcl def tem)
+    (loop for attspec in attlist do
+	  (setq name (sgml-attspec-name attspec)
+		val (cdr-safe (assq name avl))
+		dcl (sgml-attdecl-declared-value attspec)
+		def (sgml-attdecl-default-value attspec))
+	  (unless val			; no value given
+	    ;; Supply the default value if a value is needed
+	    (cond ((sgml-default-value-type-p 'required def)
+		   (setq val "#REQUIRED"))
+		  ((and (not (or sgml-omittag sgml-shorttag))
+			(consp def))
+		   (setq val (cadr def)))))
+	  (cond 
+	   ((null val))			; Ignore
+	   ;; Ignore attributes with default value
+	   ((and (consp def)		
+		 (eq sgml-minimize-attributes 'max)
+		 (or sgml-omittag sgml-shorttag)
+		 (equal val (cadr def))))
+	   ;; No attribute name for token groups
+	   ((and sgml-minimize-attributes sgml-shorttag
+		 (memq (sgml-gname-symbol val)
+		       (sgml-declared-value-token-group dcl)))
+	    (insert " " val))
+	   (t
+	    (insert " " (symbol-name name) "="
+		    (sgml-quote-attribute-value val)))))))
+
+(defun sgml-quote-attribute-value (value)
+  "Add quotes to the string VALUE unless minimization is on."
+  (let ((quote ""))
+	(cond ((and (not sgml-always-quote-attributes)
+		    sgml-shorttag
+		    (string-match "^[.A-Za-z0-9---]+$" value))
+	       ) ; no need to quote
+	      ((not (string-match "\"" value)) ; can use "" quotes
+	       (setq quote "\""))
+	      (t			; use '' quotes
+	       (setq quote "'")))
+	(concat quote value quote)))
 
 (defun sgml-completion-table (&optional avoid-tags-in-cdata)
   (sgml-parse-to-here)
@@ -2305,15 +2617,8 @@ is determined."
 	 (sgml-message "%s" sgml-current-state)
 	 nil)))
 
-(defun sgml-name-of (tag)
-  "Name of tag"
-  (and (listp tag) (setq tag (car tag)))
-  (substring tag
-	     (if (eq (aref tag 1) ?/) 2 1)
-	     -1))
-
 (defun sgml-insert-end-tag ()
-  "Insert end tag for the current open element."
+  "Insert end-tag for the current open element."
   (interactive "*")
   (sgml-parse-to-here)
   (cond
@@ -2333,17 +2638,11 @@ is determined."
 		      (sgml-end-tag-of sgml-current-tree))))
       (sgml-indent-line)))))
 
-(defun sgml-insert-tag ()
-  "Insert a tag, reading tag name in minibuffer with completion.
-If the variable sgml-balanced-tag-edit is t, also inserts the
-corresponding end tag. If sgml-leave-point-after-insert is t, the point
-is left after the inserted tag(s), unless the element has som required
-content.  If sgml-leave-point-after-insert is nil the point is left
-after the first tag inserted."
-  (interactive "*")
-  (sgml-tags-menu nil t))
 
-(defun sgml-tags-menu (event &optional nomenu)
+
+;;;; SGML mode: Menu inserting
+
+(defun sgml-tags-menu (event)
   "Pop up a menu with valid tags and insert the choosen tag.
 If the variable sgml-balanced-tag-edit is t, also inserts the
 corresponding end tag. If sgml-leave-point-after-insert is t, the point
@@ -2352,105 +2651,66 @@ content.  If sgml-leave-point-after-insert is nil the point is left
 after the first tag inserted."
   (interactive "*e")
   (let ((end (sgml-mouse-region)))
-    (sgml-ask-and-insert-tags event nomenu (point) end)))
-
-(defun sgml-ask-and-insert-tags (event &optional nomenu start end)
-  (let* ((tab (sgml-completion-table))
-	 (data (sgml-current-element-contains-data))
-	 
-	 tag				; tag to insert
-	 element			; the element of the inserted tag
-	 )
-    (cond ((null tab)			;Nothing to insert?
-	   (error "No tags available"))
-	  ;;((null (cdr tab))		;Only one
-	  ;; (setq tag (caar tab)))
-	  (nomenu
-	   (setq tag (completing-read "Tag: " tab nil t "<" )))
-	  (t
-	   (setq tag (x-popup-menu event
-				   (sgml-split-menu "Tags" tab)))))
-    (unless tag
-      (error "Menu abort"))
     (cond
-     ((and start end)
-      (sgml-tag-region (sgml-name-of tag) start end))
+     (end
+      (sgml-tag-region (sgml-menu-ask event 'element) (point) end))
      (sgml-balanced-tag-edit
-      (sgml-insert-element (sgml-name-of tag)))
+      (sgml-insert-element (sgml-menu-ask event 'element)))
      (t
-      (setq element (sgml-lookup-element (sgml-name-of tag)))
-      (unless (or data (bolp)) (insert "\n"))
-      (unless (or data (looking-at "\\s-*$")) (open-line 1))
-      (when (and (prog1 (bolp)
-		   (insert tag))
-		 (if data sgml-indent-data t))
-	(sgml-indent-line))))))
+      (sgml-insert-tag (sgml-menu-ask event 'tags))))))
 
-(defun sgml-insert-element (name &optional after silent)
-  "Reads element name from minibuffer and inserts start and end tags."
-  (interactive
-   (list
-    (sgml-read-element-name "Element: ")
-    sgml-leave-point-after-insert))
-  (let ((inel (sgml-parse-to-here))	; element inserting in
-	(data (sgml-current-element-contains-data))
-	stag-end element
-	col)
-    (when (and name (not (equal name "")))
-      (cond ((and sgml-indent-data data
-		  (save-excursion
-		    (skip-chars-backward " \t")
-		    (and (bolp)
-			 (looking-at "\\s-*$"))))
-	     (delete-horizontal-space))
-	    ((not data)
-	     (skip-chars-backward " \t")
-	     (unless (looking-at "\\s-*$") (open-line 1))
-	     (delete-horizontal-space)
-	     (unless (bolp) (insert "\n"))
-	     ))
-      (when (prog1 (bolp)
-	      (insert (format "<%s>" name)))
-	(setq col (sgml-indent-line)))
-      (setq stag-end (point))
-      (setq element (sgml-find-element-of (1- (point))))
-      (when (not (sgml-element-empty element))
-	(when (and sgml-auto-insert-required-elements
-		   (sgml-model-group-p sgml-current-state))
-	  (let (tem
-		newpos
-		(sgml-suppress-warning t))
-	    (while (and (setq tem (sgml-required-tokens sgml-current-state))
-			(null (cdr tem)))
-	      (setq tem (sgml-insert-element (car tem) t t))
-	      (setq newpos (or newpos tem))
-	      (sgml-parse-to-here))
-	    (when tem			; more than one req elem
-	      (insert (format "\n<!-- one of %s -->" tem))
-	      (sgml-indent-line nil element))
-	    (if newpos (setq stag-end newpos))))
-	(when (and col (not (sgml-element-data-p element)))
-	  (insert "\n")
-	  (sgml-indent-line col))
-	(insert (format "</%s>" name))
-	(unless after (goto-char stag-end))
-	(unless silent (sgml-show-context)))
-      stag-end)))
+(defun sgml-element-menu (event)
+  "Pop up a menu with valid elements and insert choice.
+If sgml-leave-point-after-insert is nil the point is left after the first 
+tag inserted."
+  (interactive "*e")
+  (sgml-insert-element (sgml-menu-ask event 'element)))
 
-(defun sgml-tag-region (element start end)
-  "Reads element name from minibuffer and inserts start and end tags."
-  (interactive
-   (list
-    (save-excursion (goto-char (region-beginning))
-		    (sgml-read-element-name "Tag region with element: "))
-    (region-beginning)
-    (region-end)))
-  (save-excursion
-    (when (and element (not (equal element "")))
-      (goto-char end)
-      (insert (sgml-end-tag-of element))
-      (goto-char start)
-      (insert (sgml-start-tag-of element)))))
+(defun sgml-start-tag-menu (event)
+  "Pop up a menu with valid start-tags and insert choice."
+  (interactive "*e")
+  (sgml-insert-tag (sgml-menu-ask event 'start-tag)))
+
+(defun sgml-end-tag-menu (event)
+  "Pop up a menu with valid end-tags and insert choice."
+  (interactive "*e")
+  (sgml-insert-tag (sgml-menu-ask event 'end-tag)))
+
+(defun sgml-tag-region-menu (event)
+  "Pop up a menu with valid elements and tag current region with the choice."
+  (interactive "*e")
+  (sgml-tag-region (sgml-menu-ask event 'element)
+		   (region-beginning)
+		   (region-end)))
+
+
+(defun sgml-menu-ask (event type)
+  (sgml-parse-to-here)
+  (let (tab
+	(title (symbol-name type)))
+    (cond
+     ((eq type 'element)
+	   (setq tab
+		 (mapcar (function symbol-name)
+			  (sgml-current-list-of-valid-elements))))
+     (t
+      (unless (eq type 'start-tag)
+	(setq tab
+	      (mapcar (function sgml-end-tag-of)
+		      (sgml-current-list-of-endable-elements))))
+      (unless (eq type 'end-tag)
+	(setq tab
+	      (nconc tab
+		     (mapcar (function sgml-start-tag-of)
+			     (sgml-current-list-of-valid-elements)))))))
+    (or tab
+	(error "No valid %s at this point" type))
+    (or
+     (x-popup-menu event
+		   (sgml-split-menu title
+				   (mapcar (function (lambda (x) (cons x x)))
+					   tab)))
+     (signal 'quit nil))))
 
 (defun sgml-entities-menu (event)
   (interactive "*e")
@@ -2478,6 +2738,14 @@ after the first tag inserted."
 					    sgml-max-menu-size)))
 		   (setq menu (nthcdr sgml-max-menu-size menu)))))))
     (cons title menus)))
+
+(defun sgml-doctype-insert (doctype saved-dtd)
+  (when doctype
+    (sgml-insert-markup doctype))
+  (when saved-dtd
+    (setq sgml-default-dtd-file saved-dtd)
+    (sgml-set-local-variable 'sgml-default-dtd-file saved-dtd))
+  (setq sgml-top-tree nil))
 
 ;;;; SGML mode: Fill 
 
@@ -2567,7 +2835,7 @@ subelements."
 	(setq give-up (>= (current-column) prev-column)))))))
 
 
-;;;; SGML mode: attributes
+;;;; SGML mode: Attribute editing
 
 (defvar sgml-start-attributes nil)
 (defvar sgml-end-attributes nil)
@@ -2579,11 +2847,13 @@ subelements."
 Editing is done in a separate window."
   (interactive)
   (let* ((element (sgml-find-element-of (point)))
-	 (tag-beg (sgml-element-start element)))
+	 (tag-beg (sgml-element-start element))
+	 (start (sgml-element-attribute-specification-start element)))
+    (unless start
+      (error "Element has no attribute specification list"))
     (push-mark)
-    (goto-char (1+ tag-beg))
     (sgml-with-parser-syntax
-     (sgml-check-name)
+     (goto-char start)
      (let* ((start (point-marker))
 	    (asl (sgml-parse-attribute-specification-list element))
 	    (end (point-marker))
@@ -2637,38 +2907,38 @@ Editing is done in a separate window."
        ;; Produce text like
        ;;  name = value
        ;;  -- declaration : default --
-       (let* ((aname (sgml-attribute-name attr))
-	      (dcl-value (sgml-attribute-declared-value attr))
-	      (def-value (sgml-attribute-default-value attr))
+       (let* ((aname (sgml-attdecl-name attr))
+	      (dcl-value (sgml-attdecl-declared-value attr))
+	      (def-value (sgml-attdecl-default-value attr))
 	      (cur-value (assq aname asl)))
 	 (sgml-insert			; atribute name
 	  '(read-only t rear-nonsticky (read-only))
 	  " %s = " aname)
 	 (cond				; attribute value
-	  ((and (consp def-value)
-		(eq (car def-value) 'fixed))
-	   (sgml-insert '(read-only t
-				    category sgml-fixed
+	  ((sgml-default-value-type-p 'fixed def-value)
+	   (sgml-insert '(read-only t category sgml-fixed
 				    rear-nonsticky (category))
-			"#FIXED %s" (cadr def-value)))
+			"#FIXED %s"
+			(sgml-default-value-attval def-value)))
 	  ((and (null cur-value)
 		(or (memq def-value '(implied conref current))
-		    (consp def-value)))
+		    (sgml-default-value-attval def-value)))
 	   (sgml-insert '(category sgml-default rear-nonsticky (category))
 			"#DEFAULT"))
 	  ((not (null cur-value))
-	   (sgml-insert nil "%s" (cadr cur-value))))
+	   (sgml-insert nil "%s" (sgml-attspec-attval cur-value))))
 	 (sgml-insert
 	  '(read-only 1)
 	  "\n\t-- %s: %s --\n"
-	  (if (consp dcl-value)		; Declared value
-	      (if (eq (car dcl-value) 'notation)
-		  (format "NOTATION %s" (cadr dcl-value))
-		(cadr dcl-value))
-	    dcl-value)
-	  (if (consp def-value)		; Default value
-	      (cadr def-value)
-	    (concat "#" (upcase (symbol-name def-value)))))))
+	  (cond ((sgml-declared-value-token-group dcl-value))
+		((sgml-declared-value-notation dcl-value)
+		 (format "NOTATION %s"
+			 (sgml-declared-value-notation dcl-value)))
+		(t
+		 dcl-value))
+	  (cond ((sgml-default-value-attval def-value))
+		(t
+		 (concat "#" (upcase (symbol-name def-value))))))))
       (sgml-insert '(read-only t) ">")
       (goto-char (point-min))
       (sgml-edit-attrib-next))
@@ -2701,7 +2971,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
   "Finish editing and insert attribute values in original buffer."
   (interactive)
   (let ((cb (current-buffer))
-	(avl (sgml-attribute-value-list))
+	(avl (sgml-edit-attrib-specification-list))
 	;; save buffer local variables
 	(start sgml-start-attributes)
 	(end sgml-end-attributes)
@@ -2713,37 +2983,13 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
       (goto-char start)
       (unless (= start end)
 	(kill-region start end))
-      (let (name val def tem)
-	(while avl
-	  (setq name (caar avl)
-		val (cdar avl)
-		def (assq name attlist)
-		avl (cdr avl))
-	  (cond ((and def
-		      (eq sgml-minimize-attributes 'max)
-		      (if (listp (setq tem (sgml-attribute-default-value def)))
-			  (if (symbolp (setq tem (cadr tem)))
-			      (eq tem (intern val))
-			    (equal val tem)))))
-		((and def
-		      sgml-minimize-attributes
-		      (listp (setq tem (sgml-attribute-declared-value def)))
-		      (eq 'name-token-group (car tem))
-		      (if (memq (sgml-gname-symbol val) (cadr tem))
-			  (progn (insert " " val) t)
-			(sgml-log-warning
-			 "%s is not an allowed value for attribute %s"
-			 val name)
-			nil)))
-		(t
-		 (insert " " (symbol-name name) "="
-			 (sgml-quote-attribute-value val)))))))))
+      (sgml-insert-attributes avl attlist))))
 
-(defun sgml-attribute-value-list ()
+(defun sgml-edit-attrib-specification-list ()
   (goto-char (point-min))
   (forward-line 1)
   (sgml-with-parser-syntax
-   (let ((avl nil)
+   (let ((asl nil)
 	 (al sgml-attlist))
      (while (not (eq ?> (following-char)))
        (sgml-skip-s)
@@ -2751,17 +2997,18 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 	 (forward-char 3)
 	 (unless (memq (get-text-property (point) 'category)
 		       '(sgml-default sgml-fixed))
-	   (setq avl
-		 (cons (cons name
-			     (sgml-extract-attribute-value
-			      (sgml-attribute-declared-value (car al))))
-			   avl)))
+	   (push
+	    (sgml-make-attspec name
+			       (sgml-extract-attribute-value
+				(sgml-attdecl-declared-value (car al))))
+	    asl))
 	 (while (progn (beginning-of-line 2)
 		       (not (get-text-property (point) 'read-only)))))
 					; was (eq t)
        (forward-line 1)
        (setq al (cdr al)))
-     (reverse avl))))
+     asl)))
+
 
 (defun sgml-extract-attribute-value (type)
   (save-excursion
@@ -2779,17 +3026,6 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 	(while (search-forward "'" nil t) ; replace ' with char ref
 	  (replace-match "&#39;")))
       (buffer-string))))
-
-(defun sgml-quote-attribute-value (value)
-  (let ((quote ""))
-	(cond ((and (not sgml-always-quote-attributes)
-		    (string-match "^[.A-Za-z0-9---]+$" value))
-	       ) ; no need to quote
-	      ((not (string-match "\"" value)) ; can use "" quotes
-	       (setq quote "\""))
-	      (t			; use '' quotes
-	       (setq quote "'")))
-	(concat quote value quote)))
 
 (defun sgml-edit-attrib-default ()
   "Set current attribute value to default."
@@ -2886,7 +3122,7 @@ insted of the whole buffer."
 (defun sgml-normalize-content (element only-first)
   "Normalize all elements in a content where ELEMENT is first element.
 If sgml-normalize-trims is non-nil, trim off white space from ends of
-elements with omitted end tags."
+elements with omitted end-tags."
   (let ((content nil))
     (while element
       (push element content)
@@ -2898,7 +3134,7 @@ elements with omitted end tags."
       ;; Progress report
       (message "Normalizing %d%% left"
 	       (/ (* 100.0 (point)) (point-max)))
-      ;; Fix the end tag
+      ;; Fix the end-tag
       (unless (sgml-element-empty element)
 	(cond
 	 ((or (sgml-tree-net-enabled element)
@@ -2919,14 +3155,14 @@ elements with omitted end tags."
 	    (sgml-indent-line nil element)
 	    (beginning-of-line 1)))
 	 (t
-	  ;; End tag full, but check for unclosed end tag
+	  ;; End-Tag full, but check for unclosed end-tag
 	  (goto-char (1- (sgml-tree-end element)))
 	  (unless (looking-at ">")
 	    (skip-chars-backward " \t\n") ;*** Is this allways safe?
 	    (insert ">")))))
       ;; Fix tags of content
       (sgml-normalize-content (sgml-tree-content element) nil)
-      ;; Fix the start tag
+      ;; Fix the start-tag
       (goto-char (min (point) (sgml-tree-start element)))
       (cond ((or (zerop (sgml-tree-stag-len element))
 		 (= 2 (sgml-tree-stag-len element)))
@@ -2961,12 +3197,12 @@ If it is something else complete with ispell-complete-word."
     (setq c (char-after (1- (point))))
     (cond ((eq c ?&)			; entitiy
 	   (setq tab sgml-buffer-entities))
-	  ((eq c ?<)			; start tag
+	  ((eq c ?<)			; start-tag
 	   (save-excursion
 	     (backward-char 1)
 	     (sgml-parse-to-here)
 	     (setq tab (sgml-current-list-of-valid-elements))))
-	  ((eq c ?/)			; end tag
+	  ((eq c ?/)			; end-tag
 	   (save-excursion
 	     (backward-char 2)
 	     (sgml-parse-to-here)
@@ -3003,23 +3239,6 @@ If it is something else complete with ispell-complete-word."
 		   (display-completion-list list)))
 	       (message "Making completion list...%s" "done")))))))
 
-(defun sgml-current-list-of-endable-elements ()
-  (let* ((elems nil)
-	 (tree sgml-current-tree)
-	 (state sgml-current-state))
-    (while
-	(and (sgml-final-p state)
-	     (not (eq tree sgml-top-tree))
-	     (progn
-	       (setq elems
-		     (nconc elems
-			    (list (element-name (sgml-tree-element tree))))) 
-	       sgml-omittag-transparent)
-	     (element-etag-optional (sgml-tree-element tree)))
-      (setq state (sgml-tree-pstate tree)
-	    tree (sgml-tree-parent tree)))
-    elems))
-
 
 ;;;; SGML mode: menus
 
@@ -3041,6 +3260,7 @@ If it is something else complete with ispell-complete-word."
 		  ("Minimize attributes"
 		   . sgml-minimize-attributes)
 		  ("OMITTAG" . sgml-omittag)
+		  ("SHORTTAG" . sgml-shorttag)
 		  ;;("Debug" . sgml-debug)
 		  ))
        (indents '(("None" . nil) ("0" . 0) ("1" . 1) ("2" . 2) ("3" . 3)
