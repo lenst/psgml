@@ -1346,6 +1346,18 @@ Editing is done in a separate window."
 
 
 (defvar sgml-edit-attrib-mode-map (make-sparse-keymap))
+
+;; used as only for #DEFAULT in attribute editing. Binds all normally inserting
+;; keys to a command that will clear the #DEFAULT before doing self-insert.
+(defvar sgml-attr-default-keymap
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map sgml-edit-attrib-mode-map)
+    (substitute-key-definition 'self-insert-command
+                               'sgml-attr-clean-and-insert
+                               map
+                               global-map)
+    (put 'sgml-default 'local-map map)))
+
 (define-key sgml-edit-attrib-mode-map "\C-c\C-c" 'sgml-edit-attrib-finish)
 (define-key sgml-edit-attrib-mode-map "\C-c\C-d" 'sgml-edit-attrib-default)
 (define-key sgml-edit-attrib-mode-map "\C-c\C-k" 'sgml-edit-attrib-clear)
@@ -1451,6 +1463,13 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
         (put-text-property (1- (point)) (point)
                            'rear-nonsticky '(read-only category)))
       (kill-region (point) end))))
+
+
+(defun sgml-attr-clean-and-insert (n)
+  "Insert the character you type, after clearing the current attribute."
+  (interactive "p")
+  (sgml-edit-attrib-clear)
+  (self-insert-command n))
 
 
 (defun sgml-edit-attrib-field-start ()
