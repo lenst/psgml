@@ -27,14 +27,26 @@
 
 ;;;; Code:
 
+(provide 'psgml-edit)
 (require 'psgml)
 (require 'psgml-parse)
+
+
+;;;; Variables
+
+(defvar sgml-split-level nil
+  "Used by sgml-split-element")
+
 
 ;;;; SGML mode: structure editing
 
 (defun sgml-last-element ()
+  "Return the element where last command left point.
+This either uses the save value in `sgml-last-element' or parses the buffer
+to find current open element."
   (setq sgml-markup-type nil)
-  (if (memq last-command sgml-users-of-last-element)
+  (if (and (memq last-command sgml-users-of-last-element)
+	   sgml-last-element)		; Don't return nil
       sgml-last-element
     (setq sgml-last-element (sgml-find-context-of (point))))  )
 
@@ -392,9 +404,18 @@ is determined."
   (push-mark)
   (sgml-note-change-at (point))		; Prune the parse tree
   (sgml-parse-to-here)
-  (let ((sgml-throw-on-warning 'trouble))
-    (or (catch sgml-throw-on-warning
-	  (sgml-parse-until-end-of nil))
+  (let ((sgml-suppress-warning t)
+	(sgml-last-trouble-spot (point))
+	sgml-throw-on-warning)
+    (or (catch 'trouble
+	  (sgml-parse-until-end-of
+	   nil
+	   (function (lambda ()
+		       (when (>= (point) sgml-last-trouble-spot)
+			 (setq sgml-last-trouble-spot (point-max)
+			       sgml-suppress-warning nil
+			       sgml-throw-on-warning 'trouble))
+		       nil))))
 	(message "Ok"))))
 
 
@@ -1260,7 +1281,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
       (goto-char (point-min))))
 
 
-;;;; SGML mode: Hiding attributes/tags
+;;;; SGML mode: Hiding tags/attributes
 
 (defun sgml-operate-on-tags (action &optional attr-p)
   (let ((buffer-modified-p (buffer-modified-p))
@@ -1285,11 +1306,10 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 		(if (or attr-p (not (member tag sgml-exposed-tags)))
 		    (add-text-properties
 		     (match-beginning markup-index) (match-end markup-index)
-		     '(invisible t read-only t rear-nonsticky
-				 (invisible read-only intangible face))))))
+		     '(invisible t rear-nonsticky (invisible face))))))
 	     ((eq action 'show)		; ignore markup-index
 	      (remove-text-properties (match-beginning 0) (match-end 0)
-				      '(invisible nil read-only nil)))
+				      '(invisible nil)))
 	     (t (error "Invalid action: %s" action)))))
       (set-buffer-modified-p buffer-modified-p))))
 
@@ -1354,19 +1374,21 @@ elements with omitted end-tags."
       (setq content (cdr content)))))
 
 (defun sgml-normalize-start-tag (element)
-  (goto-char (min (point) (sgml-element-start element)))
-  (let ((asl (sgml-element-attribute-specification-list element)))
-    (save-excursion
-      (sgml-change-start-tag element asl))))
+  (when (sgml-bpos-p (sgml-element-stag-epos element))
+    (goto-char (min (point) (sgml-element-start element)))
+    (let ((asl (sgml-element-attribute-specification-list element)))
+      (save-excursion
+	(sgml-change-start-tag element asl)))))
 
 (defun sgml-normalize-end-tag (element)
   (unless (sgml-element-empty element)
-    (goto-char (min (point) (sgml-element-etag-start element)))    
-    (if (and (zerop (sgml-element-etag-len element))
-	     sgml-normalize-trims)
-	(skip-chars-backward " \t\n\r"))
-    (delete-char (sgml-tree-etag-len element))
-    (save-excursion (insert (sgml-end-tag-of element)))))
+    (when (sgml-bpos-p (sgml-element-etag-epos element))
+      (goto-char (min (point) (sgml-element-etag-start element)))    
+      (if (and (zerop (sgml-element-etag-len element))
+	       sgml-normalize-trims)
+	  (skip-chars-backward " \t\n\r"))
+      (delete-char (sgml-tree-etag-len element))
+      (save-excursion (insert (sgml-end-tag-of element))))))
 
 
 (defun sgml-make-character-reference (&optional invert)
@@ -1390,6 +1412,24 @@ argument INVERT to non-nil."
       (delete-char 1)
       (insert (format "&#%d;" c))))))
 
+(defun sgml-expand-entity-reference ()
+  "Insert the text of the entity referenced at point."
+  (interactive)
+  (sgml-with-parser-syntax
+   (setq sgml-markup-start (point))
+   (sgml-check-delim "ERO")
+   (let* ((ename (sgml-check-name t))
+	  (entity (sgml-lookup-entity ename
+				      (sgml-dtd-entities
+				       (sgml-pstate-dtd
+					sgml-buffer-parse-state)))))
+     (unless entity
+       (error "Undefined entity %s" ename))
+     (or (sgml-parse-delim "REFC")
+	 (sgml-parse-RE))
+     (delete-region sgml-markup-start (point))
+     (sgml-entity-insert-text entity))))
+
 
 ;;;; SGML mode: TAB completion
 
@@ -1401,8 +1441,7 @@ If it is a markup declaration (starts with <!) complete with markup
 declaration names.
 If it is something else complete with ispell-complete-word."
   (interactive "*")
-  (let ((dtd (sgml-pstate-dtd sgml-buffer-parse-state))
-	(tab				; The completion table
+  (let ((tab				; The completion table
 	 nil)
 	(pattern nil)
 	(c nil)
@@ -1412,8 +1451,11 @@ If it is something else complete with ispell-complete-word."
     (setq c (char-after (1- (point))))
     (cond
      ;; entitiy
-     ((eq c ?&)				
-      (setq tab (sgml-entity-completion-table (sgml-dtd-entities dtd))))
+     ((eq c ?&)
+      (sgml-need-dtd)
+      (setq tab
+	    (sgml-entity-completion-table
+	     (sgml-dtd-entities (sgml-pstate-dtd sgml-buffer-parse-state)))))
      ;; start-tag
      ((eq c ?<)
       (save-excursion
@@ -1510,11 +1552,5 @@ If it is something else complete with ispell-complete-word."
 					(cddr entry)))
 				  "[X]" "[ ]"))
 		      (cdr entry))))))
-  
-
 
-;;;; Provide
-
-(provide 'psgml-edit)
-
 ;;; psgml-edit.el ends here

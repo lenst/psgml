@@ -41,8 +41,8 @@
 (define-key sgml-mode-map [menu-bar sgml-dtd]
   (cons "DTD" (make-sparse-keymap "DTD")))
 
-(define-key sgml-mode-map [menu-bar sgml-fold]
-  (cons "Fold" (make-sparse-keymap "Fold")))
+(define-key sgml-mode-map [menu-bar sgml-view]
+  (cons "View" (make-sparse-keymap "View")))
 
 (define-key sgml-mode-map [menu-bar sgml-markup]
   '("Markup" . sgml-markup-menu ))
@@ -103,21 +103,28 @@
   '("Parse DTD" . sgml-parse-prolog))
 
 
-;;;; Fold menu
+;;;; View menu
 
-(define-key sgml-mode-map [menu-bar sgml-fold unfold-all]
+(define-key sgml-mode-map [menu-bar sgml-view unhide]
+  '("Show all tags" . sgml-show-tags))
+(define-key sgml-mode-map [menu-bar sgml-view hide-attributes]
+  '("Hide attributes" . sgml-hide-attributes))
+(define-key sgml-mode-map [menu-bar sgml-view hide-tags]
+  '("Hide tags" . sgml-hide-tags))
+
+(define-key sgml-mode-map [menu-bar sgml-view unfold-all]
   '("Unfold all" . sgml-unfold-all))
-(define-key sgml-mode-map [menu-bar sgml-fold fold-region]
+(define-key sgml-mode-map [menu-bar sgml-view fold-region]
   '("Fold region" . sgml-fold-region))
-(define-key sgml-mode-map [menu-bar sgml-fold expand]
+(define-key sgml-mode-map [menu-bar sgml-view expand]
   '("Expand" . sgml-expand-element))
-(define-key sgml-mode-map [menu-bar sgml-fold unfold-element]
+(define-key sgml-mode-map [menu-bar sgml-view unfold-element]
   '("Unfold element" . sgml-unfold-element))
-(define-key sgml-mode-map [menu-bar sgml-fold unfold]
+(define-key sgml-mode-map [menu-bar sgml-view unfold]
   '("Unfold line" . sgml-unfold-line))
-(define-key sgml-mode-map [menu-bar sgml-fold subfold]
+(define-key sgml-mode-map [menu-bar sgml-view subfold]
   '("Fold subelement"   . sgml-fold-subelement))
-(define-key sgml-mode-map [menu-bar sgml-fold fold]
+(define-key sgml-mode-map [menu-bar sgml-view fold]
   '("Fold element"   . sgml-fold-element))
 
 
@@ -267,7 +274,7 @@ The entries are added last in keymap and a blank line precede it."
 	   (overlay-put o 'face face)))))
 
 (defun sgml-set-face-after-change (start end &optional pre-len)
-  (when sgml-set-face
+  (when nil;; sgml-set-face
     (loop for o in (overlays-at start)
 	  do (cond
 	      ((not (overlay-get o 'type)))

@@ -62,7 +62,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "1.0a1"
+(defconst psgml-version "1.0a2"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -93,7 +93,8 @@ use `setq-default' to set it to a value that is shared among buffers.")
 			    (pi 	. bold)
 			    (sgml 	. bold)
 			    (doctype 	. bold)
-			    (entity 	. bold-italic))
+			    (entity 	. bold-italic)
+			    (shortref   . bold))
   "*Alist of markup to face mappings.
 Each element looks like (MARKUP-TYPE . FACE).
 Possible values for MARKUP-TYPE is:
@@ -106,7 +107,8 @@ ms-start - marked section end, if not ignored
 pi	- processing instruction
 sgml	- SGML declaration
 start-tag
-entity  - general entity reference")
+entity  - general entity reference
+shortref- short reference")
 
 (defvar sgml-buggy-subst-char-in-region 
   (or (not (boundp 'emacs-minor-version))
@@ -165,7 +167,7 @@ Actually two things are done
 Setting this variable automatically makes it local to the current buffer.")
 (make-local-variable 'sgml-minimize-attributes)
 
-(defvar sgml-max-menu-size 30
+(defvar sgml-max-menu-size (/ (* (frame-height) 2) 3)
   "*Max number of entries in Tags and Entities menus before they are split
 into several panes.")
 
@@ -238,6 +240,13 @@ used for the public identifier.  An element can also be a dotted pair
 (regexp . filename), the filename is a string treated as above, but
 only if the regular expression, regexp, matches the public
 identifier.")
+
+
+(defvar sgml-local-catalogs nil
+"*A list of SGML entity catalogs to be searched first when parsing the buffer.
+This is used in addtion to `sgml-catalog-files',  and `sgml-public-map'.
+This variable is automatically local to the buffer.")
+(make-local-variable 'sgml-local-catalogs)
 
 (defvar sgml-catalog-files (sgml-parse-colon-path
 			    (or (getenv "SGML_CATALOG_FILES")
@@ -341,9 +350,10 @@ running the sgml-validate-command.")
     sgml-minimize-attributes
     sgml-live-element-indicator
     sgml-set-face
+    sgml-auto-activate-dtd
     sgml-parent-document
-    sgml-system-path
-    sgml-public-map
+;;    sgml-system-path
+;;    sgml-public-map
     sgml-default-dtd-file
     sgml-validate-command
     sgml-declaration
@@ -583,6 +593,39 @@ running the sgml-validate-command.")
   (autoload 'sgml-build-custom-menus "psgml-other")) ; Avoid compiler warnings
 
 ;; load menu file at the end
+
+;;;; Post command hook 
+
+(defvar sgml-auto-activate-dtd nil
+  "*If non-nil, loading a sgml-file will automatically try to activate its DTD.
+Activation means either to parse the document type declaration or to
+load a previously saved parsed DTD.  The name of the activated DTD
+will be shown in the mode line.")
+;;??(make-variable-buffer-local 'sgml-auto-activate-dtd)
+
+(defvar sgml-auto-activate-dtd-tried nil)
+(make-variable-buffer-local 'sgml-auto-activate-dtd-tried)
+
+(defvar sgml-buffer-parse-state nil
+  "If the buffers DTD has been activated this contains the parser state.
+The parser state has been created with `sgml-make-pstate' and contains
+the information about the DTD and the parse tree.  This parse state is
+actually only the state that persists between commands.")
+(make-variable-buffer-local 'sgml-buffer-parse-state)
+
+(eval-and-compile			; Interface to psgml-parse
+  (autoload 'sgml-need-dtd "psgml-parse")
+  (autoload 'sgml-update-display "psgml-parse"))
+
+(defun sgml-command-post ()
+  (when (eq major-mode 'sgml-mode)
+    (when (and (null sgml-buffer-parse-state)
+	       sgml-auto-activate-dtd
+	       (null sgml-auto-activate-dtd-tried))
+      (setq sgml-auto-activate-dtd-tried t)
+      (sgml-need-dtd))
+    (when sgml-buffer-parse-state
+      (sgml-update-display))))
 
 
 ;;;; SGML mode: major mode definition
@@ -705,6 +748,7 @@ All bindings:
   (when (setq sgml-default-dtd-file (sgml-default-dtd-file))
     (unless (file-exists-p sgml-default-dtd-file)
       (setq sgml-default-dtd-file nil)))
+  (add-hook 'post-command-hook 'sgml-command-post)
   (run-hooks 'text-mode-hook 'sgml-mode-hook)
   (sgml-build-custom-menus))
 

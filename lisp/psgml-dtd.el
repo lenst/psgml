@@ -27,6 +27,7 @@
 
 ;;;; Code:
 
+(provide 'psgml-dtd)
 (require 'psgml)
 (require 'psgml-parse)
 
@@ -272,7 +273,9 @@ Syntax: var dfa-expr &body forms"
   ;; *** Actually only numerical character references
   ;; I don't know how to handel the function character references.
   ;; For the shortrefs let's give them numeric values.
-  (if (sgml-parse-delim "CRO" (digit nmstart))
+  (if (if dofunchar
+	  (sgml-parse-delim "CRO" (digit nmstart))
+	(sgml-parse-delim "CRO" (digit)))
       (prog1 (if (sgml-is-delim "NULL" digit)
 		 (string-to-int (sgml-check-nametoken))
 	       (let ((spec (sgml-check-name)))
@@ -680,7 +683,7 @@ Case transformed for general names."
 	mappings literal name)
     (while (progn
 	     (sgml-skip-ps)
-	     (setq literal (sgml-parse-parameter-literal)))
+	     (setq literal (sgml-parse-parameter-literal 'dofunchar)))
       (sgml-skip-ps)
       (setq name (sgml-check-name))
       (push (cons literal name) mappings))
@@ -707,12 +710,12 @@ Case transformed for general names."
 
 (defun sgml-check-dtd-subset ()
   (while 
-      (cond
-       ((sgml-parse-ds))
-       ((sgml-parse-markup-declaration 'dtd))
-       ;;((sgml-parse-marked-section-end)) ; end of marked section
-       ((sgml-parse-delim "MS-END"))
-       ))
+      (progn
+	(setq sgml-markup-start (point))
+	(cond
+	 ((sgml-parse-ds))
+	 ((sgml-parse-markup-declaration 'dtd))
+	 ((sgml-parse-delim "MS-END")))))
   (when (sgml-any-open-param/file)
     (sgml-parse-error "DTD subset ended")))
 
@@ -744,10 +747,12 @@ Case transformed for general names."
   (interactive)
   (sgml-clear-log)
   (message "Parsing prolog...")
+  (sgml-set-global)
   (setq	sgml-dtd-info nil)
   (goto-char (point-min))
   (sgml-with-parser-syntax
    (while (progn (sgml-skip-ds)
+		 (setq sgml-markup-start (point))
 		 (and (sgml-parse-markup-declaration 'prolog)
 		      (null sgml-dtd-info)))))
   (sgml-message "Parsing prolog...done"))
