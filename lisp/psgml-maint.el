@@ -58,7 +58,7 @@
 (defun psgml-find-source-dir (&optional ask)
   (if psgml-source-dir
       t 
-    (let ((cand (list "." "./psgml-1.1.6")))
+    (let ((cand (list "." "./psgml-1.2.2")))
       (while cand
 	(if (file-exists-p (expand-file-name "psgml-maint.el" (car cand)))
 	    (progn
