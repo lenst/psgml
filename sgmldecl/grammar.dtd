@@ -1,47 +1,47 @@
 
-<!element grammar	- o	(title, prod*) 	>
+<!ELEMENT grammar	- o	(title, prod*) 	>
 
-<!element title		- o	(#pcdata)	>
+<!ELEMENT title		- o	(#pcdata)	>
 
-<!element prod		- o	(name, group)	>
-<!attlist prod
+<!ELEMENT prod		- o	(name, group)	>
+<!ATTLIST prod
 	n	cdata		#required	>
 
-<!element name		o o	(#pcdata)	>
+<!ELEMENT name		o o	(#pcdata)	>
 
-<!element group		o o	(token|delim|nt|group)*	>
-<!attlist group	
+<!ELEMENT group		o o	(token|delim|nt|group)*	>
+<!ATTLIST group	
 	status	(opt|must)		"must"
 	occur	(once|many)		"once"
 	order	(seq|alt)		"seq"
 	var	name			#IMPLIED	>
 
-<!element nt		- o	empty		>
-<!attlist nt
+<!ELEMENT nt		- o	empty		>
+<!ATTLIST nt
 	n	cdata			#required
 	name	cdata			#implied	>
 
-<!element token		- o	(#pcdata)	>
-<!element delim		- o	(#pcdata)	>
+<!ELEMENT token		- o	(#pcdata)	>
+<!ELEMENT delim		- o	(#pcdata)	>
 
 
-<!entity begtoken	starttag "token"	>
-<!entity endtoken	endtag "token"		>
-<!entity endname	endtag "name"		>
+<!ENTITY begtoken	starttag "token"	>
+<!ENTITY endtoken	endtag "token"		>
+<!ENTITY endname	endtag "name"		>
 
-<!shortref docmap
+<!SHORTREF docmap
 	'"'	begtoken
 	'='	endname
 >
-<!shortref tokmap
+<!SHORTREF tokmap
 	'"'	endtoken
 >
 
-<!-- usemap tokmap token -->
+<!-- USEMAP tokmap token -->
 
-<!entity psp	-- ps+ --
+<!ENTITY psp	-- ps+ --
  "<group many><nt n='65' name='ps'></group>" >
 
-<!entity pss	-- ps* --
+<!ENTITY pss	-- ps* --
  "<group opt many><nt n='65' name='ps'></group>" >
 

@@ -464,7 +464,7 @@
   (interactive)
   (let* ((el (sgml-find-context-of (point)))
          (et (sgml-element-eltype el)))
-    (with-output-to-temp-buffer "*Help*"
+    (with-output-to-temp-buffer "*Current Element Type*"
       (princ (format "ELEMENT: %s%s\n" (sgml-eltype-name et)
                      (let ((help-text (sgml-eltype-appdata et 'help-text)))
                        (if help-text
