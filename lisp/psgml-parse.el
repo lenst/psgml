@@ -634,6 +634,8 @@ element the value."
   (sgml-tree-mixed sgml-current-tree))
 
 (defun sgml-set-doctype (model)
+  (make-local-variable 'before-change-function)
+  (setq before-change-function 'sgml-note-change-at)
   (setq sgml-top-tree
 	(sgml-make-tree
 	 (make-element :name "Document (no element)"
@@ -1452,8 +1454,6 @@ or if nil, until end of buffer."
 
 (defun sgml-parse-to (sgml-goal)
   (when (null sgml-top-tree)		; first parse in this buffer
-    (make-local-variable 'before-change-function)
-    (setq before-change-function 'sgml-note-change-at)
     ;;(make-local-variable 'pre-command-hook)
     ;;(setq pre-command-hook 'sgml-reset-log)
     (sgml-set-doctype sgml-any)
