@@ -1,3 +1,8 @@
+1998-10-31  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-declared-value-notation): change 'notation
+	to 'NOTATION
+	
 Sat Oct 31 20:00:22 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-cache-catalog): Use file-truename for

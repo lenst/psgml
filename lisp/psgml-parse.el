@@ -674,7 +674,7 @@ returned."
 This applies to notation declared value.  For other declared values
 nil is returned."
   (and (consp declared-value)
-       (eq 'notation (car declared-value))
+       (eq 'NOTATION (car declared-value))
        (cadr declared-value)))
 
 ;;; default-value representation = symbol | ((nil | 'fixed) attval)
