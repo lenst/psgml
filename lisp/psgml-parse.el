@@ -82,8 +82,8 @@ Tested by sgml-close-element to see if the parse should be ended.")
 (defvar sgml-buffer-param-entities nil)
 (make-variable-buffer-local 'sgml-buffer-element-map)
 
-(defvar sgml-buffer-entities '("aumlaut" "diaresis"))
-
+(defvar sgml-buffer-entities nil)
+(make-variable-buffer-local 'sgml-buffer-entities)
 
 (defvar sgml-buffer-element-map nil)
 (make-variable-buffer-local 'sgml-buffer-element-map)
@@ -679,16 +679,25 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	     (search-forward-regexp (element-conref-regexp el)
 				    after-tag t)))))
 
+(defun sgml-element-empty (element)
+  "True if ELEMENT is empty."
+  (let ((regexp (element-conref-regexp (sgml-tree-element element))))
+      (or (eq sgml-empty (sgml-element-model element))
+      (and regexp
+	   (save-excursion
+	     (goto-char (sgml-tree-start element))
+	     (search-forward-regexp regexp
+				    (+ (point)
+				       (sgml-tree-stag-len element))
+				    t))))))
+
 (defun sgml-set-parse-state (tree where)
   "Set parse state from TREE, either from start of TREE if WHERE is start
 or from after TREE if WHERE is after."
   (setq sgml-current-tree tree
 	sgml-markup-tree tree)
   (cond ((and (eq where 'start)
-	      (not (sgml-element-empty-p (sgml-tree-element tree)
-					 (sgml-tree-start tree)
-					 (+ (sgml-tree-start tree)
-					    (sgml-tree-stag-len tree)))))
+	      (not (sgml-element-empty tree)))
 	 (setq sgml-current-state (element-model (sgml-current-element)))
 	 (setq sgml-markup-type 'start-tag
 	       sgml-markup-start (sgml-tree-start sgml-current-tree))
@@ -749,14 +758,8 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
     (setq sgml-current-state (element-model el)
 	  sgml-current-tree nt)
     (setq sgml-markup-tree sgml-current-tree)
-    (cond ((or (eq sgml-empty sgml-current-state)
-	       (and (element-conref-regexp el) ;*** can I use the
-					       ;sgml-element-empty-p function?
-		    (save-excursion
-		      (goto-char before-tag)
-		      (search-forward-regexp (element-conref-regexp el)
-					     after-tag t))))
-	   (sgml-close-element after-tag after-tag)))))
+    (when (sgml-element-empty sgml-current-tree)
+      (sgml-close-element after-tag after-tag))))
 
 
 (defun sgml-fake-open-element (tree el)
