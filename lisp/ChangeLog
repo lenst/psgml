@@ -1,10 +1,17 @@
 2005-02-09  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* psgml.el (sgml-debug): remove sgml-log-message
+	reemove log related keybinding/menu entry
+
+	* psgml-parse.el (sgml-compile-dtd, sgml-check-entities)
+	(sgml-log-warning, sgml-error): remove sgml-log-message 
+	(sgml-entity-stack): new func
+
 	* psgml-ids.el: New file (From: Jean-Daniel.Fekete)
 	* psgml-edit.el: ID/IDREF patch (From: Jean-Daniel.Fekete)
 	* psgml-maint.el: ID/IDREF patch (From: Jean-Daniel.Fekete)
 	* psgml-parse.el: ID/IDREF patch (From: Jean-Daniel.Fekete)
-	
+
 2003-06-09  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-modify-dtd): added some error checking for
