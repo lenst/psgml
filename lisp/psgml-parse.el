@@ -59,9 +59,10 @@ Tested by sgml-close-element to see if the parse should be ended.")
 
 
 ;; For loading DTD
-(defconst sgml-max-singel-octet-number 250)
+(eval-and-compile
+  (defconst sgml-max-single-octet-number 250))
 
-(defvar sgml-singel-octet-threshold 255
+(defvar sgml-single-octet-threshold 255
   "Octets greater than this is the first of a two octet coding.")
 
 (defvar sgml-read-token-vector nil)	; Vector of symbols used to decode
@@ -476,12 +477,12 @@ element the value."
 
 (defsubst sgml-read-number ()
   (let ((n (sgml-read-octet)))
-    (if (> n sgml-singel-octet-threshold)
+    (if (> n sgml-single-octet-threshold)
 	(+ (* (- n (eval-when-compile
-		     (1+ sgml-max-singel-octet-number)))
+		     (1+ sgml-max-single-octet-number)))
 	      256)
 	   (sgml-read-octet)
-	   sgml-max-singel-octet-number)
+	   sgml-max-single-octet-number)
       n)))
 
 (defsubst sgml-read-peek ()
@@ -571,9 +572,9 @@ element the value."
     (setq temp (sgml-read-sexp))		; file-version
     (assert (equal (car temp) 'sgml-saved-dtd-version))
     (cond ((equal temp '(sgml-saved-dtd-version 1))
-	   (setq sgml-singel-octet-threshold 255))
+	   (setq sgml-single-octet-threshold 255))
 	  ((equal temp '(sgml-saved-dtd-version 2))
-	   (setq sgml-singel-octet-threshold sgml-max-singel-octet-number))
+	   (setq sgml-single-octet-threshold sgml-max-single-octet-number))
 	  (t
 	   (error "Unknown file format for saved DTD: %s" temp)))
     ;; elements
