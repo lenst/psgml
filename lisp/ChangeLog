@@ -1,3 +1,8 @@
+2003-06-09  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-modify-dtd): added some error checking for
+	the has-seen-elements.
+
 2003-03-28  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-do-processing-instruction): new handling
