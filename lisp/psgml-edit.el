@@ -49,7 +49,8 @@
 This either uses the save value in `sgml-last-element' or parses the buffer
 to find current open element."
   (setq sgml-markup-type nil)
-  (if (and (memq last-command sgml-users-of-last-element)
+  (if (and (not sgml-xml-p)
+           (memq last-command sgml-users-of-last-element)
 	   sgml-last-element)		; Don't return nil
       sgml-last-element
     (setq sgml-last-element (sgml-find-context-of (point))))  )
