@@ -52,18 +52,12 @@
 ;; - Find next data context
 
 ;; TODO
-;; better handling of the warning/error log
-;; perhaps start attribute edit if inserting a start tag with required
-;;  attributes.
-;; Hiding attributes (first test done).
-;; Fold all elements with GI
-;; SHORTREF
-;; Better error recovery in the parser
+;; - SHORTREF
+;; - Better error recovery in the parser
 
 ;; BUGS
-;;  "*SGML LOG*" buffer handling is confusing
-;;  NET only recognized for current element.
-;;  short tag recognision should be possible to turn off
+;; - "*SGML LOG*" buffer handling is confusing
+
 
 
 ;;;; Code:
@@ -118,7 +112,9 @@ Setting this variable automatically makes it local to the current buffer.")
   "*Determines minimization of attributes inserted by edit-attributes.
 Actually two things are done
 1. If non-nil, omit attribute name, if attribute value is from a token group.
-2. If 'max, omit attributes with default value.")
+2. If 'max, omit attributes with default value.
+Setting this variable automatically makes it local to the current buffer.")
+(make-local-variable 'sgml-minimize-attributes)
 
 (defvar sgml-max-menu-size 30
   "*Max number of entries in Tags and Entities menus before they are split
@@ -153,7 +149,7 @@ If nil, no indentation.
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-indent-step)
 
-(defvar sgml-indent-data t
+(defvar sgml-indent-data nil
   "*If non-nil, indent in data/mixed context also.
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-indent-data)
@@ -169,14 +165,15 @@ Setting this variable automatically makes it local to the current buffer.")
 This is a list of possible file names.  To find the file for a public
 identifier the elements of the list are used one at the time from the
 beginning.  If the element is a string a file name is constructed from
-the string by substitution of owner for %O, public text class for %C,
-and public text description for %D.  The text class will be converted
-to lower case and the owner and description will be transliterated
-according to the variable sgml-public-transliterations.  If the file
-exists it will be the file used for the public identifier.  An element
-can also be a dotted pair (regexp . filename), the filename is a
-string treated as above, but only if the regular expression, regexp,
-matches the public identifier.")
+the string by substitution of the whole public identifier for %P,
+owner for %O, public text class for %C, and public text description
+for %D.  The text class will be converted to lower case and the owner
+and description will be transliterated according to the variable
+sgml-public-transliterations.  If the file exists it will be the file
+used for the public identifier.  An element can also be a dotted pair
+(regexp . filename), the filename is a string treated as above, but
+only if the regular expression, regexp, matches the public
+identifier.")
 
 (defvar sgml-public-transliterations '((? . ?_) (?/ . ?%))
   "*Transliteration for characters that should be avoided in file names.
@@ -414,22 +411,24 @@ running the sgml-validate-command.")
 ;(define-key sgml-mode-map "<" 'sgml-insert-tag)
 (define-key sgml-mode-map ">" 'sgml-close-angle)
 (define-key sgml-mode-map "/" 'sgml-slash)
-(define-key sgml-mode-map "\C-c\C-v" 'sgml-validate)
 (define-key sgml-mode-map "\C-c/"    'sgml-insert-end-tag)
 (define-key sgml-mode-map "\C-c<"    'sgml-insert-tag)
 (define-key sgml-mode-map "\C-c="    'sgml-change-element-name)
+(define-key sgml-mode-map "\C-c-"    'sgml-untag-element)
 (define-key sgml-mode-map "\C-c\C-a" 'sgml-edit-attributes)
 (define-key sgml-mode-map "\C-c\C-c" 'sgml-show-context)
 (define-key sgml-mode-map "\C-c\C-d" 'sgml-next-data-field)
 (define-key sgml-mode-map "\C-c\C-e" 'sgml-insert-element)
+(define-key sgml-mode-map "\C-c\C-k" 'sgml-kill-markup)
 (define-key sgml-mode-map "\C-c\C-l" 'sgml-show-or-clear-log)
 (define-key sgml-mode-map "\C-c\C-n" 'sgml-up-element)
 (define-key sgml-mode-map "\C-c\C-o" 'sgml-next-trouble-spot)
 (define-key sgml-mode-map "\C-c\C-p" 'sgml-parse-prolog)
+(define-key sgml-mode-map "\C-c\C-q" 'sgml-fill-element)
 (define-key sgml-mode-map "\C-c\C-r" 'sgml-tag-region)
 (define-key sgml-mode-map "\C-c\C-s" 'sgml-unfold-line)
 (define-key sgml-mode-map "\C-c\C-t" 'sgml-list-valid-tags)
-(define-key sgml-mode-map "\C-c\C-q" 'sgml-fill-element)
+(define-key sgml-mode-map "\C-c\C-v" 'sgml-validate)
 (define-key sgml-mode-map "\C-c\C-w" 'sgml-what-element)
 
 (define-key sgml-mode-map "\C-c\C-f\C-e" 'sgml-fold-element)
@@ -506,6 +505,8 @@ Folding and unfolding
 
 User options:
 
+sgml-omittag  Set this to reflect OMITTAG in the SGML declaration.
+sgml-shortag  Set this to reflect SHORTTAG in the SGML declaration.
 sgml-auto-insert-required-elements  If non-nil, automatically insert required 
 	elements in the content of an inserted element.
 sgml-balanced-tag-edit  If non-nil, always insert start-end tag pairs.
@@ -527,8 +528,8 @@ sgml-indent-step  How much to increament indent for every element level.
 sgml-indent-data  If non-nil, indent in data/mixed context also.
 sgml-system-path  List of directorys used to look for system identifiers.
 sgml-public-map  Mapping from public identifiers to file names.
-sgml-offer-save  If non-nil, ask about saving modified buffers before ]
-		M-x sgml-validate is run.
+sgml-offer-save  If non-nil, ask about saving modified buffers before
+		\\[sgml-validate] is run.
 
 All bindings:
 \\{sgml-mode-map}
@@ -943,7 +944,8 @@ If it is something else complete with ispell-complete-word."
 (autoload 'sgml-options-menu "psgml-parse"
 	  nil
 	  t nil)
-
+(autoload 'sgml-untag-element "psgml-parse" "" t)
+(autoload 'sgml-kill-markup "psgml-parse" "" t)
 
 
 ;;;; Last provisions
