@@ -343,6 +343,8 @@ if the item is selected."
 (unless (fboundp 'frame-width)
   (defalias 'frame-width 'screen-width))
 
+(unless (fboundp 'buffer-substring-no-properties)
+  (defalias 'buffer-substring-no-properties 'buffer-substring))
 
 
 ;;;; Provide
