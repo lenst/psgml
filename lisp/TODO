@@ -1,4 +1,4 @@
-TODO      [Time-stamp: "2005-02-17 12:15:43 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2005-02-27 15:32:16 lenst"]           -*- outline -*- 
 
 
 * parse prolog and parent document
@@ -12,7 +12,9 @@ only a dummy DTD available, nor will they update the parse to the
 correct DTD.  Just a suggestion.
 
 OR perhaps sgml-load-doctype does what the interactive command should
-do.
+do. 
+[lenst/2005-02-27 15:31:57] I think so, changed C-c C-p to call
+sgml-load-doctype
 
 
 * Rewrite sgml-popup-multi-menu

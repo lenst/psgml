@@ -1,5 +1,30 @@
 2005-02-27  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* psgml.el (sgml-content-indent-function): moved
+	(sgml-attribute-indent-function): moved
+
+	* psgml-edit.el (sgml-show-context): use new option
+	sgml-show-context-function. 
+	(sgml-show-context-standard, sgml-show-context-backslash): new
+	functions for sgml-show-context-function 
+	(sgml-right-menu): new command for use on a mouse button
+
+	* psgml.el (sgml-mode-map): bind C-c C-t to
+	sgml-show-current-element-type 
+	(sgml-show-context-function): new option
+
+	* psgml-edit.el (sgml-show-current-element-type): new command
+
+	* psgml.el (sgml-mode-map): change C-c C-p to sgml-load-doctype
+
+	* psgml-parse.el (sgml-load-doctype): make interactive, this is a
+	more useful command than sgml-parse-prolog.
+
+	* psgml-info.el (sgml-describe-dtd): rename sgml-general-dtd-info
+	to sgml-describe-dtd. Keep old name as alias.
+
+	* psgml-other.el (sgml-set-face-for): added face setting for content
+
 	* psgml-parse.el (sgml--pi-element-handler): use sgml-parse-s not
 	sgml-skip-ps.
 

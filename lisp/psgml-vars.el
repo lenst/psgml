@@ -98,7 +98,7 @@ will be shown in the mode line.")
   "*If non-nil, ask about saving modified buffers before \\[sgml-validate] is run.")
 
 (defvar sgml-parent-document nil
-  "* Used when the current file is part of a bigger document.
+  "*Used when the current file is part of a bigger document.
 
 The variable describes how the current file's content fit into the element
 hierarchy. The variable should have the form
