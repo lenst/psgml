@@ -951,7 +951,7 @@ tag inserted."
     (when choice
       (insert "&" choice ";"))))
 
-(defun sgml-doctype-insert (doctype &rest vars)
+(defun sgml-doctype-insert (doctype vars)
   "Insert string DOCTYPE (ignored if nil) and set variables in &rest VARS.
 VARS should be a list of variables and values.
 For backward compatibility a singel string instead of a variable is 
@@ -1246,7 +1246,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 	 (unless (memq (get-text-property (point) 'category)
 		       '(sgml-default sgml-fixed))
 	   (push
-	    (sgml-make-attspec name
+	    (sgml-make-attspec (sgml-attdecl-name (car al))
 			       (sgml-extract-attribute-value
 				(sgml-attdecl-declared-value (car al))))
 	    asl))
