@@ -26,16 +26,13 @@ all:
 	rm -f *.elc ; $(EMACS) $(FLAGS) -f psgml-compile-files
 
 
-install: compile installdirs 
+install: compile 
 	$(SHELL) mkinstalldirs $(lispdir)
 	for p in *.elc; do \
 	  echo " $(INSTALL_DATA) $$p $(lispdir)/$$p"; \
 	  $(INSTALL_DATA) $$p $(lispdir)/$$p; \
 	done
 	$(INSTALL_DATA) iso88591.map $(lispdir)
-
-installdirs:
-	$(srcdir)/mkinstalldirs $(psgmldir)
 
 install-info:
 	$(INSTALL_DATA) psgml.info $(infodir)
