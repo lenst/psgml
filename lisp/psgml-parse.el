@@ -33,6 +33,17 @@
 ;;; Internal variables
 ;;; See also parser state
 
+(defvar sgml-current-element-name nil
+  "Name of current element for mode line display.")
+
+(defvar sgml-last-element 
+  "Used to keep information about position in element structure between
+commands.")
+
+(defconst sgml-users-of-last-element
+  '(sgml-up-element sgml-backward-up-element)
+  "List of commands that set the sgml-last-element variable.")
+
 (defvar sgml-parser-syntax nil
   "Syntax table used during parsing.")
 
@@ -49,7 +60,21 @@
   "Can be nil for no trap, an element or t for any element.
 Tested by sgml-close-element to see if the parse should be ended.")
 
-(defvar sgml-markup-type nil)
+(defvar sgml-markup-type nil
+"Contains the type of markup parsed last.
+The value is a symbol:
+nil	- pcdata or space
+CDATA	- CDATA or RCDATA
+comment	- comment declaration
+doctype	- doctype declaration
+end-tag 
+ignored	- ignored marked section
+ms-end	- marked section start, if not ignored 
+ms-start - makred section end, if not ignored
+pi	- processing instruction
+sgml	- SGML declaration
+start-tag")
+
 (defvar sgml-markup-tree)
 (defvar sgml-markup-start)
 
@@ -150,49 +175,6 @@ Tested by sgml-close-element to see if the parse should be ended.")
 	   (progn (,@ body))
 	 (set-syntax-table normal-syntax-table)))))
 (put 'sgml-with-parser-syntax 'edebug-form-hook '(&rest form))
-
-;;;; Set face of markup
-
-(defun sgml-set-face-for (start end type)
-  (let ((current (overlays-at start))
-	(face (cdr (assq type
-			 '((start-tag . bold)
-			   (end-tag . bold)
-			   (comment . italic)
-			   (pi . bold)
-			   (sgml . bold)
-			   (doctype . bold)))))
-	o)
-
-    (while current
-      (cond ((and (null o)
-		  (eq type (overlay-get (car current) 'type)))
-	     (setq o (car current)))
-	    (t (delete-overlay (car current))))
-      (setq current (cdr current)))
-    (cond (o
-	   (move-overlay o start end))
-	  (face
-	   (setq o (make-overlay start end))
-	   (overlay-put o 'type type)
-	   (overlay-put o 'face face)))))
-
-(defun sgml-set-face-after-change (start end &optional pre-len)
-  (when sgml-set-face
-    (loop for o in (overlays-at start)
-	  do (cond
-	      ((= start (overlay-start o))
-	       (move-overlay o end (overlay-end o)))
-	      (t (delete-overlay o))))))
-
-(defalias 'next-overlay-at 'next-overlay-change) ; fix bug in cl.el
-
-(defun sgml-clear-faces ()
-  (interactive)
-  (loop for o being the overlays
-	if (overlay-get o 'type)
-	do (delete-overlay o)))
-
 
 ;;;; State machine
 
@@ -940,23 +922,23 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-set-live-element-indicator ()
   (when (and (eq major-mode 'sgml-mode)
 	     sgml-live-element-indicator)
-    (let ((post-command-hook nil)
-	  (sgml-suppress-warning t)
-	  (elname (condition-case err
-		      (sgml-element-name (sgml-parse-to-here))
-		    (error "*error*"))))
-      (when sgml-active-dtd-indicator
-	(setq sgml-active-dtd-indicator
-	      (format " [%s/%s]"
-		      (or sgml-document-element "ANY")
-		      elname)))
+    (let* ((post-command-hook nil)
+	   (sgml-suppress-warning t)
+	   (elname (condition-case err
+		       (sgml-element-name
+			(if (memq this-command sgml-users-of-last-element)
+			    sgml-last-element
+			  (sgml-parse-to-here)))
+		     (error "*error*"))))
+      (setq sgml-current-element-name (prin1-to-string elname))
       (force-mode-line-update))))
 
 (defun sgml-set-active-dtd-indicator ()
   (add-hook 'post-command-hook 'sgml-set-live-element-indicator)
   (set (make-local-variable 'sgml-active-dtd-indicator)
-       (format " [%s]" 
-	       (or sgml-document-element "ANY"))))
+       (list (format " [%s" (or sgml-document-element "ANY"))
+	     '(sgml-live-element-indicator ("/" sgml-current-element-name))
+	     "]")))
 
 ;;;; Parser state
 
@@ -1011,7 +993,8 @@ or from after TREE if WHERE is after."
 	      (not (sgml-element-empty tree)))
 	 (setq sgml-current-state
 	       (sgml-element-model sgml-current-tree))
-	 (setq sgml-markup-type 'start-tag
+	 (setq sgml-markup-type (if (not (zerop (sgml-tree-stag-len tree)))
+				    'start-tag)
 	       sgml-markup-start (sgml-tree-start sgml-current-tree))
 	 (goto-char (+ sgml-markup-start
 		       (sgml-tree-stag-len sgml-current-tree))))
@@ -2341,13 +2324,19 @@ If the start-tag is implied, move to the start of the element."
   "Move backward out of this element level.
 That is move to before the start-tag or where a start-tag is implied."
   (interactive)
-  (goto-char (sgml-element-start (sgml-find-context-of (point)))))
+  (unless (memq last-command sgml-users-of-last-element)
+    (setq sgml-last-element (sgml-find-context-of (point))))
+  (goto-char (sgml-element-start sgml-last-element))
+  (setq sgml-last-element (sgml-element-parent sgml-last-element)))
 
 (defun sgml-up-element ()
   "Move forward out of this element level.
 That is move to after the end-tag or where an end-tag is implied."
   (interactive)
-  (goto-char (sgml-element-end (sgml-find-context-of (point)))))
+  (unless (memq last-command sgml-users-of-last-element)
+    (setq sgml-last-element (sgml-find-context-of (point))))
+  (goto-char (sgml-element-end sgml-last-element))
+  (setq sgml-last-element (sgml-element-parent sgml-last-element)))
 
 (defun sgml-forward-element ()
   "Move forward over next element."
@@ -2508,28 +2497,40 @@ region. And optional third argument true unhides."
   (interactive "r\nP")
   (let ((mp (buffer-modified-p))
 	(buffer-read-only nil)
-	(before-change-function nil))
+	(before-change-function nil)
+	(after-change-function nil))
     (setq selective-display t)
     (unwind-protect
 	(subst-char-in-region beg end
 			      (if unhide ?\r ?\n)
 			      (if unhide ?\n ?\r)
 			      'noundo)
-      (set-buffer-modified-p mp))))
+      (when sgml-buggy-subst-char-in-region
+	(set-buffer-modified-p mp)))))
 
 (defun sgml-fold-element ()
   "Fold the lines comprising the current element, leaving the first line visible.
 This uses the selective display feature."
   (interactive)
   (sgml-parse-to-here)
-  (cond ((or (looking-at "<!sgml")
-	     (eq sgml-markup-type 'sgml))
+  (cond ((and (eq sgml-current-tree sgml-top-tree) ; outside document element
+	      sgml-markup-type)
+	 (sgml-fold-region sgml-markup-start
+			   (save-excursion
+			     (sgml-parse-to (point))
+			     (point))))
+	((and (eq sgml-current-tree sgml-top-tree) ; outside document element
+	      (looking-at " *<!"))
 	 (sgml-fold-region (point)
 			   (save-excursion
-			     (sgml-skip-markup-declaration)
+			     (skip-chars-forward " \t")
+			     (sgml-parse-to (1+ (point)))
 			     (point))))
+
 	(t
 	 (let ((el (sgml-find-element-of (point))))
+	   (when (eq el sgml-top-tree)
+	     (error "No element here"))
 	   (save-excursion
 	     (goto-char (sgml-element-end el))
 	     (when (zerop (sgml-element-etag-len el))
@@ -3025,6 +3026,11 @@ assigned to sgml-default-dtd-file.
 All variables are made buffer local and are also added to the
 buffers local variables list."
   (when doctype
+    (unless (bolp)
+      (insert "\n"))
+    (unless (eolp)
+      (insert "\n")
+      (forward-char -1))
     (sgml-insert-markup doctype))
   (while vars
     (cond ((stringp (car vars))
@@ -3164,22 +3170,6 @@ Editing is done in a separate window."
        (setq sgml-always-quote-attributes quote)
        (make-local-variable 'sgml-main-buffer)
        (setq sgml-main-buffer cb)))))
-
-(defun sgml-insert (props format &rest args)
-  (let ((start (point)))
-    (insert (apply (function format)
-		   format
-		   args))
-    (when sgml-running-lucid		
-      (remf props 'rear-nonsticky))	; not useful in Lucid
-    (add-text-properties start (point) props)
-    ;; A read-only value of 1 is used for the text after values
-    ;; and this should in Lucid be open at the front.
-    (if (and sgml-running-lucid
-	     (eq 1 (getf props 'read-only)))
-      (set-extent-property
-       (extent-at start nil 'read-only)
-       'start-open t))))
 
 (defun sgml-attribute-buffer (element asl)
   (let ((bname "*Edit attributes*")
@@ -3565,6 +3555,7 @@ If it is something else complete with ispell-complete-word."
 		   . sgml-minimize-attributes)
 		  ("OMITTAG" . sgml-omittag)
 		  ("SHORTTAG" . sgml-shorttag)
+		  ("Indicate current element" . sgml-live-element-indicator)
 		  ;;("Debug" . sgml-debug)
 		  ))
        (indents '(("None" . nil) ("0" . 0) ("1" . 1) ("2" . 2) ("3" . 3)
@@ -3611,7 +3602,8 @@ If it is something else complete with ispell-complete-word."
       (when var
 	(make-local-variable var)
 	(set var val)
-	(message "%s set to %s" var val)))))
+	(message "%s set to %s" var val)))
+    (force-mode-line-update)))
 
 
 
