@@ -865,6 +865,7 @@ as that may change."
     ["Tag Region"	sgml-tag-region-menu	t]
     ["Insert Attribute" sgml-attrib-menu	t]
     ["Insert Entity"	sgml-entities-menu	t]
+    ["Add Element to element"	sgml-add-element-menu	t]
     ))
 
 (easy-menu-define

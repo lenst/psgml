@@ -967,6 +967,11 @@ tag inserted."
   (let ((what (sgml-menu-ask event 'element)))
     (and what (sgml-insert-element what))))
 
+(defun sgml-add-element-menu (event)
+  (interactive "*e")
+  (let ((what (sgml-menu-ask event 'add-element)))
+    (and what (sgml-add-element-to-element what nil))))
+
 (defun sgml-start-tag-menu (event)
   "Pop up a menu with valid start-tags and insert choice."
   (interactive "*e")
@@ -992,6 +997,11 @@ tag inserted."
   (let (tab
 	(title (capitalize (symbol-name type))))
     (cond
+     ((eq type 'add-element)
+      (setq tab
+            (mapcar #'sgml-eltype-name
+                    (sgml--all-possible-elements
+                     (sgml-find-context-of (point))))))
      (sgml-markup-type)
      ((eq type 'element)
       (setq tab
@@ -1214,14 +1224,35 @@ Editing is done in a separate window."
        (switch-to-buffer-other-window
 	(sgml-attribute-buffer element asl))
        (sgml-edit-attrib-mode)
-       (make-local-variable 'sgml-attlist)
-       (setq sgml-attlist (sgml-element-attlist element))
        (make-local-variable 'sgml-start-attributes)
        (setq sgml-start-attributes start)
        (make-local-variable 'sgml-always-quote-attributes)
        (setq sgml-always-quote-attributes quote)
        (make-local-variable 'sgml-main-buffer)
        (setq sgml-main-buffer cb))))
+
+
+(defun sgml-effective-attlist (eltype)
+  (let ((effective-attlist nil)
+        (attlist (sgml-eltype-attlist eltype))
+        (attnames (or (sgml-eltype-appdata eltype 'attnames)
+                      '(*))))
+    (while (and attnames (not (eq '* (car attnames))))
+      (let ((attdecl (sgml-lookup-attdecl (car attnames) attlist)))
+        (if attdecl 
+            (push attdecl effective-attlist)
+          (message "Attnames specefication error: no %s attribute in %s"
+                   (car attnames) eltype)))
+      (setq attnames (cdr attnames)))
+    (when (eq '* (car attnames))
+      (while attlist
+        (let ((attdecl (sgml-lookup-attdecl (sgml-attdecl-name (car attlist))
+                                            effective-attlist)))
+          (unless attdecl
+            (push (car attlist) effective-attlist)))
+        (setq attlist (cdr attlist))))
+    (nreverse effective-attlist)))
+
 
 (defun sgml-attribute-buffer (element asl)
   (let ((bname "*Edit attributes*")
@@ -1233,11 +1264,14 @@ Editing is done in a separate window."
       (setq buf (get-buffer-create bname))
       (set-buffer buf)
       (erase-buffer)
+      (make-local-variable 'sgml-attlist)
+      (setq sgml-attlist (sgml-effective-attlist
+                          (sgml-element-eltype element)))
       (sgml-insert '(read-only t rear-nonsticky (read-only))
 		   "<%s  -- Edit values and finish with C-c C-c --\n"
 		   (sgml-element-name element))
       (loop
-       for attr in (sgml-element-attlist element) do
+       for attr in sgml-attlist do
        ;; Produce text like
        ;;  name = value
        ;;  -- declaration : default --
@@ -1278,6 +1312,7 @@ Editing is done in a separate window."
       (sgml-edit-attrib-next))
     buf))
 
+
 (defvar sgml-edit-attrib-mode-map (make-sparse-keymap))
 (define-key sgml-edit-attrib-mode-map "\C-c\C-c" 'sgml-edit-attrib-finish)
 (define-key sgml-edit-attrib-mode-map "\C-c\C-d" 'sgml-edit-attrib-default)
@@ -1292,14 +1327,14 @@ Editing is done in a separate window."
 Use \\[sgml-edit-attrib-next] to move between input fields.  Use
 \\[sgml-edit-attrib-default] to make an attribute have its default
 value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
-(\\[delete-window]).  To finsh edit use \\[sgml-edit-attrib-finish].
+\(\\[delete-window]).  To finsh edit use \\[sgml-edit-attrib-finish].
 
 \\{sgml-edit-attrib-mode-map}"
-  (kill-all-local-variables)
   (setq mode-name "SGML edit attributes"
 	major-mode 'sgml-edit-attrib-mode)
   (use-local-map sgml-edit-attrib-mode-map)
   (run-hooks 'text-mode-hook 'sgml-edit-attrib-mode-hook))
+
 
 (defun sgml-edit-attrib-finish ()
   "Finish editing and insert attribute values in original buffer."
@@ -1709,7 +1744,8 @@ argument INVERT to non-nil."
 If it is a tag (starts with < or </) complete with valid tags.
 If it is an entity (starts with &) complete with declared entities.
 If it is a markup declaration (starts with <!) complete with markup 
-declaration names.
+declaration names. If it is a reserved word starting with # complete
+reserved words.
 If it is something else complete with ispell-complete-word."
   (interactive "*")
   (let ((tab				; The completion table
@@ -1719,7 +1755,7 @@ If it is something else complete with ispell-complete-word."
 	(pattern nil)
 	(c nil)
 	(here (point)))
-    (skip-chars-backward "^ \n\t</!&%")
+    (skip-chars-backward "^ \n\t</!&%#")
     (setq pattern (buffer-substring (point) here))
     (setq c (char-after (1- (point))))
     (cond
@@ -1746,6 +1782,11 @@ If it is something else complete with ispell-complete-word."
      ;; markup declaration
      ((eq c ?!)
       (setq tab sgml-markup-declaration-table
+            ignore-case t))
+     ;; Reserved words with '#' prefix
+     ((eq c ?#)
+      (setq tab '(("PCDATA") ("NOTATION") ("IMPLIED") ("REQUIRED")
+                  ("FIXED") ("EMPTY"))
             ignore-case t))
      (t
       (goto-char here)
