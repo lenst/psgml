@@ -978,12 +978,14 @@ as that may change."
       (unless last-values
         (setq last-values (cons menuname nil))
         (push last-values sgml-last-options-menu-values))
-      (setf (cdr last-values) (mapcar #'symbol-value option-vars)))))
+      (setf (cdr last-values) (mapcar (function symbol-value) option-vars)))))
 
 
 (defun sgml-update-all-options-menus ()
-  (sgml-update-options-menu "File Options" sgml-file-options 'sgml-save-options)
-  (sgml-update-options-menu "User Options" sgml-user-options))
+  (sgml-update-options-menu "File Options" sgml-file-options
+			    'sgml-save-options)
+  (sgml-update-options-menu "User Options" sgml-user-options)
+  nil)
 
 (defun sgml-compute-insert-dtd-items ()
   (loop for e in sgml-custom-dtd collect
@@ -1008,7 +1010,8 @@ as that may change."
 			(sgml-compute-insert-dtd-items)))
     (when sgml-custom-markup
       (easy-menu-change '("Markup") "Custom markup"
-			(sgml-compute-custom-markup-items)))))
+			(sgml-compute-custom-markup-items))))
+  nil)
 
 
 ;;;; Post command hook 
@@ -1171,21 +1174,25 @@ All bindings:
 	 ;; emacs>= 19.29
 	 (make-local-hook 'post-command-hook)
 	 (add-hook 'post-command-hook 'sgml-command-post 'append 'local)
-         (make-local-hook 'activate-menubar-hook)
-         (add-hook 'activate-menubar-hook 'sgml-update-all-options-menus nil 'local))
+	 (unless sgml-running-lucid 
+	   ;; XEmacs 20.4 doesn't handle local activate-menubar-hook
+	   ;; it tries to call the function `t' when using the menubar
+	   (make-local-hook 'activate-menubar-hook))
+         (add-hook 'activate-menubar-hook 'sgml-update-all-options-menus
+		   nil 'local))
 	(t
 	 ;; emacs< 19.29
 	 (add-hook 'post-command-hook 'sgml-command-post 'append)
          (add-hook 'menu-bar-update-hook 'sgml-update-all-options-menus)
          ))
   (run-hooks 'text-mode-hook 'sgml-mode-hook)
-  (sgml-build-custom-menus)
   (easy-menu-add sgml-main-menu)
   (easy-menu-add sgml-modify-menu)
   (easy-menu-add sgml-move-menu)
   (easy-menu-add sgml-markup-menu)
   (easy-menu-add sgml-view-menu)
-  (easy-menu-add sgml-dtd-menu))
+  (easy-menu-add sgml-dtd-menu)
+  (sgml-build-custom-menus))
 
 
 
