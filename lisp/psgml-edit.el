@@ -1617,7 +1617,7 @@ If it is something else complete with ispell-complete-word."
       (setq val (read-string (concat (sgml-variable-description var)
 				     " (sexp): ")))
       (when (stringp val)
-	(set var (read-from-string val))))))
+	(set var (car (read-from-string val)))))))
   (force-mode-line-update))
 
 (defun sgml-option-value-indicator (var)
@@ -1630,6 +1630,8 @@ If it is something else complete with ispell-complete-word."
       (if (stringp val)
 	  (substring val 0 4)
 	"-"))
+     ((and (atom type) val)
+      "...")
      ((consp type)
       (or (car (rassq val type))
 	  val))
