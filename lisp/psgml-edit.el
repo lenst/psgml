@@ -863,12 +863,13 @@ CURVALUE is nil or a string that will be used as default value."
   (interactive
    (let* ((el (sgml-find-attribute-element))
 	  (name
-	   (let ((completion-ignore-case sgml-namecase-general))
-	     (completing-read
-	      "Attribute name: "
-	      (mapcar (function (lambda (a) (list (sgml-attdecl-name a))))
-		      (sgml-non-fixed-attributes (sgml-element-attlist el)))
-	      nil t))))
+           (sgml-general-case
+            (let ((completion-ignore-case sgml-namecase-general))
+              (completing-read
+               "Attribute name: "
+               (mapcar (function (lambda (a) (list (sgml-attdecl-name a))))
+                       (sgml-non-fixed-attributes (sgml-element-attlist el)))
+               nil t)))))
      (list name
 	   (sgml-read-attribute-value
 	    (sgml-lookup-attdecl name (sgml-element-attlist el))
@@ -1225,8 +1226,6 @@ Editing is done in a separate window."
 	   (cb (current-buffer))
 	   (quote sgml-always-quote-attributes)
 	   (xml-p sgml-xml-p))
-      (unless asl
-        (error "This tag has no editable attributes"))
       (switch-to-buffer-other-window
        (sgml-attribute-buffer element asl))
       (sgml-edit-attrib-mode)
@@ -1275,7 +1274,7 @@ Editing is done in a separate window."
       (make-local-variable 'sgml-attlist)
       (setq sgml-attlist (sgml-effective-attlist
                           (sgml-element-eltype element)))
-      (sgml-insert '(read-only t rear-nonsticky (read-only))
+      (sgml-insert '(read-only t)
 		   "<%s  -- Edit values and finish with C-c C-c --\n"
 		   (sgml-element-name element))
       (loop
@@ -1288,20 +1287,23 @@ Editing is done in a separate window."
 	      (def-value (sgml-attdecl-default-value attr))
 	      (cur-value (sgml-lookup-attspec aname asl)))
 	 (sgml-insert			; atribute name
-	  '(read-only t rear-nonsticky (read-only))
-	  " %s = " aname)
+	  '(read-only t category sgml-form) " %s =" aname)
 	 (cond				; attribute value
 	  ((sgml-default-value-type-p 'FIXED def-value)
-	   (sgml-insert '(read-only t category sgml-fixed
-				    rear-nonsticky (category))
-			"#FIXED %s"
+	   (sgml-insert '(read-only t category sgml-fixed)
+			" #FIXED %s"
 			(sgml-default-value-attval def-value)))
 	  ((and (null cur-value)
 		(or (memq def-value '(IMPLIED CONREF CURRENT))
 		    (sgml-default-value-attval def-value)))
-	   (sgml-insert '(category sgml-default rear-nonsticky (category))
+           (sgml-insert '(read-only t category sgml-form) " ")
+	   (sgml-insert '(category sgml-default rear-nonsticky (category)
+                                   read-only sgml-default)
 			"#DEFAULT"))
 	  ((not (null cur-value))
+           (sgml-insert '(read-only t category sgml-form
+                                    rear-nonsticky (read-only category))
+                        " ")
 	   (sgml-insert nil "%s" (sgml-attspec-attval cur-value))))
 	 (sgml-insert
 	  '(read-only 1)
@@ -1410,27 +1412,37 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
   (interactive)
   (sgml-edit-attrib-clear)
   (save-excursion
-    (sgml-insert '(category sgml-default)
-		 "#DEFAULT")))
+    (sgml-insert '(category sgml-default read-only sgml-default)
+		 "#DEFAULT"))
+  (let ((inhibit-read-only t))
+    (put-text-property (1- (point)) (point)
+                       'rear-nonsticky '(category))))
 
 (defun sgml-edit-attrib-clear ()
   "Kill the value of current attribute."
   (interactive)
-  (kill-region
-   (progn (sgml-edit-attrib-field-start) (point))
-   (progn (sgml-edit-attrib-field-end) (point))))
+  (let ((inhibit-read-only '(sgml-default)))
+    (sgml-edit-attrib-field-start)
+    (let ((end (save-excursion (sgml-edit-attrib-field-end) (point))))
+      (put-text-property (point) end 'read-only nil)
+      (let ((inhibit-read-only t))
+        (put-text-property (1- (point)) (point)
+                           'rear-nonsticky '(read-only category)))
+      (kill-region (point) end))))
+
 
 (defun sgml-edit-attrib-field-start ()
   "Go to the start of the attribute value field."
   (interactive)
   (let (start)
-        (beginning-of-line 1)
+    (beginning-of-line 1)
     (while (not (eq t (get-text-property (point) 'read-only)))
       (beginning-of-line 0))
-    (setq start (next-single-property-change (point) 'read-only))
-    (unless start (error "No attribute value here"))
-    (assert (number-or-marker-p start))
-    (goto-char start)))
+    (while (eq 'sgml-form (get-text-property (point) 'category))
+      (setq start (next-single-property-change (point) 'category))
+      (unless start (error "No attribute value here"))
+      (assert (number-or-marker-p start))
+      (goto-char start))))
 
 (defun sgml-edit-attrib-field-end ()
   "Go to the end of the attribute value field."
