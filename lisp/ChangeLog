@@ -1,3 +1,10 @@
+2002-05-07  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* Version 1.3.0 released
+
+	* psgml-maint.el (psgml-common-files): add psgml-sysdep
+	(psgml-find-source-dir): fix version
+
 2002-04-26  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el (sgml-mode): make adding to
