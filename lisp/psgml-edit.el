@@ -122,6 +122,9 @@ With implied tags this is ambigous."
 (defun sgml-kill-element ()
   "Kill the element following the cursor."
   (interactive "*")
+  (sgml-parse-to-here)
+  (when sgml-markup-type
+    (error "Point is inside markup"))
   (kill-region (point)
 	       (sgml-element-end (sgml-find-element-after (point)))))
 
