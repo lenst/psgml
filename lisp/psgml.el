@@ -224,6 +224,8 @@ running the sgml-validate-command.")
 (defvar sgml-saved-validate-command nil
   "The command last used to validate in this buffer.")
 
+(defvar sgml-running-lucid (string-match "Lucid" emacs-version))
+
 (defvar sgml-mode-map nil "Keymap for SGML mode")
 
 
@@ -232,9 +234,10 @@ running the sgml-validate-command.")
 (defun sgml-set-local-variable (var val)
   (save-excursion
     (let ((prefix "") 
-	  (suffix ""))
+	  (suffix "")
+	  (case-fold-search t))
       (goto-char (max (point-min) (- (point-max) 3000)))
-      (cond ((search-forward "local variables:" nil t)
+      (cond ((search-forward "Local Variables:" nil t)
 	     (setq suffix (buffer-substring (point)
 					    (save-excursion (end-of-line 1)
 							    (point))))
@@ -312,17 +315,10 @@ running the sgml-validate-command.")
       (delete-char -1))
     (when old-text (insert old-text))))
 
-(defun sgml-doctype-insert (doctype saved-dtd)
-  (when doctype
-    (sgml-insert-markup doctype))
-  (when saved-dtd
-    (setq sgml-default-dtd-file saved-dtd)
-    (sgml-set-local-variable 'sgml-default-dtd-file saved-dtd)))
-
 (defun sgml-mouse-region ()
   (let (start end)
     (cond
-     ((string-match "Lucid" (emacs-version))
+     (sgml-running-lucid
       (cond
        ((null (mark-marker)) nil)
        (t (setq start (region-beginning)
@@ -360,7 +356,7 @@ running the sgml-validate-command.")
 ;;; Menu bar
 
 (cond
- ((string-match "Lucid" (emacs-version))
+ (sgml-running-lucid
   (require 'psgml-lucid)
   (add-hook 'sgml-mode-hook 'sgml-install-lucid-menus))
  (t
@@ -721,6 +717,8 @@ is given.  If COL is given it should be the column to indent to.  If
 ELEMENT is given it should be a parse tree node, from which the level
 is determined."
 	  nil nil)
+
+(autoload 'sgml-doctype-insert "psgml-parse")
 
 (autoload 'sgml-load-dtd "psgml-parse"
 	  "Load a saved DTD from FILE."
