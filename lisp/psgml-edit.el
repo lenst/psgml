@@ -383,7 +383,7 @@ Deprecated: ELEMENT"
     (let ((here (point-marker))
           ;; Where the indentation goes, i.e., will this be data
           element-insert                
-          ;; Where we compute indentation, where the thing we ident is.
+          ;; Where we compute indentation, where the thing we indent is.
           ;; Can be different from above if end-tag is omitted.
           element-level)
       (back-to-indentation)
