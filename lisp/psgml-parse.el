@@ -118,7 +118,7 @@ Tested by sgml-close-element to see if the parse should be ended.")
   (setq sgml-element-map sgml-buffer-element-map
 	sgml-entities sgml-buffer-entities
 	sgml-param-entities sgml-buffer-param-entities
-	sgml-doctype sgml-buffer-doctype)))
+	sgml-doctype sgml-buffer-doctype))
 
 (defun sgml-set-local ()
   "Copy the global DTD data structures to buffer local variables."
