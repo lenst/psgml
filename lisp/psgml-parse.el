@@ -3039,6 +3039,9 @@ entity hierarchy as possible."
     (let ((u (sgml-pstate-top-tree sgml-buffer-parse-state)))
       (when u
 	;;(message "%d" at)
+        (when (and sgml-xml-p (> at (point-min)))
+          (when (eq ?/ (char-after (1- at)))
+            (setq at (1- at))))
 	(while
 	    (cond
 	     ((and (sgml-tree-next u)	; Change clearly in next element
@@ -3793,7 +3796,7 @@ VALUE is a string.  Returns nil or an attdecl."
   (sgml-set-global)
   (setq sgml-current-tree sgml-top-tree)
   (while (stringp (cadr modifier))	; Loop thru the context elements
-    (let ((et (sgml-lookup-eltype (car modifier))))
+    (let ((et (sgml-lookup-eltype (sgml-general-case (car modifier)))))
       (sgml-open-element et nil (point-min) (point-min))
       (setq modifier (cdr modifier))))
 
@@ -3814,7 +3817,8 @@ VALUE is a string.  Returns nil or an attdecl."
       (loop for seenel in (cadr modifier)
 	    do (setq sgml-current-state
 		     (sgml-get-move sgml-current-state
-				    (sgml-lookup-eltype seenel))))))
+				    (sgml-lookup-eltype
+                                     (sgml-general-case seenel)))))))
   
   (let ((top (sgml-pstate-top-tree sgml-buffer-parse-state)))
     (setf (sgml-tree-includes top) (sgml-tree-includes sgml-current-tree))
