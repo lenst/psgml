@@ -1701,10 +1701,9 @@ in any of them."
   (let ((entity
 	 (sgml-lookup-entity name
 			     (sgml-dtd-entities sgml-dtd-info))))
-    (cond ((and (null entity)
-		sgml-warn-about-undefined-entities)
-	   (sgml-log-warning
-	    "Undefined entity %s" name))
+    (cond ((null entity)
+           (when sgml-warn-about-undefined-entities
+             (sgml-log-warning "Undefined entity %s" name)))
 	  ((sgml-entity-data-p entity)
 	   (when sgml-xml-p
 	     (sgml-error
