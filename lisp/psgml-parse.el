@@ -2047,33 +2047,35 @@ If DEPENDENCIES contains the symbol `t', FILE is not considered newer."
   (if (sgml-dtd-merged sgml-dtd-info)
       nil				; Will not merge twice
     (let ((merged (sgml-compiled-dtd pubid file)))
-      (when merged
-	(sgml-map-entities
-	 (function (lambda (entity)
-		     (let ((other
-			    (sgml-lookup-entity
-			     (sgml-entity-name entity)
-			     (sgml-dtd-parameters (cdr merged)))))
-		       (unless (or (null other)
-				   (equal entity other))
-			 (setq merged nil)))))
-	 (sgml-dtd-parameters sgml-dtd-info))
-	(when merged
-	  ;; Do the merger
-	  (setf (sgml-dtd-merged sgml-dtd-info) merged)
-	  (setf (sgml-dtd-eltypes sgml-dtd-info)
-		(sgml-merge-eltypes (sgml-dtd-eltypes sgml-dtd-info)
-				    (sgml-dtd-eltypes (cdr merged))))
-	  (sgml-merge-entity-tables (sgml-dtd-entities sgml-dtd-info)
-				    (sgml-dtd-entities (cdr merged)))
-	  (sgml-merge-entity-tables (sgml-dtd-parameters sgml-dtd-info)
-				    (sgml-dtd-parameters (cdr merged)))
-	  (sgml-merge-shortmaps (sgml-dtd-shortmaps sgml-dtd-info)
-				(sgml-dtd-shortmaps (cdr merged)))
-	  (setf (sgml-dtd-dependencies sgml-dtd-info)
-		(nconc (sgml-dtd-dependencies sgml-dtd-info)
-		       (sgml-dtd-dependencies (cdr merged))))))
-      merged)))
+      (and merged
+	   (block check-entities
+	     (sgml-map-entities
+	      (function (lambda (entity)
+			  (let ((other
+				 (sgml-lookup-entity
+				  (sgml-entity-name entity)
+				  (sgml-dtd-parameters (cdr merged)))))
+			    (unless (or (null other)
+					(equal entity other))
+			      (return-from check-entities nil)))))
+	      (sgml-dtd-parameters sgml-dtd-info))
+	     t)
+	   (progn
+	     ;; Do the merger
+	     (setf (sgml-dtd-eltypes sgml-dtd-info)
+		   (sgml-merge-eltypes (sgml-dtd-eltypes sgml-dtd-info)
+				       (sgml-dtd-eltypes (cdr merged))))
+	     (sgml-merge-entity-tables (sgml-dtd-entities sgml-dtd-info)
+				       (sgml-dtd-entities (cdr merged)))
+	     (sgml-merge-entity-tables (sgml-dtd-parameters sgml-dtd-info)
+				       (sgml-dtd-parameters (cdr merged)))
+	     (sgml-merge-shortmaps (sgml-dtd-shortmaps sgml-dtd-info)
+				   (sgml-dtd-shortmaps (cdr merged)))
+	     (setf (sgml-dtd-dependencies sgml-dtd-info)
+		   (nconc (sgml-dtd-dependencies sgml-dtd-info)
+			  (sgml-dtd-dependencies (cdr merged))))
+	     (setf (sgml-dtd-merged sgml-dtd-info) merged))))))
+
 
 
 ;;;; Pushing and poping entities
