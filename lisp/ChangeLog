@@ -1,3 +1,7 @@
+1999-12-15  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml.el: autoload for sgml-do-set-option
+
 1999-12-03  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml.el (sgml-mode-syntax-table): new variable
