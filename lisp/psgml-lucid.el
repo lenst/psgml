@@ -86,10 +86,10 @@
 (defun sgml-install-lucid-menus ()
   "Install lucid menus for psgml mode"
   (set-buffer-menubar (copy-sequence default-menubar))
-  (add-menu nil (car sgml-sgml-menu) (cdr sgml-sgml-menu) "Help")
-  (add-menu nil (car sgml-markup-menu) (cdr sgml-markup-menu) "Help")
-  (add-menu nil (car sgml-fold-menu) (cdr sgml-fold-menu) "Help")
-  (add-menu nil (car sgml-dtd-menu) (cdr sgml-dtd-menu) "Help"))
+  (add-menu nil (car sgml-sgml-menu) (cdr sgml-sgml-menu))
+  (add-menu nil (car sgml-markup-menu) (cdr sgml-markup-menu))
+  (add-menu nil (car sgml-fold-menu) (cdr sgml-fold-menu))
+  (add-menu nil (car sgml-dtd-menu) (cdr sgml-dtd-menu)))
 
 (defvar sgml-markup-menu
   '("Markup"
