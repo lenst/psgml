@@ -61,7 +61,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "1.0a5"
+(defconst psgml-version "1.0a6"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -209,6 +209,11 @@ If nil, the point will be placed before the inserted tag(s).")
   "*If non-nil, recover from an undefined element by ignoring the tag.
 If nil, recover from an undefined element by assuming it can occur any
 where and has content model ANY.")
+
+(defvar sgml-ignore-out-of-date-cdtd t
+  "*If non-nil, out of date compiled DTDs will not be automatically recompiled.
+A DTD that referes to undefined external entities is always out of date,
+thus in such case it can be useful to set this variable to t.")
 
 (defvar sgml-indent-step 2
   "*How much to increment indent for every element level.
@@ -411,9 +416,11 @@ See `compilation-error-regexp-alist'.")
     sgml-warn-about-undefined-elements
     sgml-warn-about-undefined-entities
     sgml-ignore-undefined-elements
-    sgml-markup-faces
-    sgml-validate-command
+    sgml-ignore-out-of-date-cdtd
+    sgml-default-doctype-name
     sgml-declaration
+    sgml-validate-command
+    sgml-markup-faces
     sgml-system-path
     sgml-public-map
     sgml-catalog-files
@@ -617,6 +624,7 @@ as that may change."
 	 'sgml-live-element-indicator
 	 'sgml-set-face
 	 'sgml-markup-faces
+	 'sgml-public-map
 	 ))))
 
 
