@@ -887,10 +887,11 @@ This may change ELTYPES1, ELTYPES2 is unchanged. Returns the new table."
 	if (boundp et)
 	collect (cons name name)))
 
-(defun sgml-read-element-type (prompt dtd)
+(defun sgml-read-element-type (prompt dtd &optional default)
   "Read an element type name.
 PROMPT is displayed as a prompt and DTD should be the dtd to get the
-element types from."
+element types from. Optional argument DEFAULT (string) will be used as
+a default for the element type name."
   (let ((name
 	 (completing-read prompt
 			  (sgml-dtd-eltypes dtd)
@@ -898,9 +899,9 @@ element types from."
 			  t
 			  nil
 			  nil)))
-    (if (equal name "")
-	(error "Aborted")
-      (sgml-lookup-eltype name dtd))))
+    (when (equal name "")
+      (setq name (or default (error "Aborted"))))
+    (sgml-lookup-eltype name dtd)))
 
 (defun sgml-map-eltypes (fn dtd &optional collect all)
   (let ((*res* nil))
@@ -1398,7 +1399,8 @@ in any of them."
   (let ((entity
 	 (sgml-lookup-entity name
 			     (sgml-dtd-entities sgml-dtd-info))))
-    (cond ((null entity)
+    (cond ((and (null entity)
+		sgml-warn-about-undefined-entities)
 	   (sgml-log-warning
 	    "Undefined entity %s" name))
 	  ((sgml-entity-data-p entity)
@@ -1683,8 +1685,7 @@ FILES is a list of catalogs to use. PUBID is the public identifier
 (defun sgml-path-lookup (extid type name)
   (let* ((pubid (car extid))
 	 (sysid (cdr extid))
-	 (subst (list '(?% ?%)))
-	 res)
+	 (subst (list '(?% ?%))))
     (when pubid
       (nconc subst (list (cons ?p (sgml-transliterate-file pubid)))
 	     (sgml-pubid-parts pubid))
@@ -1700,7 +1701,7 @@ FILES is a list of catalogs to use. PUBID is the public identifier
 	  thereis
 	  (and (setq cand (sgml-subst-expand cand subst))
 	       (file-readable-p
-		(setq res (substitute-in-file-name cand)))
+		(setq cand (substitute-in-file-name cand)))
 	       (not (file-directory-p cand))
 	       cand))))
 
@@ -3433,12 +3434,12 @@ pointing to start of short ref and point pointing to the end."
 	     (setf (sgml-eltype-mixed et) t)
 	     (setf (sgml-eltype-etag-optional et) t)
 	     (when sgml-warn-about-undefined-elements
-	     (sgml-log-warning
-	      "Start-tag of undefined element %s; assume O O ANY"
-	      (sgml-eltype-name et))))
-      (sgml-open-element et sgml-conref-flag sgml-markup-start (point) asl)
-      (when net-enabled
-	(setf (sgml-tree-net-enabled sgml-current-tree) t))))))
+	       (sgml-log-warning
+		"Start-tag of undefined element %s; assume O O ANY"
+		(sgml-eltype-name et))))
+	   (sgml-open-element et sgml-conref-flag sgml-markup-start (point) asl)
+	   (when net-enabled
+	     (setf (sgml-tree-net-enabled sgml-current-tree) t))))))
 
 (defun sgml-do-empty-start-tag ()
   "Return eltype to use if empty start tag"
