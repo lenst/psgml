@@ -1,4 +1,6 @@
-TODO      [Time-stamp: "2000-04-16 21:12:29 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2000-05-15 19:06:48 lenst"]           -*- outline -*- 
+
+* Restore window config after edit-attr
 
 * Indent and fill
 
@@ -106,3 +108,13 @@ attributes. The check against the DTD will fill in attribute names for
 attributes specified with a value only. This is also the time to check
 for CONREF and check that all required attributes are given.
 
+* For 1.2
+
+** Syntax
+
+;; Request by:  Michael Hucka <mhucka@bbb.caltech.edu>
+(defvar sgml-mode-syntax-table
+  (let ((s (copy-syntax-table text-mode-syntax-table)))
+    (modify-syntax-entry ?< "(<"  s)
+    (modify-syntax-entry ?> ")>"  s)
+    s))

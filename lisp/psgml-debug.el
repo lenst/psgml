@@ -1,5 +1,5 @@
 ;;;;\filename psgml-debug.el
-;;;\Last edited: 2000-04-16 17:52:20 lenst
+;;;\Last edited: 2000-05-26 23:47:53 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -453,6 +453,7 @@
           (throw 'show-data-stop nil))))))
 
 ;;;; Show current element type
+;; Candidate for C-c C-t
 
 (defun sgml-show-current-element-type ()
   (interactive)
