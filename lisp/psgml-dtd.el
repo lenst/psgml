@@ -35,12 +35,15 @@
 ;;;; Variables
 
 ;; Variables used during doctype parsing and loading
-(defvar sgml-used-pcdata nil)		; True if model group built is mixed
+(defvar sgml-used-pcdata nil
+  "True if model group built is mixed")
 
 (defvar sgml-dtd-shortmaps nil
   "List of short reference maps.
 Used while parsing the DTD.")
 
+(defvar sgml-no-elements nil
+  "Number of declared elements.")
 
 ;;;; Constructing basic
 
@@ -149,59 +152,65 @@ Syntax: var dfa-expr &body forms"
 		 (sgml-move-dest (sgml-moves-lookup (sgml-move-token m)
 						    (sgml-state-reqs s2)))))))
 
-(defun sgml-other-start-state (s)
-  ;; Look for another state accesible from S that is
-  ;; equivalent to S.  Using this state insted may save a state.
-  ;; This optimization should be safe, and appropriate for * and +.
-  (sgml-debug "OPT other start: reqs %d opts %d"
+(defun sgml-remove-redundant-states-1 (s)
+  ;; Remove states accessible from s with one move and equivalent to s,
+  ;; by changing the moves from s.
+  (sgml-debug "OPT redundant-1: reqs %d opts %d"
 	      (length (sgml-state-reqs s))
 	      (length (sgml-state-opts s)))
-  (let ((considered nil)
-	(l (append (sgml-state-reqs s)
-		   (sgml-state-opts s)))
+  (let ((yes nil)
+	(no (list s))
+	(l (sgml-state-reqs s))
+	(nl (sgml-state-opts s))
 	(res s)
 	dest)
-    (while l
+    (while (or l (setq l (prog1 nl (setq nl nil))))
       (cond
-       ((and (sgml-normal-state-p (setq dest (sgml-move-dest (car l))))
-	     (if (memq dest considered)
-		 nil
-	       (push dest considered))
-	     (sgml-states-equal s dest))
-	(sgml-debug "OPT other start: sucess")
-	(setq res dest
-	      l nil))
-       (t (setq l (cdr l)))))
-    res))
+       ((not (sgml-normal-state-p (setq dest (sgml-move-dest (car l))))))
+       ((memq dest no))
+       ((memq dest yes))
+       ((sgml-states-equal s dest)
+	(progn (push dest yes))))
+      (setq l (cdr l)))
+    (setq l (sgml-state-opts s)
+	  nl (sgml-state-reqs s))
+    (when yes
+      (sgml-debug "OPT redundant-1: sucess %s" (length yes))
+      (while (or l (setq l (prog1 nl (setq nl nil))))
+	(cond ((memq (sgml-move-dest (car l)) yes)
+	       (setf (sgml-move-dest (car l)) s)))
+	(setq l (cdr l))))))
+	  
 
 
 ;;;; Constructing
 
-(defun sgml-make-primitive-content-token (token)
+(defsubst sgml-make-primitive-content-token (token)
   (let ((s1 (sgml-make-state))
 	(s2 (sgml-make-state)))
     (sgml-add-req-move s1 token s2)
     s1))
 
 (defun sgml-make-opt (s1)
-  (setf (sgml-state-opts s1)
-	(append (sgml-state-opts s1)
-		(sgml-state-reqs s1)))
-  (setf (sgml-state-reqs s1) nil)
+  (when (sgml-state-reqs s1)
+    (setf (sgml-state-opts s1)
+	  (nconc (sgml-state-opts s1)
+		 (sgml-state-reqs s1)))
+    (setf (sgml-state-reqs s1) nil))
   s1)
 
 (defun sgml-make-* (s1)
   (setq s1 (sgml-make-+ s1))
-  (cond ((sgml-state-reqs s1)
-	 (sgml-other-start-state	; optimize
-	  (sgml-make-opt s1)))		; make-opt needed thoug
-	(t
-	 s1)))
+  (when (sgml-state-reqs s1)
+    (sgml-make-opt s1))
+  (sgml-remove-redundant-states-1 s1)
+  s1)
 
 (defun sgml-make-+ (s1)
   (sgml-for-all-final-states s s1
     (sgml-copy-moves-to-opt s1 s))
-  (sgml-other-start-state s1))		; optimize
+  (sgml-remove-redundant-states-1 s1)	; optimize
+  s1)
 
 (defun sgml-make-conc (s1 s2)
   (let ((moves (append (sgml-state-reqs s1) (sgml-state-opts s1))))
@@ -214,16 +223,8 @@ Syntax: var dfa-expr &body forms"
 	(sgml-copy-moves s2 s1)))
      (t					; general case
       (sgml-for-all-final-states s s1
-	(sgml-copy-moves s2 s)))))
-  s1)
-
-(defun sgml-make-alt (s1 s2)
-  (cond ((or (sgml-state-final-p s1)	; is result optional
-	     (sgml-state-final-p s2))
-	 (sgml-make-opt s1)
-	 (sgml-copy-moves-to-opt s2 s1))
-	(t
-	 (sgml-copy-moves s2 s1)))
+	(sgml-copy-moves s2 s)
+	(sgml-remove-redundant-states-1 s)))))
   s1)
 
 (defun sgml-make-pcdata ()
@@ -238,9 +239,13 @@ Syntax: var dfa-expr &body forms"
 
 (defun sgml-reduce-| (l)
   (while (cdr l)			; apply the binary make-alt
-    (setcar (cdr l)			; reducing the list l
-	    (sgml-make-alt (car l) (cadr l)))
-    (setq l (cdr l)))
+    (cond ((or (sgml-state-final-p (car l))	; is result optional
+	       (sgml-state-final-p (cadr l)))
+	   (sgml-make-opt (car l))
+	   (sgml-copy-moves-to-opt (cadr l) (car l)))
+	  (t
+	   (sgml-copy-moves (cadr l) (car l))))
+    (setcdr l (cddr l)))
   (sgml-one-final-state (car l))	; optimization
   (car l))
 
@@ -356,7 +361,7 @@ Syntax: var dfa-expr &body forms"
 	     (goto-char p)
 	     nil))))))
 
-(defun sgml-parse-connector ()
+(defsubst sgml-parse-connector ()
   (sgml-skip-ps)
   (cond ((sgml-parse-delim "SEQ")
 	 (function sgml-reduce-,))
@@ -472,14 +477,13 @@ Case transformed for general names."
   (sgml-make-primitive-content-token
    (sgml-eltype-token
     (sgml-lookup-eltype
-     (sgml-general-case
-      (sgml-check-name))))))
+     (sgml-check-name)))))
 
 (defun sgml-check-model-group ()
   (sgml-skip-ps)
   (let (el mod)
     (cond
-     ((sgml-parse-delim GRPO)
+     ((sgml-parse-delim "GRPO")
       (let ((subs (list (sgml-check-model-group)))
 	    (con1 nil)
 	    (con2 nil))
@@ -489,19 +493,19 @@ Case transformed for general names."
 		 (sgml-parse-error "Mixed connectors")))
 	  (setq con1 con2)
 	  (setq subs (nconc subs (list (sgml-check-model-group)))))
-	(sgml-check-delim GRPC)
+	(sgml-check-delim "GRPC")
 	(setq el (if con1
 		     (funcall con1 subs)
 		   (car subs)))))
      ((sgml-parse-rni "pcdata")		; #PCDATA
       (setq sgml-used-pcdata t)
       (setq el (sgml-make-pcdata)))
-     ((sgml-parse-delim DTGO)			; data tag group
+     ((sgml-parse-delim "DTGO")			; data tag group
       (sgml-skip-ts)
       (let ((tok (sgml-check-primitive-content-token)))
-	(sgml-skip-ts) (sgml-check-delim SEQ)
+	(sgml-skip-ts) (sgml-check-delim "SEQ")
 	(sgml-skip-ts) (sgml-check-data-tag-pattern)
-	(sgml-skip-ts) (sgml-check-delim DTGC)
+	(sgml-skip-ts) (sgml-check-delim "DTGC")
 	(setq el (sgml-make-conc tok (sgml-make-pcdata)))
 	(setq sgml-used-pcdata t)))
      (t
@@ -563,7 +567,10 @@ Case transformed for general names."
 			  stag-opt etag-opt model
 			  exclusions inclusions
 			  sgml-used-pcdata)
-      (setq names (cdr names)))))
+      (setq names (cdr names)))
+    (message "Parsing doctype (%s elements)..."
+	     (incf sgml-no-elements))
+    ))
 
 
 ;;;; Parse doctype: Entity
@@ -743,6 +750,7 @@ Case transformed for general names."
   ;; Parse the part of a DOCTYPE declaration after the <!DOCTYPE and 
   ;; before the >
   (message "Parsing doctype...")
+  (setq sgml-no-elements 0)
   (let ((docname (sgml-check-name))
 	(external (sgml-parse-external)))
     (setq sgml-dtd-info (sgml-make-dtd docname)) ; Create a empty DTD struct
@@ -773,6 +781,7 @@ Case transformed for general names."
   (interactive)
   (sgml-clear-log)
   (message "Parsing prolog...")
+  (sgml-cleanup-entities)
   (sgml-set-global)
   (setq	sgml-dtd-info nil)
   (goto-char (point-min))
