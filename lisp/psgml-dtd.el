@@ -519,7 +519,7 @@ Case transformed for general names."
 	 (sgml-check-content-model))
 	(t
 	 ;; ANY, CDATA, RCDATA or EMPTY
-	 (let ((dc (intern (sgml-check-name)))) 
+	 (let ((dc (intern (sgml-check-case (sgml-check-name))))) 
 	   (cond ((eq dc 'ANY)
 		  (setq sgml-used-pcdata t))
 		 ((eq dc 'CDATA)
@@ -536,7 +536,7 @@ Case transformed for general names."
                                   "ANY, CDATA, RCDATA or EMPTY"))))
 	   dc))))
 
-(defun sgml-parse-exeption (type)
+(defun sgml-parse-exception (type)
   (sgml-skip-ps)
   (if (sgml-parse-char type)
       (if sgml-xml-p
@@ -560,8 +560,8 @@ Case transformed for general names."
 	 (etag-opt (sgml-parse-opt))
 	 (sgml-used-pcdata nil)
 	 (model (sgml-check-content))
-	 (exclusions (sgml-parse-exeption ?-))
-	 (inclusions (sgml-parse-exeption ?+)))
+	 (exclusions (sgml-parse-exception ?-))
+	 (inclusions (sgml-parse-exception ?+)))
     (sgml-before-eltype-modification)
     (while names
       (sgml-debug "Defining element %s" (car names))
@@ -616,7 +616,7 @@ Case transformed for general names."
 	    (let ((token (intern (sgml-check-case (sgml-check-name)))))
 	      (sgml-skip-ps)
 	      (when (and sgml-xml-p
-			 (memq token '(cdata sdata pi starttag endtag ms md)))
+			 (memq token '(CDATA SDATA PI STARTTAG ENDTAG MS MD)))
 		(sgml-error "XML forbids %s entities."
 			    (upcase (symbol-name token))))
 	      (cond
@@ -647,16 +647,14 @@ Case transformed for general names."
   (let ((type (sgml-parse-name))
 	(notation nil))
     (when type
-      (setq type (intern (downcase (sgml-check-case type))))
-      (when (and sgml-xml-p (memq type '(subdoc cdata sdata)))
+      (setq type (intern (sgml-check-case type)))
+      (when (and sgml-xml-p (memq type '(SUBDOC CDATA SDATA)))
 	(sgml-error "XML forbids %s entities."
 		    (upcase (symbol-name type))))
-      (cond ((eq type 'subdoc))
-	    ((memq type '(cdata ndata sdata))
+      (cond ((eq type 'SUBDOC))
+	    ((memq type '(CDATA NDATA SDATA))
 	     (sgml-skip-ps)
 	     (setq notation (sgml-parse-name))
-	     (when notation
-	       (setq notation (intern (downcase (sgml-check-case notation)))))
 	     ;;149.2+ data attribute specification
 	     ;;                      = 65 ps+, DSO,
 	     ;;                        31 attribute specification list,
@@ -667,8 +665,7 @@ Case transformed for general names."
 	       (sgml-parse-s)
 	       (sgml-check-delim DSC)))
 	    (t (sgml-error "Illegal entity type: %s" type))))
-    (cons type notation)
-    ))
+    (cons type notation)))
 
 
 ;;;; Parse doctype: Attlist
