@@ -110,6 +110,9 @@ commands.")
 (defvar sgml-throw-on-warning nil
   "Set to a symbol other than nil to make sgml-log-warning throw to that symbol.")
 
+(defvar sgml-throw-on-error nil
+  "Set to a symbol other than nil to make sgml-error throw to that symbol.")
+
 (defvar sgml-show-warnings nil
   "Set to t to show warnings.")
 
@@ -1062,7 +1065,9 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (let ((cb (current-buffer))
 	  (tem nil)
 	  (dtd nil)
-	  (l (buffer-list)))
+	  (l (buffer-list))
+	  (find-file-type		; Allways binary
+	   (function (lambda (fname) 1))))
       ;; Search loaded buffer for a already loaded DTD
       (while (and l (null tem))
 	(set-buffer (car l))
@@ -1102,10 +1107,17 @@ settings in ENTS."
   ;;(Assume the current buffer is a scratch buffer and is empty)
   (sgml-debug "Trying to load compiled DTD from %s..." cfile)
   (or (and (file-readable-p cfile)
-	   (insert-file-contents cfile nil nil nil t)
+	   (let ((find-file-type	; Allways binary
+		     (function (lambda (fname) 1))))
+	     ;; fifth arg to insert-file-contents is not available in early
+	     ;; v19.
+	     (insert-file-contents cfile nil nil nil))
 	   (equal '(sgml-saved-dtd-version 6) (sgml-read-sexp))
-	   (or sgml-ignore-out-of-date-cdtd
-	       (sgml-up-to-date-p cfile (sgml-read-sexp))))
+	   (or (sgml-up-to-date-p cfile (sgml-read-sexp))
+	       (if (eq 'ask sgml-ignore-out-of-date-cdtd)
+		   (not (y-or-n-p
+			 "Compiled DTD is out of date, recompile? "))
+		 sgml-ignore-out-of-date-cdtd)))
       (sgml-compile-dtd dtdfile cfile ents)))
 
 (defun sgml-up-to-date-p (file dependencies)
@@ -2197,13 +2209,15 @@ overrides the entity type in entity look up."
      ((and sgml-parsing-dtd
 	   (consp (sgml-entity-text entity))) ; external id?
       (let ((file (sgml-entity-file entity type)))
+	(sgml-debug "Push to %s = %s" (sgml-entity-text entity) file)
 	(cond
 	 ((and file
 	       (sgml-try-merge-compiled-dtd (car (sgml-entity-text entity))
 					    file))
 	  (goto-char (point-max)))
 	 (file
-	  (insert-file-contents file nil nil nil t)
+	  ;; fifth arg not available in early v19
+	  (insert-file-contents file nil nil nil)
 	  (goto-char (point-min))
 	  (push file (sgml-dtd-dependencies sgml-dtd-info)))
 	 (t
@@ -2649,6 +2663,9 @@ entity hierarchy as possible."
 	       sgml-current-tree (sgml-tree-parent sgml-current-tree))
 	 (assert sgml-current-state))))
 
+(defun sgml-fake-close-element (tree)
+  (sgml-tree-parent tree))
+
 (defun sgml-note-change-at (at &optional end)
   ;; Inform the cache that there have been some changes after AT
   (when sgml-buffer-parse-state
@@ -2793,6 +2810,8 @@ The symbols are the tokens used in the DFAs."
     (set-buffer cb)))
 
 (defun sgml-error (format &rest things)
+  (when sgml-throw-on-error
+    (throw sgml-throw-on-error nil))
   (while (and (boundp 'sgml-previous-buffer) sgml-previous-buffer)
     (when sgml-current-eref
       (sgml-log-message
@@ -3489,19 +3508,12 @@ pointing to start of short ref and point pointing to the end."
 		 (sgml-log-warning
 		  "NET enabling start-tag is not allowed with SHORTTAG NO"))))
        (sgml-check-tag-close)))
-    (while				; Until token accepted
-	(cond
-	 ((not (sgml-eltype-defined et)) nil)
-	 ((eq sgml-current-state sgml-any) nil)
-	 ((and (not (memq et (sgml-excludes)))
-	       (setq temp (sgml-get-move sgml-current-state et)))
-	  (setq sgml-current-state temp)
-	  nil)
-	 ((and (memq et (sgml-includes))
-	       (not (memq et (sgml-excludes))))
-	  nil)
-	 ((sgml-do-implied
-	   (format "%s start-tag" (sgml-eltype-name et))))))
+    (sgml-execute-implied (sgml-list-implications et)
+			  (format "%s start-tag" (sgml-eltype-name et)))
+    (unless (eq sgml-any sgml-current-state)
+      (setq sgml-current-state
+	    (or (sgml-get-move sgml-current-state et)
+		sgml-current-state)))
     (sgml-set-markup-type 'start-tag)
     (cond ((and sgml-ignore-undefined-elements
 		(not (sgml-eltype-defined et)))
@@ -3517,9 +3529,70 @@ pointing to start of short ref and point pointing to the end."
 	       (sgml-log-warning
 		"Start-tag of undefined element %s; assume O O ANY"
 		(sgml-eltype-name et))))
-	   (sgml-open-element et sgml-conref-flag sgml-markup-start (point) asl)
+	   (sgml-open-element et sgml-conref-flag
+			      sgml-markup-start (point) asl)
 	   (when net-enabled
 	     (setf (sgml-tree-net-enabled sgml-current-tree) t))))))
+
+(defun sgml-list-implications (et)
+  "Return a list of the tags implied by a start-tag with type ET.
+ET is an eltype, and the list elemennts are either eltype or `t'.
+Where the latter represents end-tags."
+  (let ((state sgml-current-state)
+	(tree sgml-current-tree)
+	(temp nil)
+	(imps nil))
+    (while				; Until token accepted
+	(cond
+	 ;; Test if accepted in state
+	 ((or (not (sgml-eltype-defined et));***??
+	      (eq state sgml-any)
+	      (and (not (memq et (sgml-excludes)))
+		   (or (memq et (sgml-includes))
+		       (sgml-get-move state et))))
+	  nil)
+	 ;; Test if end tag implied
+	 ((and (sgml-final-p state)
+	       (not (eq tree sgml-top-tree)))
+	  (setq state (sgml-tree-pstate tree)
+		tree (sgml-fake-close-element tree))
+	  (push t imps)
+	  t)
+	 ;; Test if start-tag can be implied
+	 ((and (setq temp (sgml-required-tokens state))
+	       (null (cdr temp)))
+	  (setq temp (car temp)
+		tree (sgml-fake-open-element tree temp)
+		state (sgml-element-model tree))
+	  (push temp imps)
+	  t)
+	 ;; No implictions and not accepted
+	 (t
+	  (sgml-log-warning
+	   "Out of context start-tag %s"
+	   (sgml-eltype-name et))
+	  (setq imps nil))))
+    ;; Return the implications in correct order
+    (nreverse imps)))
+
+(defun sgml-execute-implied (imps type)
+  (loop for et in imps do
+	(if (eq t et)
+	    (sgml-implied-end-tag type sgml-markup-start sgml-markup-start;***
+				  )
+	  (setq sgml-current-state
+		(sgml-get-move sgml-current-state et))
+	  (when sgml-throw-on-element-change
+	    (throw sgml-throw-on-element-change 'start))
+	  (sgml-open-element (sgml-token-eltype et)
+			     nil sgml-markup-start sgml-markup-start)
+	  (unless (and sgml-current-omittag
+		       (sgml-element-stag-optional sgml-current-tree))
+	    (sgml-log-warning
+	     "%s start-tag implied by %s; not minimizable"
+	     (sgml-eltype-name et)
+	     type)))))
+
 
 (defun sgml-do-empty-start-tag ()
   "Return eltype to use if empty start tag"
@@ -3637,6 +3710,7 @@ pointing to start of short ref and point pointing to the end."
 	       (following-char))))
   
 (defun sgml-do-implied (type &optional temp)
+  ;; *** can this be obsoleted?
   (cond
    ((sgml-final-p sgml-current-state)
     (sgml-implied-end-tag type sgml-markup-start sgml-markup-start)
@@ -3652,7 +3726,6 @@ pointing to start of short ref and point pointing to the end."
     (unless (and sgml-current-omittag
 		 (sgml-element-stag-optional sgml-current-tree))
       (sgml-log-warning
-
        "%s start-tag implied by %s; not minimizable"
        (car temp) type))
     t)
