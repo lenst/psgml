@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: Fri Sep 23 09:30:21 1994 by lenst@lysita (Lennart Staflin)
+;;;\Last edited: Sat Oct 29 02:46:23 1994 by lenst@lysita (Lennart Staflin)
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -74,11 +74,14 @@
 
 ;;;; dump
 
-(defun sgml-dump-dtd ()
+(defun sgml-dump-dtd (&optional dtd)
   (interactive )
+  (unless dtd
+    (setq dtd (sgml-pstate-dtd sgml-buffer-parse-state)))
   (with-output-to-temp-buffer "*DTD dump*"
-    (loop for et being the symbols of
-	  (sgml-dtd-eltypes (sgml-pstate-dtd sgml-buffer-parse-state))
+    (princ (format "Dependencies: %S\n"
+		   (sgml-dtd-dependencies dtd)))
+    (loop for et being the symbols of (sgml-dtd-eltypes dtd)
 	  do (sgml-dp-element et))))
 
 (defun sgml-dump-element (el-name)
@@ -169,7 +172,8 @@
 
 (defun test-sgml (start)
   (interactive "p")
-  (let (file)
+  (let (file
+	(sgml-show-warnings t))
     (with-output-to-temp-buffer "*Testing psgml*"
       (while
 	  (progn
@@ -223,36 +227,18 @@
 	  sgml-parser-loop
 	  sgml-parse-markup-declaration
 	  sgml-do-processing-instruction
+	  sgml-pop-entity
+	  sgml-tree-net-enabled
+	  sgml-do-end-tag
+	  sgml-do-data
 	  sgml-deref-shortmap
 	  sgml-handle-shortref
-	  sgml-do-end-tag
 	  sgml-do-start-tag
 	  sgml-do-general-entity-ref
-	  sgml-pop-entity
-	  sgml-pcdata-move
-	  sgml-skip-cdata
-	  sgml-eltype-mixed
 	  sgml-set-face-for
+	  sgml-pcdata-move
 	  sgml-shortmap-skipstring
-	  ;; In sgml-do-end-tag
-	  sgml-lookup-eltype
-	  sgml-check-tag-close
-	  sgml-implied-end-tag
-	  sgml-close-element
-	  sgml-eltype-name
-	  sgml-element-gi
-	  sgml-required-tokens
-	  ;; in do pcdata move
-	  sgml-do-implied
-	  ;;sgml-next-sub&
-	  ;;sgml-get-&move
-	  ;; in sgml-do-start-tag
-	  sgml-parse-attribute-specification-list
-	  sgml-open-element
-	  ;; in sgml-parse-general-entity-ref
-	  sgml-push-to-entity
-	  sgml-parse-name
-	  sgml-lookup-entity
+	  ;;
 	  ))
   (elp-instrument-list))
 
