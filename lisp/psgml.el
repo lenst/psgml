@@ -64,7 +64,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "0.3a3"
+(defconst psgml-version "0.3a4"
   "Version of psgml package.")
 
 (require 'cl)
@@ -354,6 +354,9 @@ running the sgml-validate-command.")
   (setq sgml-mode-map (make-sparse-keymap)))
 
 ;;; Menu bar
+
+(eval-when-compile
+  (autoload 'sgml-build-custom-menus "psgml-ohter")) ; Avoid compiler warnings
 
 (cond
  (sgml-running-lucid
