@@ -337,7 +337,9 @@ Syntax: var dfa-expr &body forms"
 	((sgml-parse-delim "OR")
 	 (function sgml-reduce-|))
 	((sgml-parse-delim "AND")
-	 (function sgml-make-&))))
+	 (if sgml-xml-p
+	     (sgml-error "XML forbids AND connector.")
+	   (function sgml-make-&)))))
 
 (defun sgml-parse-name-group ()
   "Parse a single name or a name group (general name case) .
@@ -383,6 +385,8 @@ Case transformed for general names."
 ;;;                      |  [[119 ranked group]]
   (cond
    ((sgml-parse-delim GRPO)
+    (when sgml-xml-p
+      (sgml-error "XML forbids name groups for the element type"))
     (sgml-skip-ts)
     (let ((names (list (sgml-check-name))))
       (while (progn (sgml-skip-ts)
@@ -405,8 +409,8 @@ Case transformed for general names."
 	      name))))))
 
 
-(defun sgml-check-external ()
-  (or (sgml-parse-external)
+(defun sgml-check-external (&optional pubid-ok)
+  (or (sgml-parse-external pubid-ok)
       (sgml-parse-error "Expecting a PUBLIC or SYSTEM")))
 
 ;;;; Parse doctype: notation
@@ -421,7 +425,7 @@ Case transformed for general names."
   (sgml-skip-ps)
   (sgml-check-name)
   (sgml-skip-ps)
-  (sgml-check-external))
+  (sgml-check-external t))
 
 
 ;;;; Parse doctype: Element
@@ -430,9 +434,13 @@ Case transformed for general names."
   (sgml-skip-ps)
   (cond ((or (sgml-parse-char ?o)
 	     (sgml-parse-char ?O))
-	 t)
+	 (if sgml-xml-p
+	      (sgml-error "XML forbids omitted tag minimization.")
+	   t))
 	((sgml-parse-char ?-)
-	 nil)))
+	 (if sgml-xml-p
+	     (sgml-error "XML forbids omitted tag minimization.")
+	   nil))))
 
 (defun sgml-parse-modifier ()
   (cond ((sgml-parse-delim PLUS)
@@ -471,6 +479,8 @@ Case transformed for general names."
       (setq sgml-used-pcdata t)
       (setq el (sgml-make-pcdata)))
      ((sgml-parse-delim "DTGO")			; data tag group
+      (when sgml-xml-p
+	(sgml-error "XML forbids DATATAG."))
       (sgml-skip-ts)
       (let ((tok (sgml-check-primitive-content-token)))
 	(sgml-skip-ts) (sgml-check-delim "SEQ")
@@ -513,15 +523,23 @@ Case transformed for general names."
 	(t
 	 ;; ANY, CDATA, RCDATA or EMPTY
 	 (let ((dc (intern (upcase (sgml-check-name))))) 
-	   (when (eq dc 'ANY)
-	     (setq sgml-used-pcdata t))
+	   (cond ((eq dc 'ANY)
+		  (setq sgml-used-pcdata t))
+		 ((eq dc 'CDATA)
+		  (when sgml-xml-p
+		    (sgml-error "XML forbids CDATA declared content.")))
+		 ((eq dc 'RCDATA)
+		  (when sgml-xml-p
+		    (sgml-error "XML forbids RCDATA declared content"))))
 	   dc))))
 
 (defun sgml-parse-exeption (type)
   (sgml-skip-ps)
   (if (sgml-parse-char type)
-      (mapcar (function sgml-lookup-eltype)
-	      (sgml-check-name-group))))
+      (if sgml-xml-p
+	   (sgml-error "XML forbids inclusion and exclusion exceptions.")
+	(mapcar (function sgml-lookup-eltype)
+		(sgml-check-name-group)))))
 
 (defun sgml-before-eltype-modification ()
 ;;;  (let ((merged (sgml-dtd-merged sgml-dtd-info)))
@@ -588,8 +606,12 @@ Case transformed for general names."
 	    (setq type (or (sgml-parse-entity-type) 'text))
 	    extid)
 	   ((sgml-startnm-char-next)
-	    (let ((token (intern (sgml-check-name))))
+	    (let ((token (intern (sgml-check-case (sgml-check-name)))))
 	      (sgml-skip-ps)
+	      (when (and sgml-xml-p
+			 (memq token '(cdata sdata pi starttag endtag ms md)))
+		(sgml-error "XML forbids %s entities."
+			    (upcase (symbol-name token))))
 	      (cond
 	       ((memq token '(cdata sdata)) ; data text ***
 		(setq type token)
@@ -617,7 +639,10 @@ Case transformed for general names."
   ;;                             149.2+ data attribute specification?)
   (let ((type (sgml-parse-name)))
     (when type
-      (setq type (intern (downcase type)))
+      (setq type (intern (sgml-check-case type)))
+      (when (and sgml-xml-p (memq type '(subdoc cdata sdata)))
+	(sgml-error "XML forbids %s entities."
+		    (upcase (symbol-name type))))
       (cond ((eq type 'subdoc))
 	    ((memq type '(cdata ndata sdata))
 	     (sgml-skip-ps)
@@ -639,11 +664,15 @@ Case transformed for general names."
 
 (defun sgml-declare-attlist ()
   (let* ((assnot (cond ((sgml-parse-rni "notation")
+			(when sgml-xml-p
+			  (sgml-error "XML forbids data attribute declarations"))
 			(sgml-skip-ps)
 			t)))
 	 (assel (sgml-check-name-group))
-	 (attlist nil)			; the list
+	 (attlist nil)
 	 (attdef nil))
+    (when (and sgml-xml-p (> (length assel) 1))
+      (sgml-error "XML forbids name groups for an associated element type."))
     (while (setq attdef (sgml-parse-attribute-definition))
       (push attdef attlist))
     (setq attlist (nreverse attlist))
@@ -651,7 +680,16 @@ Case transformed for general names."
       (sgml-before-eltype-modification)
       (loop for elname in assel do
 	    (setf (sgml-eltype-attlist (sgml-lookup-eltype elname))
-		  attlist)))))
+		  (sgml-merge-attlists
+		   (sgml-eltype-attlist
+		    (sgml-lookup-eltype elname))
+		   attlist))))))
+
+(defun sgml-merge-attlists (old new)
+  (loop for att in new do
+	(unless (assoc (car att) old)
+	  (setq old (cons att old))))
+  old)
 
 (defun sgml-parse-attribute-definition ()
   (sgml-skip-ps)
@@ -666,21 +704,54 @@ Case transformed for general names."
   (let ((type 'name-token-group)
 	(names nil))
     (unless (eq (following-char) ?\()
-      (setq type (intern (sgml-check-name)))
+      (setq type (intern (sgml-check-case (sgml-check-name))))
+      (sgml-validate-declared-value type)
       (sgml-skip-ps))
     (when (memq type '(name-token-group notation))
       (setq names (sgml-check-nametoken-group)))
     (sgml-make-declared-value type names)))
 
+(defun sgml-validate-declared-value (type)
+  (unless (memq type
+		'(cdata
+		  entity
+		  entities
+		  id
+		  idref
+		  idrefs
+		  name
+		  names
+		  nmtoken
+		  nmtokens
+		  notation
+		  number
+		  numbers
+		  nutoken
+		  nutokens))
+    (sgml-error "Invalid attribute declared value: %s" type))
+  (when (and sgml-xml-p (memq type
+			      '(name names number numbers nutoken nutokens)))
+    (sgml-error "XML forbids %s attributes." (upcase (symbol-name type)))))
+
 (defun sgml-check-default-value ()
   (sgml-skip-ps)
   (let* ((rni (sgml-parse-rni))
-	 (key (if rni (intern (sgml-check-name)))))
+	 (key (if rni (intern (sgml-check-case (sgml-check-name))))))
+    (if rni (sgml-validate-default-value-rn key))
     (sgml-skip-ps)
     (sgml-make-default-value
      key
      (if (or (not rni) (eq key 'fixed))
 	 (sgml-check-attribute-value-specification)))))
+
+(defun sgml-validate-default-value-rn (rn)
+  (unless (memq rn '(required fixed current conref implied))
+    (sgml-error "Unknown reserved name: %s."
+		(upcase (symbol-name rn))))
+  (when (and sgml-xml-p (memq rn '(current conref)))
+    (sgml-error "XML forbids #%s attributes."
+		(upcase (symbol-name rn)))))
+  
 
 
 ;;;; Parse doctype: Shortref

@@ -6,7 +6,7 @@
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Acknowledgment:
 ;;   The catalog parsing code was contributed by
-;;      David Megginson <dmeggins@aix1.uottawa.CA>
+;;      David Megginson <dmeggins@microstar.com>
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License
@@ -732,8 +732,10 @@ If ATTSPEC is nil, nil is returned."
 ;;       sysid = nil | string
 ;;       dir   = string
 
-(defun sgml-make-extid (pubid sysid &optional dir)
-  (cons pubid (cons sysid (or dir default-directory))))
+(defun sgml-make-extid (pubid sysid &optional pubid-ok)
+  (and sgml-xml-p (not pubid-ok) pubid (not sysid)
+    (sgml-error "XML requires a system ID after a public ID."))
+  (cons pubid (cons sysid default-directory)))
 
 (defun sgml-extid-pubid (extid)
   (car extid))
@@ -1318,6 +1320,11 @@ ends at point."
       ;; Some combinations
       "MS-START" "<!["			; MDO DSO
       "MS-END"   "]]>"			; MSC MDC
+      ;; XML stuff
+      "XML-ECOM"   "-->"		; end an XML comment
+      "XML-PIC"    "?>"			; end an XML processing instruction
+      "XML-SCOM"   "<!--"		; start an XML comment
+      "XML-TAGCE"  "/>"			; end an XML empty element
       ;; Pseudo
       "NULL"  ""
       )))
@@ -1506,16 +1513,25 @@ in any of them."
 
 (defun sgml-do-processing-instruction ()
   (let ((start (point)))
-    (sgml-skip-upto "PIC")
+    (if sgml-xml-p
+	(sgml-skip-upto "XML-PIC")
+      (sgml-skip-upto "PIC"))
     (when sgml-pi-function
 	  (funcall sgml-pi-function
 		   (buffer-substring-no-properties start (point)))))
-  (sgml-check-delim "PIC")
+  (if sgml-xml-p
+      (sgml-check-delim "XML-PIC")
+    (sgml-check-delim "PIC"))
   (sgml-set-markup-type 'pi)
   t)
 
 
-(defmacro sgml-general-case (string)  (`(downcase (, string))))
+(defmacro sgml-general-case (string)
+  (`(let ((sgml-general-case (, string)))
+      (if sgml-namecase-general
+	  (downcase sgml-general-case)
+	sgml-general-case))))
+
 (defmacro sgml-entity-case (string)   string)
 
 (defun sgml-parse-name (&optional entity-name)
@@ -1594,6 +1610,10 @@ in any of them."
 	   (sgml-log-warning
 	    "Undefined entity %s" name))
 	  ((sgml-entity-data-p entity)
+	   (when sgml-xml-p
+	     (sgml-error
+	      "XML forbids data-entity references in data or DTD (%s)."
+	      name))
 	   (when sgml-signal-data-function
 	     (funcall sgml-signal-data-function))
 	   (cond
@@ -1628,8 +1648,16 @@ in any of them."
 
 (defun sgml-parse-comment ()
   (if (sgml-parse-delim "COM")
-      (progn (sgml-skip-upto "COM")
-	     (sgml-check-delim "COM")
+      (if sgml-xml-p
+	  (sgml-parse-error "XML forbids nested comments.")
+	(progn (sgml-skip-upto "COM")
+	       (sgml-check-delim "COM")
+	       t))))
+
+(defun sgml-parse-xml-comment ()
+  (if (sgml-parse-delim "XML-SCOM")
+      (progn (sgml-skip-upto "XML-ECOM")
+	     (sgml-check-delim "XML-ECOM")
 	     t)))
 
 (defun sgml-skip-cs ()
@@ -1671,8 +1699,17 @@ a RNI must be followed by NAME."
    (t '(sgml-parse-delim "RNI"))))
 
 (defun sgml-check-token (name)
-  (or (equal (sgml-check-name) name)
+  (or (equal (sgml-check-case (sgml-check-name)) name)
       (sgml-parse-error "Reserved name not expected")))
+
+(defun sgml-check-case (name)
+  "Convert the argument to lower case.
+If sgml-namecase-general is nil, then signal an error if the argument
+is not in upper case."
+  (or sgml-namecase-general
+      (equal name (upcase name))
+      (sgml-parse-error "Uppercase keyword expected."))
+  (downcase name))
 
 (defun sgml-parse-literal ()
   "Parse a literal and return a string, if no literal return nil."
@@ -1726,7 +1763,7 @@ a RNI must be followed by NAME."
   (or (sgml-parse-minimum-literal)
       (sgml-parse-error "A minimum literal expected")))
 
-(defun sgml-parse-external ()
+(defun sgml-parse-external (&optional pubid-ok)
   "Leaves nil if no external id, or (pubid . sysid)"
   (sgml-skip-ps)
   (let* ((p (point))
@@ -1734,15 +1771,15 @@ a RNI must be followed by NAME."
     (cond
      (token
       (sgml-skip-ps)
-      (cond ((member token '("public" "system"))
+      (cond ((member (sgml-check-case token) '("public" "system"))
 	     (let* ((pubid		; the public id
-		     (if (string-equal token "public")
+		     (if (string-equal (downcase token) "public")
 			 (or (sgml-parse-minimum-literal)
 			     (sgml-parse-error "Public identifier expected"))))
 		    (sysid		; the system id
 		     (progn (sgml-skip-ps)
 			    (sgml-parse-literal))))
-	       (sgml-make-extid pubid sysid)))
+	       (sgml-make-extid pubid sysid pubid-ok)))
 	    (t
 	     (goto-char p)
 	     nil))))))
@@ -2603,6 +2640,11 @@ overrides the entity type in entity look up."
   (or (eq sgml-empty (sgml-element-model element))
       (sgml-tree-conref element)))
 
+(defun sgml-check-empty (name)
+  "True if element with NAME is empty."
+  (let ((eltype (if (symbolp name) name (sgml-lookup-eltype name))))
+    (eq sgml-empty (sgml-eltype-model eltype))))
+
 (defun sgml-element-data-p (element)
   "True if ELEMENT can have data characters in its content."
   (or (sgml-element-mixed element)
@@ -3292,12 +3334,15 @@ Also move point.  Return nil, either if no shortref or undefined."
 
 (defun sgml-skip-until-dsc ()
   (while (progn
-	   (sgml-skip-upto ("DSO" "DSC" "LITA" "LIT" "COM"))
+	   (if sgml-xml-p
+	       (sgml-skip-upto ("DSO" "DSC" "LITA" "LIT" "XML-SCOM" "COM"))
+	     (sgml-skip-upto ("DSO" "DSC" "LITA" "LIT" "COM")))
 	   (not (sgml-parse-delim "DSC")))
     (cond ((sgml-parse-literal))
 	  ((sgml-parse-delim "DSO")
 	   (sgml-skip-until-dsc))
-	  ((sgml-parse-comment))
+	  ((and sgml-xml-p (sgml-parse-xml-comment)))
+	  ((and (not sgml-xml-p) (sgml-parse-comment)))
 	  (t (forward-char 1)))))
 
 (defun sgml-skip-upto-mdc ()
@@ -3475,12 +3520,13 @@ Assumes starts with point inside a markup declaration."
 OPTION can be `prolog' if parsing the prolog or `dtd' if parsing the
 dtd or `ignore' if the declaration is to be ignored."
   (cond
+   ((and sgml-xml-p (sgml-parse-xml-comment)))
    ((sgml-parse-delim "MDO" (nmstart "COM" "MDC"))
     (cond
      ((sgml-startnm-char-next)
       (setq sgml-markup-type nil)
       (let* ((tok (sgml-parse-nametoken))
-	     (rut (assoc tok sgml-markup-declaration-table)))
+	     (rut (assoc (sgml-check-case tok) sgml-markup-declaration-table)))
 	(when (and (not (memq option '(prolog ignore)))
 		   (member tok '("sgml" "doctype")))
 	  (sgml-error "%s declaration is only valid in prolog" tok))
@@ -3553,8 +3599,9 @@ Returns a list of attspec (attribute specification)."
 
 (defun sgml-check-attribute-value-specification ()
   (or (sgml-parse-literal)
-      (sgml-parse-nametoken t)		; Not really a nametoken, but an
-					; undelimited literal
+      (prog1 (sgml-parse-nametoken t)	; Not really a nametoken, but an
+	(when sgml-xml-p		; undelimited literal
+	  (sgml-parse-error "XML forbids undelimited literals.")))
       (sgml-parse-error "Expecting an attribute value: literal or token")))
 
 (defun sgml-parse-attribute-value-specification (&optional warn)
@@ -3883,7 +3930,7 @@ pointing to start of short ref and point pointing to the end."
     (unless (sgml-parse-delim "TAGC")	; optimize common case
       (setq asl (sgml-parse-attribute-specification-list et))
       (or
-       (if (sgml-parse-delim "NET")
+       (if (and (not sgml-xml-p) (sgml-parse-delim "NET"))
 	   (prog1 (setq net-enabled t)
 	     (or sgml-current-shorttag
 		 (sgml-log-warning
@@ -4013,6 +4060,7 @@ pointing to start of short ref and point pointing to the end."
 (defun sgml-check-tag-close ()
   (or
    (sgml-parse-delim "TAGC")
+   (and sgml-xml-p (sgml-parse-delim "XML-TAGCE"))
    (if (or (sgml-is-delim "STAGO" gi)
 	   (sgml-is-delim "ETAGO" gi))
        (or sgml-current-shorttag
@@ -4234,7 +4282,9 @@ This is a list of (attname value) lists."
 
 (defun sgml-start-tag-of (element)
   "Return the start-tag for ELEMENT."
-  (format "<%s>" (sgml-cohere-name element)))
+  (if (and sgml-xml-p (sgml-check-empty (sgml-cohere-name element)))
+      (format "<%s/>" (sgml-cohere-name element))
+    (format "<%s>" (sgml-cohere-name element))))
 
 (defun sgml-end-tag-of (element)
   "Return the end-tag for ELEMENT (token or element)."

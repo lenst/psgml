@@ -570,7 +570,8 @@ content.  If sgml-leave-point-after-insert is nil the point is left
 after the first tag inserted."
   (interactive 
    (list
-    (completing-read "Tag: " (sgml-completion-table) nil t "<" )))
+    (let ((completion-ignore-case sgml-namecase-general))
+      (completing-read "Tag: " (sgml-completion-table) nil t "<" ))))
   (sgml-find-context-of (point))
   (assert (null sgml-markup-type))
   ;; Fix white-space before tag
@@ -602,12 +603,16 @@ after the first tag inserted."
 	(sgml-show-warnings nil))
     (when (and name (not (equal name "")))
       (sgml-insert-tag (sgml-start-tag-of name) 'silent)
-      (forward-char -1)
+      (if (and sgml-xml-p (sgml-check-empty name))
+	  (forward-char -2)
+	(forward-char -1))
       (setq element (sgml-find-element-of (point)))
       (sgml-insert-attributes (funcall sgml-new-attribute-list-function
 				       element)
 			      (sgml-element-attlist element))
-      (forward-char 1)
+      (if (and sgml-xml-p (sgml-check-empty name))
+	  (forward-char 2)
+	(forward-char 1))
       (when (not (sgml-element-empty element))
 	(when (and sgml-auto-insert-required-elements
 		   (sgml-model-group-p sgml-current-state))
@@ -746,7 +751,9 @@ AVL should be a assoc list mapping symbols to strings."
 (defun sgml-insert-start-tag (name asl attlist &optional net)
   (insert "<" name)
   (sgml-insert-attributes asl attlist)
-  (insert (if net "/" ">")))
+  (if (and sgml-xml-p (sgml-check-empty name))
+      (insert "/>")
+    (insert (if net "/" ">"))))
 
 (defun sgml-change-start-tag (element asl)
   (let ((name (sgml-element-gi element))

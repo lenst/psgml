@@ -74,6 +74,10 @@
 
 (defvar sgml-running-lucid (string-match "Lucid" emacs-version))
 
+(defvar sgml-xml-p nil
+  "Is this an XML document?")
+(make-variable-buffer-local 'sgml-xml-p)
+
 ;;; User settable options:
 
 (defvar sgml-insert-missing-element-comment t
@@ -209,6 +213,14 @@ Setting this variable automatically makes it local to the current buffer.")
 
 (make-variable-buffer-local 'sgml-shorttag)
 (put 'sgml-shorttag 'sgml-desc "SHORTTAG")
+
+(defvar sgml-namecase-general t
+  "*Set to non-nil, if you use NAMECASE GENERAL YES.
+
+Setting this variable automatically makes it local to the current buffer.")
+
+(make-variable-buffer-local 'sgml-namecase-general)
+(put 'sgml-namecase-general 'sgml-desc "NAMECASE GENERAL")
 
 (defvar sgml-minimize-attributes nil
   "*Determines minimization of attributes inserted by edit-attributes.
@@ -423,7 +435,7 @@ Example:
 ;;; Its error messages can be parsed by next-error.
 ;;; The -s option suppresses output.
 
-(defvar sgml-validate-command "nsgmls -s %s %s"
+(defvar sgml-validate-command   "nsgmls -s %s %s"
   "*The shell command to validate an SGML document.
 
 This is a `format' control string that by default should contain two
@@ -444,6 +456,7 @@ string will be replaced according to the list below, if the string contains
 %s means the SGML declaration specified in the sgml-declaration variable
 %d means the file containing the DOCTYPE declaration, if not in the buffer 
 ")
+(make-variable-buffer-local 'sgml-validate-command)
 
 (defvar sgml-validate-files nil
   "If non-nil, a function of no arguments that returns a list of file names.
@@ -462,6 +475,10 @@ See `compilation-error-regexp-alist'.")
   "*If non-nil, this is the name of the SGML declaration file.")
 (put 'sgml-declaration 'sgml-type 'string)
 
+(defvar sgml-xml-declaration nil
+  "*If non-nil, this is the name of the SGML declaration for XML files.")
+(put 'sgml-xml-declaration 'sgml-type 'string)
+
 (defvar sgml-mode-hook nil
   "A hook or list of hooks to be run when entering sgml-mode")
 
@@ -469,6 +486,7 @@ See `compilation-error-regexp-alist'.")
   '(
     sgml-omittag
     sgml-shorttag
+    sgml-namecase-general
     sgml-minimize-attributes
     sgml-always-quote-attributes
     sgml-indent-step
@@ -717,6 +735,7 @@ as that may change."
 	 'sgml-public-map
 	 'sgml-set-face
 	 'sgml-shorttag
+	 'sgml-namecase-general
 	 'sgml-tag-region-if-active
 	 ))))
 
@@ -992,6 +1011,7 @@ User options:
 
 sgml-omittag  Set this to reflect OMITTAG in the SGML declaration.
 sgml-shortag  Set this to reflect SHORTTAG in the SGML declaration.
+sgml-namecase-general  Set this to reflect NAMECASE GENERAL in the SGML declaration.
 sgml-auto-insert-required-elements  If non-nil, automatically insert required 
 	elements in the content of an inserted element.
 sgml-balanced-tag-edit  If non-nil, always insert start-end tag pairs.
@@ -1022,6 +1042,7 @@ All bindings:
 "
   (interactive)
   (kill-all-local-variables)
+  (setq sgml-xml-p nil)
   (setq local-abbrev-table sgml-mode-abbrev-table)
   (use-local-map sgml-mode-map)
   (setq mode-name "SGML")
@@ -1071,6 +1092,18 @@ All bindings:
   (easy-menu-add sgml-markup-menu)
   (easy-menu-add sgml-view-menu)
   (easy-menu-add sgml-dtd-menu))
+
+;;;###autoload
+(define-derived-mode xml-mode sgml-mode "XML"
+  (setq sgml-xml-p t)
+  (setq sgml-omittag nil)
+  (setq sgml-shorttag nil)
+  (setq sgml-namecase-general nil)
+  (setq sgml-minimize-attributes nil)
+  (setq sgml-always-quote-attributes t)
+  (setq sgml-validate-command "nsgmls -wxml -s %s %s")
+  (unless sgml-declaration
+    (setq sgml-declaration sgml-xml-declaration)))
 
 (defun sgml-default-dtd-file ()
   (and (buffer-file-name)
