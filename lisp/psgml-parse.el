@@ -1997,7 +1997,7 @@ NAME is the entity name."
 				   cfile key cname
 				   (if file "" " !unreadable"))))
 	(setq remaining
-	      (append additional (cdr remaining)))))
+	      (nconc (nreverse additional) (cdr remaining)))))
     file))
 
 
