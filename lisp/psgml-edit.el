@@ -688,12 +688,13 @@ after the first tag inserted."
       (sgml-insert-attributes (funcall sgml-new-attribute-list-function
 				       element)
 			      (sgml-element-attlist element))
+      ;; Get element with new attributes
+      (setq element (sgml-find-context-of (point)))
       (if (and sgml-xml-p (sgml-check-empty name))
 	  (forward-char 2)
 	(forward-char 1))
       (when (sgml-break-after-stag-p name)
         (sgml-insert-break))
-      (setq element (sgml-find-context-of (point)))
       (when (not (sgml-element-empty element))
 	(when (and sgml-auto-insert-required-elements
 		   (sgml-model-group-p sgml-current-state))
