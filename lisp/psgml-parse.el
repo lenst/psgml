@@ -40,8 +40,8 @@
 (defvar sgml-throw-on-warning nil
   "Set to a symbol other than nil to make sgml-log-warning throw to that symbol.")
 
-(defvar sgml-supress-warning nil
-  "Set to t to supress warnings.")
+(defvar sgml-suppress-warning nil
+  "Set to t to suppress warnings.")
 
 (defvar sgml-goal 0
   "Point in buffer to parse up to.")
@@ -952,7 +952,7 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 					       (point-max))))))
 
 (defun sgml-log-warning (format &rest things)
-  (unless sgml-supress-warning
+  (unless sgml-suppress-warning
     (when sgml-throw-on-warning
       (apply 'message format things)
       (throw sgml-throw-on-warning t))
@@ -1555,7 +1555,7 @@ or if nil, until end of buffer."
   (let ((bigparse (> (- sgml-goal (point)) 10000))
 	(sgml-param-entities sgml-buffer-param-entities))
     (when bigparse
-	(sgml-message "Parsing"))
+	(sgml-message "Parsing..."))
     (sgml-with-parser-syntax
      (sgml-parser-loop))
     (when bigparse
@@ -2335,7 +2335,7 @@ after the first tag inserted."
 		   (sgml-model-group-p sgml-current-state))
 	  (let (tem
 		newpos
-		(sgml-supress-warning t))
+		(sgml-suppress-warning t))
 	    (while (and (setq tem (sgml-required-tokens sgml-current-state))
 			(null (cdr tem)))
 	      (setq tem (sgml-insert-element (car tem) t t))
@@ -2565,9 +2565,10 @@ Editing is done in a separate window."
 
 (defun sgml-edit-attrib-mode ()
   "Major mode to edit attribute specification list.\\<sgml-edit-attrib-mode-map>
-Use \\[sgml-edit-attrib-next] to move between input fields.  To abort edit
-kill buffer (\\[kill-buffer]) and remove window (\\[delete-window]).  
-To finsh edit use \\[sgml-edit-attrib-finish].
+Use \\[sgml-edit-attrib-next] to move between input fields.  Use
+\\[sgml-edit-attrib-default] to make an attribute have its default
+value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
+(\\[delete-window]).  To finsh edit use \\[sgml-edit-attrib-finish].
 
 \\{sgml-edit-attrib-mode-map}"
   (kill-all-local-variables)
