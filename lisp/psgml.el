@@ -27,6 +27,8 @@
 
 ;; Major mode for editing the SGML document-markup language.
 
+;; Send bugs to lenst@lysator.liu.se
+
 ;; LIMITATIONS
 
 ;; - only accepts the referece concrete syntax, though it does allow
@@ -55,6 +57,8 @@
 ;;  attributes.
 ;; Hiding attributes (first test done).
 ;; Fold all elements with GI
+;; SHORTREF
+;; Better error recovery in the parser
 
 ;; BUGS
 ;;  "*SGML LOG*" buffer handling is confusing
@@ -64,7 +68,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "0.3a6"
+(defconst psgml-version "0.3b"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
