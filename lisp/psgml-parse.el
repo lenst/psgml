@@ -108,7 +108,7 @@ start-tag")
 					; a finite automaton.
 
 ;; Variables used during doctype parsing and loading
-(defvar sgml-element-map nil)		; assoc list of element types
+(defvar sgml-eltype-map nil)		; assoc list of element types
 (defvar sgml-param-entities nil)	; assoc list of parameter entities
 (defvar sgml-used-pcdata nil)		; True if model group built is mixed
 (defvar sgml-entities nil)		; List of general entity names
@@ -117,13 +117,13 @@ start-tag")
 ;; Buffer local variables 
 
 (defvar sgml-buffer-param-entities nil)
-(make-variable-buffer-local 'sgml-buffer-element-map)
+(make-variable-buffer-local 'sgml-buffer-eltype-map)
 
 (defvar sgml-buffer-entities nil)
 (make-variable-buffer-local 'sgml-buffer-entities)
 
-(defvar sgml-buffer-element-map nil)
-(make-variable-buffer-local 'sgml-buffer-element-map)
+(defvar sgml-buffer-eltype-map nil)
+(make-variable-buffer-local 'sgml-buffer-eltype-map)
 
 (defvar sgml-buffer-doctype nil)
 (make-variable-buffer-local 'sgml-buffer-doctype)
@@ -143,14 +143,14 @@ start-tag")
 
 (defun sgml-set-global ()
   "Copy the buffer local DTD data structures to global variables."
-  (setq sgml-element-map sgml-buffer-element-map
+  (setq sgml-eltype-map sgml-buffer-eltype-map
 	sgml-entities sgml-buffer-entities
 	sgml-param-entities sgml-buffer-param-entities
 	sgml-doctype sgml-buffer-doctype))
 
 (defun sgml-set-local ()
   "Copy the global DTD data structures to buffer local variables."
-  (setq sgml-buffer-element-map sgml-element-map
+  (setq sgml-buffer-eltype-map sgml-eltype-map
 	sgml-buffer-entities sgml-entities
 	sgml-buffer-param-entities sgml-param-entities)
   (sgml-set-doctype sgml-doctype))
@@ -595,7 +595,8 @@ If ATTSPEC is nil, nil is returned."
 
 ;;;; Element objects
 
-(defstruct element
+(defstruct (sgml-eltype
+	    (:constructor sgml-make-eltype (name model)))
   name					; Name of element (symbol)
   stag-optional				; Flag
   etag-optional				; Flag
@@ -609,65 +610,52 @@ If ATTSPEC is nil, nil is returned."
 
 (defun sgml-define-element (name stag-opt etag-opt
 				 content excludes includes mixed)
-  (let ((el (make-element
-	     :name name
-	     :stag-optional stag-opt
-	     :etag-optional etag-opt
-	     :model content
-	     :excludes excludes
-	     :includes includes
-	     :mixed mixed))
-	(bp (assq name sgml-element-map)))
-    ;; If the element is allready in the map, it is because its
-    ;; attlist has been defined.
-    (cond ((null bp)
-	   (setq bp (cons name nil))
-	   (setq sgml-element-map (cons bp sgml-element-map)))
-	  (t
-	   (setf (element-attlist el) (element-attlist (cdr bp))
-		 (element-conref-regexp el)
-		 (element-conref-regexp (cdr bp)))))
-    (setcdr bp el)))
+  (let ((el (sgml-intern-eltype name)))
+    (setf (sgml-eltype-stag-optional el) stag-opt
+	  (sgml-eltype-etag-optional el) etag-opt
+	  (sgml-eltype-model el) 	content
+	  (sgml-eltype-excludes el) 	excludes
+	  (sgml-eltype-includes el) 	includes 
+	  (sgml-eltype-mixed el) 	mixed)))
+
+(defun sgml-intern-eltype (name)
+  (let ((bp (assq name sgml-eltype-map)))
+    (unless bp
+      (setq bp (cons name (sgml-make-eltype name sgml-any)))
+      (push bp sgml-eltype-map))
+    (cdr bp)))
 
 (defun sgml-define-element-attlist (name attlist)
   "Define the ATTLIST for NAME. Returns the element."
-  (let ((bp (assq name sgml-element-map)))
-    (cond
-     (bp
-      (setf (element-attlist (cdr bp)) attlist))
-     (t
-      (setq bp (cons name
-		     (make-element :name name
-				   :model sgml-any
-				   :attlist attlist)))
-      (push bp sgml-element-map)))
+  (let ((el (sgml-intern-eltype name)))
+    (setf (sgml-eltype-attlist el) attlist)
     (while attlist			; Find any conref attribute
       (cond				; and set conref regexp
        ((eq (sgml-attdecl-default-value (car attlist))
 	    'conref)
-	(setf (element-conref-regexp (cdr bp))
+	(setf (sgml-eltype-conref-regexp el)
 	      (format "\\b%s[ \t\r\n]*=" (sgml-attdecl-name (car attlist))))
 	(setq attlist nil))
        (t
 	(setq attlist (cdr attlist)))))
-    (cdr bp)))
+    el))
 
 (defun sgml-lookup-element (name)
   "Lookup the element defintion for NAME (symbol or string)."
   (or (cdr-safe (assq (if (symbolp name) name (intern (downcase name)))
-		       sgml-buffer-element-map))
+		       sgml-buffer-eltype-map))
       (progn
 	(when (and sgml-warn-about-undefined-elements
-		   sgml-buffer-element-map)
+		   sgml-buffer-eltype-map)
 	  (sgml-log-warning "Undefined element %s" name))
-	(make-element :name name :model sgml-any))))
+	(sgml-make-eltype name sgml-any))))
 
 (defun sgml-start-tag-of (element)
   "Return the start-tag for ELEMENT (token or element)."
   (format "<%s>"
 	  (if (vectorp element)
-	      (if (element-p element)
-		  (element-name element)
+	      (if (sgml-eltype-p element)
+		  (sgml-eltype-name element)
 		(sgml-element-name element))
 	    element)))
 
@@ -675,8 +663,8 @@ If ATTSPEC is nil, nil is returned."
   "Return the end-tag for ELEMENT (token or element)."
   (format "</%s>"
 	  (if (vectorp element)
-	      (if (element-p element)
-		  (element-name element)
+	      (if (sgml-eltype-p element)
+		  (sgml-eltype-name element)
 		(sgml-element-name element))
 	    element)))
 
@@ -774,10 +762,10 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (let ((gc-cons-threshold (max gc-cons-threshold 500000))
 	(cb (current-buffer))
 	temp)
-    (setq sgml-buffer-element-map nil
+    (setq sgml-buffer-eltype-map nil
 	  sgml-buffer-entities nil
 	  sgml-buffer-param-entities nil)
-    (setq sgml-element-map nil
+    (setq sgml-eltype-map nil
 	  sgml-entities nil
 	  sgml-param-entities nil)
     (set-buffer buffer)
@@ -894,19 +882,19 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 
 (defun sgml-element-model (element)
   "Declared content or content model of ELEMENT."
-  (element-model (sgml-tree-element element)))
+  (sgml-eltype-model (sgml-tree-element element)))
 
 (defun sgml-element-name (element)
-  (element-name (sgml-tree-element element)))
+  (sgml-eltype-name (sgml-tree-element element)))
 
-(defun sgml-element-stag-optional (element)
-  (element-stag-optional (sgml-tree-element element)))
+(defmacro sgml-element-stag-optional (element)
+  (`(sgml-eltype-stag-optional (sgml-tree-element (, element)))))
 
-(defun sgml-element-etag-optional (element)
-  (element-etag-optional (sgml-tree-element element)))
+(defmacro sgml-element-etag-optional (element)
+  (`(sgml-eltype-etag-optional (sgml-tree-element (, element)))))
 
 (defun sgml-element-attlist (element)
-  (element-attlist (sgml-tree-element element)))
+  (sgml-eltype-attlist (sgml-tree-element element)))
 
 (defun sgml-element-stag-end (element)
   "Position after start-tag of ELEMENT."
@@ -915,7 +903,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 
 (defun sgml-element-empty (element)
   "True if ELEMENT is empty."
-  (let ((regexp (element-conref-regexp (sgml-tree-element element))))
+  (let ((regexp (sgml-eltype-conref-regexp (sgml-tree-element element))))
       (or (eq sgml-empty (sgml-element-model element))
       (and regexp
 	   (save-excursion
@@ -990,8 +978,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (sgml-set-active-dtd-indicator)
   (setq sgml-top-tree
 	(sgml-make-tree
-	 (make-element :name "Document (no element)"
-		       :model model)
+	 (sgml-make-eltype "Document (no element)" model)
 	 0 0 nil 0 nil nil nil nil nil)))
 
 
@@ -1056,9 +1043,9 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	      el before-tag (- after-tag before-tag)
 	      sgml-current-tree
 	      (1+ (sgml-tree-level sgml-current-tree))
-	      (append (element-excludes el) (sgml-excludes))
-	      (append (element-includes el) (sgml-includes))
-	      sgml-current-state (element-mixed el)
+	      (append (sgml-eltype-excludes el) (sgml-excludes))
+	      (append (sgml-eltype-includes el) (sgml-includes))
+	      sgml-current-state (sgml-eltype-mixed el)
 	      (if (sgml-tree-net-enabled sgml-current-tree) 1))))
     (let ((u (sgml-tree-content sgml-current-tree)))
       (cond ((and u (> before-tag (sgml-tree-start u)))
@@ -1072,7 +1059,7 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
     ;; *** all the way up?  tree-end = nil?
     (setf (sgml-tree-next sgml-current-tree) nil)
     ;; Set new state
-    (setq sgml-current-state (element-model el)
+    (setq sgml-current-state (sgml-eltype-model el)
 	  sgml-current-tree nt)
     (setq sgml-markup-tree sgml-current-tree)
     (when (sgml-element-empty sgml-current-tree)
@@ -1083,8 +1070,8 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
    el 0 0 
    tree
    0
-   (append (element-excludes el) (sgml-tree-excludes tree))
-   (append (element-includes el) (sgml-tree-includes tree))
+   (append (sgml-eltype-excludes el) (sgml-tree-excludes tree))
+   (append (sgml-eltype-includes el) (sgml-tree-includes tree))
    nil nil
    nil))
 
@@ -1135,12 +1122,12 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	       req
 	       (null (cdr req)))
 	  (let ((el (sgml-lookup-element (car req))))
-	    (when (element-stag-optional el)
+	    (when (sgml-eltype-stag-optional el)
 		  (setq elems
 			(nconc elems	; *** possibility of duplicates
 			       (sgml-list-of-elements
 				(sgml-fake-open-element tree el)
-				(element-model el)))))))
+				(sgml-eltype-model el)))))))
     elems))
 
 
@@ -1183,9 +1170,9 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	     (progn
 	       (setq elems
 		     (nconc elems
-			    (list (element-name (sgml-tree-element tree))))) 
+			    (list (sgml-eltype-name (sgml-tree-element tree))))) 
 	       sgml-omittag)
-	     (element-etag-optional (sgml-tree-element tree)))
+	     (sgml-eltype-etag-optional (sgml-tree-element tree)))
       (setq state (sgml-tree-pstate tree)
 	    tree (sgml-tree-parent tree)))
     elems))
@@ -2273,7 +2260,7 @@ Returns parse tree; error if no element after POS."
 
 (defun sgml-read-element-name (prompt)
   (sgml-parse-to-here)
-  (cond ((and sgml-buffer-element-map
+  (cond ((and sgml-buffer-eltype-map
 	      (not (eq sgml-current-state sgml-any)))
 	 (let ((tab
 		(mapcar (function (lambda (x) (cons (symbol-name x) nil)))

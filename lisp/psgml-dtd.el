@@ -781,7 +781,7 @@ Syntax: var dfa-expr &body forms"
   (interactive)
   (sgml-clear-log)
   (message "Parsing prolog...")
-  (setq	sgml-element-map nil		; Remove old element dcl
+  (setq	sgml-eltype-map nil		; Remove old element dcl
 	sgml-param-entities nil
 	sgml-entities nil)
   (goto-char (point-min))
@@ -792,7 +792,7 @@ Syntax: var dfa-expr &body forms"
    (cond ((sgml-parse-mdo)
 	  (cond ((eq 'doctype (sgml-check-nametoken))
 		 (sgml-set-doctype (sgml-check-doctype))
-		 (setq sgml-buffer-element-map sgml-element-map
+		 (setq sgml-buffer-eltype-map sgml-eltype-map
 		       sgml-buffer-param-entities sgml-param-entities
 		       sgml-buffer-entities (sort sgml-entities
 						  (function string-lessp))
@@ -898,12 +898,12 @@ FORMS should produce the binary coding of element in VAR."
 	  (sgml-code-model m)))))))
 
 (defun sgml-code-element (el)
-  (sgml-code-token (element-name el))
-  (insert (+ (if (element-stag-optional el) 1 0)
-	     (if (element-etag-optional el) 2 0)
-	     (if (element-mixed el) 4 0)))
-  (let ((c (element-model el))
-	(name (element-name el))
+  (sgml-code-token (sgml-eltype-name el))
+  (insert (+ (if (sgml-eltype-stag-optional el) 1 0)
+	     (if (sgml-eltype-etag-optional el) 2 0)
+	     (if (sgml-eltype-mixed el) 4 0)))
+  (let ((c (sgml-eltype-model el))
+	(name (sgml-eltype-name el))
 	u)
     (cond ((eq c sgml-cdata) (insert 0))
 	  ((eq c sgml-rcdata) (insert 1))
@@ -913,13 +913,13 @@ FORMS should produce the binary coding of element in VAR."
 	   (assert (sgml-model-group-p c))
 	   (insert 128)
 	   (sgml-code-model c))))
-  (sgml-code-tokens (element-includes el))
-  (sgml-code-tokens (element-excludes el))
-  (sgml-code-sexp (element-attlist el)))
+  (sgml-code-tokens (sgml-eltype-includes el))
+  (sgml-code-tokens (sgml-eltype-excludes el))
+  (sgml-code-sexp (sgml-eltype-attlist el)))
 
 (defun sgml-code-dtd (target)
   "Produce the binary coding of the current DTD into the TARGET buffer."
-  (let ((elems sgml-buffer-element-map)
+  (let ((elems sgml-buffer-eltype-map)
 	(params sgml-buffer-param-entities)
 	(entities sgml-buffer-entities)
 	(doctype sgml-buffer-doctype)
@@ -961,7 +961,7 @@ FORMS should produce the binary coding of element in VAR."
   (setq file (expand-file-name file))
   (when (equal file (buffer-file-name))
     (error "Would clobber current file"))
-  (unless sgml-buffer-element-map
+  (unless sgml-buffer-eltype-map
     (sgml-parse-prolog))
   (cond ((equal (expand-file-name default-directory)
 		(file-name-directory file))
