@@ -216,7 +216,7 @@ Syntax: var dfa-expr &body forms"
   s1)
 
 (defun sgml-make-pcdata ()
-  (sgml-make-opt (sgml-make-primitive-content-token sgml-pcdata-token)))
+  (sgml-make-* (sgml-make-primitive-content-token sgml-pcdata-token)))
 
 (defun sgml-reduce-, (l)
   (while (cdr l)
@@ -275,35 +275,6 @@ Syntax: var dfa-expr &body forms"
       (prog1 (string-to-int (sgml-check-nametoken))
 	(or (sgml-parse-delim "REFC")
 	    (sgml-parse-char ?\n)))))
-
-(defun sgml-parse-minimum-literal ()
-  "Parse a quoted SGML string and return it, if no string return nil."
-  (cond
-   ((memq (following-char) '(?\" ?\'))
-    (let* ((qchar (following-char))
-	   (blanks " \t\r\n")
-	   (qskip (format "^%s%c" blanks qchar))
-	   (start (point))
-	   (value			; accumulates the literal value
-	    "")
-	   (spaced ""))
-      (forward-char 1)
-      (skip-chars-forward blanks)
-      (while (not (sgml-parse-char qchar))
-	(cond ((eobp)
-	       (goto-char start)
-	       (sgml-parse-error "Unterminated literal"))
-	      ((sgml-parse-s)
-	       (setq spaced " "))
-	      (t
-	       (setq value
-		     (concat value spaced
-			     (buffer-substring
-			      (point)
-			      (progn (skip-chars-forward qskip)
-				     (point))))
-		     spaced ""))))
-      value))))
 
 (defun sgml-parse-parameter-literal ()
   (let* (lita				; flag if lita
@@ -553,7 +524,8 @@ Case transformed for general names."
 	 (inclusions (sgml-parse-exeption ?+)))
     (while names
       (sgml-debug "Defining element %s" (car names))
-      (sgml-define-eltype (car names) stag-opt etag-opt model
+      (sgml-define-eltype (sgml-lookup-eltype (car names))
+			  stag-opt etag-opt model
 			  exclusions inclusions
 			  sgml-used-pcdata)
       (setq names (cdr names)))))
@@ -589,15 +561,17 @@ Case transformed for general names."
 					; 73 external identifier,
 					; (65 ps+, 109+ entity type)?
 	    (sgml-skip-ps)
-	    (setq type (sgml-parse-entity-type))
+	    (setq type (or (sgml-parse-entity-type) 'text))
 	    extid)
 	   ((sgml-startnm-char-next)
 	    (let ((token (intern (sgml-check-name))))
 	      (sgml-skip-ps)
 	      (cond
-	       ((memq token '(cdata sdata pi)) ; data text ***
+	       ((memq token '(cdata sdata)) ; data text ***
 		(setq type token)
 		(sgml-check-parameter-literal))
+	       ((eq token 'pi)
+		(concat "<?" (sgml-check-parameter-literal) ">"))
 	       ((eq token 'starttag)
 		(sgml-start-tag-of (sgml-check-parameter-literal)))
 	       ((eq token 'endtag)
@@ -651,7 +625,8 @@ Case transformed for general names."
     (setq attlist (nreverse attlist))
     (unless assnot
       (loop for elname in assel do
-	    (sgml-define-eltype-attlist elname attlist)))))
+	    (sgml-define-eltype-attlist (sgml-lookup-eltype elname)
+					attlist)))))
 
 (defun sgml-parse-attribute-definition ()
   (sgml-skip-ps)
@@ -714,21 +689,20 @@ Case transformed for general names."
 ;;;; Parse doctype
 
 (defun sgml-check-dtd-subset ()
-  (let ((elcnt ""))
-    (message "Parsing doctype%s" elcnt)
-    (while 
-	(cond
-	 ((sgml-parse-ds))
-	 ((sgml-parse-markup-declaration 'dtd))
-	 ;;((sgml-parse-marked-section-end)) ; end of marked section
-	 ((sgml-parse-delim MS-END))
-	 ))
-    (when (sgml-any-open-param/file)
-      (sgml-parse-error "DTD subset ended"))))
+  (while 
+      (cond
+       ((sgml-parse-ds))
+       ((sgml-parse-markup-declaration 'dtd))
+       ;;((sgml-parse-marked-section-end)) ; end of marked section
+       ((sgml-parse-delim "MS-END"))
+       ))
+  (when (sgml-any-open-param/file)
+    (sgml-parse-error "DTD subset ended")))
 
 (defun sgml-check-doctype-body ()
   ;; Parse the part of a DOCTYPE declaration after the <!DOCTYPE and 
   ;; before the >
+  (message "Parsing doctype...")
   (let ((docname (sgml-check-name))
 	(external (sgml-parse-external)))
     (setq sgml-dtd-info (sgml-make-dtd docname)) ; Create a empty DTD struct
@@ -741,7 +715,9 @@ Case transformed for general names."
 	   (sgml-push-to-entity (sgml-make-entity docname 'dtd external))
 	   (sgml-check-dtd-subset)))
     (sgml-skip-ps)
-    (sgml-set-initial-state sgml-dtd-info)))
+    (sgml-set-initial-state sgml-dtd-info))
+  (message "Parsing doctype...done")
+  (run-hooks 'sgml-doctype-parsed-hook))
 
 
 ;;;; Parse prolog
@@ -805,14 +781,17 @@ Case transformed for general names."
 	      (logand (- num sgml-max-single-octet-number) 255))
     (insert num)))
 
-(defsubst sgml-code-token (token)
+(defun sgml-code-token-number (token)
   (let ((bp (assq token sgml-code-token-numbers)))
     (unless bp
       (setq sgml-code-token-numbers
 	    (nconc sgml-code-token-numbers
 		   (list (setq bp (cons token
 					(length sgml-code-token-numbers)))))))
-    (sgml-code-number (cdr bp))))
+    (cdr bp)))
+
+(defun sgml-code-token (token)
+  (sgml-code-number (sgml-code-token-number token)))
 
 (defmacro sgml-code-sequence (loop-c &rest body)
   "Produce the binary coding of a counted sequence from a list.
@@ -830,7 +809,8 @@ FORMS should produce the binary coding of element in VAR."
 
 (defun sgml-code-sexp (sexp)
   (let ((standard-output (current-buffer)))
-    (print sexp)))
+    (prin1 sexp)
+    (terpri)))
 
 (defun sgml-code-tokens (l)
   (sgml-code-sequence (x l)
@@ -859,7 +839,6 @@ FORMS should produce the binary coding of element in VAR."
 	  (sgml-code-model m)))))))
 
 (defun sgml-code-element (el)
-  (sgml-code-token (sgml-eltype-name el))
   (insert (+ (if (sgml-eltype-stag-optional el) 1 0)
 	     (if (sgml-eltype-etag-optional el) 2 0)
 	     (if (sgml-eltype-mixed el) 4 0)))
@@ -870,42 +849,46 @@ FORMS should produce the binary coding of element in VAR."
 	  ((eq c sgml-rcdata) (insert 1))
 	  ((eq c sgml-empty) (insert 2))
 	  ((eq c sgml-any) (insert 3))
+	  ((null c) (insert 4))
 	  (t
 	   (assert (sgml-model-group-p c))
 	   (insert 128)
 	   (sgml-code-model c))))
   (sgml-code-tokens (sgml-eltype-includes el))
   (sgml-code-tokens (sgml-eltype-excludes el))
-  (sgml-code-sexp (sgml-eltype-attlist el)))
+  (sgml-code-sexp (sgml-eltype-attlist el))
+  (sgml-code-sexp (sgml-eltype-all-appdata el)))
 
 (defun sgml-code-dtd (target)
   "Produce the binary coding of the current DTD into the TARGET buffer."
-  (let ((elems sgml-buffer-eltype-map)
-	(params sgml-buffer-param-entities)
-	(entities sgml-buffer-entities)
-	(doctype sgml-buffer-doctype)
+  (let ((dtd (sgml-pstate-dtd sgml-buffer-parse-state))
 	(cb (current-buffer)))
     (set-buffer target)
     (erase-buffer)
     (insert
      ";;; This file was created by psgml on " (current-time-string) "\n"
-     "(sgml-saved-dtd-version 2)\n")
-    (let ((tv-point (point))		; insert token vector here
-	  (done 0)			; count written elements
-	  (tot (length elems)))
+     "(sgml-saved-dtd-version 3)\n")
+    (sgml-code-sexp (sgml-dtd-doctype dtd))
+    (let ((done 0)			; count written elements
+	  tot)
       (setq sgml-code-token-numbers nil)
-      (sgml-code-sequence (pair elems)
+      (sgml-code-token-number sgml-pcdata-token) ; Make #PCDATA token 0
+      (sgml-map-eltypes			; Assign numbers to all tokens
+       (function (lambda (et)
+		   (sgml-code-token-number (sgml-eltype-token et))))
+       dtd)
+      (setq tot (length sgml-code-token-numbers))
+      ;; Produce the counted sequence of element type names
+      (sgml-code-sequence (pair (cdr sgml-code-token-numbers))
+	(sgml-code-sexp (sgml-eltype-name (car pair))))
+      ;; Produce the counted sequence of element types
+      (sgml-code-sequence (pair (cdr sgml-code-token-numbers))
 	(setq done (1+ done))
-	(sgml-code-element (cdr pair))
+	(sgml-code-element (car pair))
 	(message "Coding %d%% done" (/ (* 100 done) tot)))
-      (sgml-code-sexp params)
-      (sgml-code-sexp entities)
-      (sgml-code-sexp doctype)
-      (goto-char tv-point)
-      (sgml-code-sexp
-       (loop for x in sgml-code-token-numbers
-	     vconcat (list (car x)))))
-    (set-buffer cb)))
+      (sgml-code-sexp (sgml-dtd-parameters dtd))
+      (sgml-code-sexp (sgml-dtd-entities dtd))
+      (set-buffer cb))))
 
 ;;;; Save DTD
 
@@ -922,8 +905,7 @@ FORMS should produce the binary coding of element in VAR."
   (setq file (expand-file-name file))
   (when (equal file (buffer-file-name))
     (error "Would clobber current file"))
-  (unless sgml-buffer-eltype-map
-    (sgml-parse-prolog))
+  (sgml-need-dtd)
   (cond ((equal (expand-file-name default-directory)
 		(file-name-directory file))
 	 (setq sgml-default-dtd-file (file-name-nondirectory file)))
