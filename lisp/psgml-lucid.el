@@ -88,7 +88,10 @@
 
 (defvar sgml-markup-menu
   '("Markup"
-    ["Insert tag" (sgml-tags-menu last-command-event) t]
+    ["Insert element" (sgml-element-menu last-command-event) t]
+    ["Insert start-tag" (sgml-start-tag-menu last-command-event) t]
+    ["Insert end-tag" (sgml-end-tag-menu last-command-event) t]
+    ["Tag region" (sgml-tag-region-menu last-command-event) t]
     ["Insert entity" (sgml-entities-menu last-command-event) t]
     "----------"
     ["Marked section" (sgml-insert-markup "<![ [\r]]>\n") t]
@@ -96,11 +99,11 @@
     ["RCDATA marked section" (sgml-insert-markup "<![RCDATA[\r]]>\n") t]
     ["TEMP marked section" (sgml-insert-markup "<![TEMP[\r]]>") t]
     "----------"
-    ["Doctype" (sgml-insert-markup "<!doctype \r -- public or system -- [\n]>\n") t]
     ["Comment" (sgml-insert-markup "<!-- \r -->\n") t]
     ["Local variables comment" (sgml-insert-markup "<!--\nLocal Variables:\nmode: sgml\n\rEnd:\n-->\n")
      t]
     "----------"
+    ["<!doctype ... >" (sgml-insert-markup "<!doctype \r -- public or system --\n[\n]>\n") t]
     ["<!entity ... >" (sgml-insert-markup "<!entity \r>\n") t]
     ["<!attlist ... >" (sgml-insert-markup "<!attlist \r>\n") t]
     ["<!element ... >" (sgml-insert-markup "<!element \r>\n") t]
@@ -135,6 +138,7 @@
     ["Change element name" sgml-change-element-name t]
     ["Show valid tags" sgml-list-valid-tags t]
     ["Show/hide warning log" sgml-show-or-clear-log t]
+    ["Validate" sgml-validate t]
     ["Normalize" sgml-normalize t]
     ["Fill element" sgml-fill-element t]
     ["Options" sgml-options-menu t]
@@ -160,29 +164,6 @@
 	  sgml-custom-dtd))
 
 (define-key sgml-mode-map [button3] 'sgml-tags-menu)
-
-
-;;;; Emulate text properties
-
-
-;;(set-face-underline-p (make-face 'underline) t) 
-
-
-;;(defun add-text-properties (start end props)
-;;  ;; First truncate existing extents
-;;  (let ((e (extent-at start)))
-;;    (when e
-;;      (set-extent-endpoints e (extent-start-position e) start)))
-;;  (when props
-;;  (let ((e (make-extent start end)))
-;;    (when (getf props 'read-only)
-;;      (set-extent-attribute e 'write-protected))
-;;    (when (getf props 'category)
-;;      (set-extent-face e (find-face 'underline))
-;;      (set-extent-data e (getf props 'category))))
-;;    )
-;;)
-
 
 
 ;;;; Provide
