@@ -2969,7 +2969,8 @@ entity hierarchy as possible."
 	(setq epos (sgml-eref-start (sgml-epos-eref epos)))))
     epos))
 
-(defun sgml-open-element (eltype conref before-tag after-tag &optional asl)
+(defun sgml-open-element (eltype conref before-tag after-tag
+                                 &optional asl net-enabled)
   (unless (sgml-eltype-defined eltype)
     (setf (sgml-eltype-mixed eltype) t)
     (setf (sgml-eltype-etag-optional eltype) t)
@@ -2996,7 +2997,8 @@ entity hierarchy as possible."
 	      (append (sgml-eltype-includes eltype)
 		      (sgml-tree-includes sgml-current-tree))
 	      sgml-current-state
-	      (if (sgml-tree-net-enabled sgml-current-tree) 1)
+              (or net-enabled
+                  (if (sgml-tree-net-enabled sgml-current-tree) 1))
 	      conref
 	      newmap
 	      sgml-current-shortmap
@@ -4123,13 +4125,8 @@ pointing to start of short ref and point pointing to the end."
 	   (sgml-do-move (sgml-eltype-token et)
 			 (format "%s start-tag" (sgml-eltype-name et)))
 	   (sgml-open-element et sgml-conref-flag
-			      sgml-markup-start (point) asl)
-	   (when net-enabled
-             ;; FIXME: why not argument to sgml-open-el? it's not just
-             ;; ugly it is wrong if the element is empty, then open-el
-             ;; closes it immediately and the wron node will be
-             ;; flagged.
-	     (setf (sgml-tree-net-enabled sgml-current-tree) t))))))
+			      sgml-markup-start (point) asl net-enabled)))))
+
 
 (defun sgml-do-empty-start-tag ()
   "Return eltype to use if empty start tag."

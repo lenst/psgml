@@ -1,9 +1,15 @@
 2002-08-13  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* psgml-parse.el (sgml-open-element): add optional net-enabled
+	parameter.
+	(sgml-do-start-tag): use new parameter on sgml-open-element.
+
 	* psgml-edit.el (sgml-edit-attrib-field-start,
 	sgml-edit-attrib-clear, sgml-attribute-buffer,
 	sgml-edit-attrib-specification-list): change sgml-category to
-	category.
+	category. Fix bug with edit attributes.
+	(sgml-change-element-name): insert TAGC before finding new element
+	object. Fix bug with change element name not copying attributes.
 
 2002-05-08  Lennart Staflin  <lenst@lysator.liu.se>
 
