@@ -146,7 +146,9 @@
      ["Validate" sgml-validate t]
      ["Normalize" sgml-normalize t]
      ["Fill element" sgml-fill-element t])
-   (if (not (boundp 'emacs-major-version))
+   (if (or (not (boundp 'emacs-major-version))
+	   (and (boundp 'emacs-minor-version)
+		(< emacs-minor-version 10)))
        '(["Options" sgml-options-menu t])
      (list
       (cons "Options"
@@ -201,10 +203,6 @@
 
 
 ;;;; Insert with properties
-
-(facep 'underline)
-
-
 
 (defun sgml-insert (props format &rest args)
   (let ((start (point))
