@@ -66,29 +66,29 @@
 (define-key sgml-mode-map [menu-bar sgml options]
   '("Options..." . sgml-options-menu))
 (define-key sgml-mode-map [menu-bar sgml fill]
-  '("Fill element           [C-c C-q]" . sgml-fill-element))
+  '("Fill element" . sgml-fill-element))
 (define-key sgml-mode-map [menu-bar sgml normalize]
-  '("Normalize                " . sgml-normalize))
+  '("Normalize" . sgml-normalize))
 (define-key sgml-mode-map [menu-bar sgml validate]
-  '("Validate               [C-c C-v]" . sgml-validate))
+  '("Validate" . sgml-validate))
 (define-key sgml-mode-map [menu-bar sgml show-log]
-  '("Show/hide warning log  [C-c C-l]" . sgml-show-or-clear-log))
+  '("Show/hide warning log" . sgml-show-or-clear-log))
 (define-key sgml-mode-map [menu-bar sgml show-tags]
-  '("List valid tags        [C-c C-t]" . sgml-list-valid-tags))
+  '("List valid tags" . sgml-list-valid-tags))
 (define-key sgml-mode-map [menu-bar sgml change-name]
-  '("Change element name    [C-c =]" . sgml-change-element-name))
+  '("Change element name" . sgml-change-element-name))
 (define-key sgml-mode-map [menu-bar sgml edit-attributes]
-  '("Edit attributes        [C-c C-a]" . sgml-edit-attributes))
+  '("Edit attributes" . sgml-edit-attributes))
 (define-key sgml-mode-map [menu-bar sgml next-trouble]
-  '("Next trouble spot      [C-c C-o]" . sgml-next-trouble-spot)) 
+  '("Next trouble spot" . sgml-next-trouble-spot)) 
 (define-key sgml-mode-map [menu-bar sgml what-element]
-  '("What element           [C-c C-w]" . sgml-what-element))
+  '("What element" . sgml-what-element))
 (define-key sgml-mode-map [menu-bar sgml show-context]
-  '("Show context           [C-c C-c]" . sgml-show-context))
+  '("Show context" . sgml-show-context))
 (define-key sgml-mode-map [menu-bar sgml insert-end-tag]
-  '("End element            [C-c /]" . sgml-insert-end-tag))
+  '("End element" . sgml-insert-end-tag))
 (define-key sgml-mode-map [menu-bar sgml next-data]
-  '("Next data field        [C-c C-d]" . sgml-next-data-field))
+  '("Next data field" . sgml-next-data-field))
 
 
 ;;;; DTD menu
@@ -106,19 +106,19 @@
 ;;;; Fold menu
 
 (define-key sgml-mode-map [menu-bar sgml-fold unfold-all]
-  '("Unfold all       [C-c C-u C-a]" . sgml-unfold-all))
+  '("Unfold all" . sgml-unfold-all))
 (define-key sgml-mode-map [menu-bar sgml-fold fold-region]
-  '("Fold region      [C-c C-f C-r]" . sgml-fold-region))
+  '("Fold region" . sgml-fold-region))
 (define-key sgml-mode-map [menu-bar sgml-fold expand]
-  '("Expand           [C-c C-f C-x]" . sgml-expand-element))
+  '("Expand" . sgml-expand-element))
 (define-key sgml-mode-map [menu-bar sgml-fold unfold-element]
-  '("Unfold element   [C-c C-u C-e]" . sgml-unfold-element))
+  '("Unfold element" . sgml-unfold-element))
 (define-key sgml-mode-map [menu-bar sgml-fold unfold]
-  '("Unfold line      [C-c C-s]" . sgml-unfold-line))
+  '("Unfold line" . sgml-unfold-line))
 (define-key sgml-mode-map [menu-bar sgml-fold subfold]
-  '("Fold subelement  [C-c C-f C-s]"   . sgml-fold-subelement))
+  '("Fold subelement"   . sgml-fold-subelement))
 (define-key sgml-mode-map [menu-bar sgml-fold fold]
-  '("Fold element     [C-c C-f C-e]"   . sgml-fold-element))
+  '("Fold element"   . sgml-fold-element))
 
 
 ;;;; Markup menu
@@ -232,11 +232,17 @@ The entries are added last in keymap and a blank line precede it."
 
 ;;;; Insert with properties
 
+(defvar sgml-write-protect-intagible
+  (not (boundp 'emacs-minor-version)))
+
 (defun sgml-insert (props format &rest args)
   (let ((start (point)))
     (insert (apply (function format)
 		   format
 		   args))
+    (when (and sgml-write-protect-intagible
+	       (getf props 'intangible))
+	  (setf (getf props 'read-only) t))
     (add-text-properties start (point) props)))
 
 
