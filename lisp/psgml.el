@@ -618,6 +618,8 @@ sgml-normalize-trims  If non-nil, sgml-normalize will trim off white space
 	from end of element when adding end tag.
 sgml-indent-step  How much to increament indent for every element level.
 sgml-indent-data  If non-nil, indent in data/mixed context also.
+sgml-set-face     If non-nil, psgml will set the face of parsed markup.
+sgml-markup-faces The faces used when the above variable is non-nil.
 sgml-system-path  List of directorys used to look for system identifiers.
 sgml-public-map  Mapping from public identifiers to file names.
 sgml-offer-save  If non-nil, ask about saving modified buffers before
