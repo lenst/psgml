@@ -351,6 +351,9 @@ Setting this variable automatically makes it local to the current buffer.")
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-indent-data)
 
+(defvar sgml-content-indent-function 'sgml-indent-according-to-level)
+(defvar sgml-attribute-indent-function 'sgml-indent-according-to-stag)
+
 
 (defun sgml-parse-colon-path (cd-path)
   "Explode a colon-separated list of paths into a string list."
@@ -547,6 +550,11 @@ See `compilation-error-regexp-alist'.")
 
 (defvar sgml-mode-map nil
   "Keymap for SGML mode")
+
+(defvar sgml-show-context-function
+  'sgml-show-context-standard
+  "*Function to called to show context of and element.
+Should return a string suitable form printing in the echo area.")
 
 (defconst sgml-file-options
   '(
@@ -855,11 +863,12 @@ as that may change."
 (define-key sgml-mode-map "\C-c\r"   'sgml-split-element)
 (define-key sgml-mode-map "\C-c\C-n" 'sgml-up-element)
 (define-key sgml-mode-map "\C-c\C-o" 'sgml-next-trouble-spot)
-(define-key sgml-mode-map "\C-c\C-p" 'sgml-parse-prolog)
+(define-key sgml-mode-map "\C-c\C-p" 'sgml-load-doctype)
 (define-key sgml-mode-map "\C-c\C-q" 'sgml-fill-element)
 (define-key sgml-mode-map "\C-c\C-r" 'sgml-tag-region)
 (define-key sgml-mode-map "\C-c\C-s" 'sgml-unfold-line)
-(define-key sgml-mode-map "\C-c\C-t" 'sgml-list-valid-tags)
+;(define-key sgml-mode-map "\C-c\C-t" 'sgml-list-valid-tags)
+(define-key sgml-mode-map "\C-c\C-t" 'sgml-show-current-element-type)
 (define-key sgml-mode-map "\C-c\C-u\C-a" 'sgml-unfold-all)
 (define-key sgml-mode-map "\C-c\C-u\C-d" 'sgml-custom-dtd)
 (define-key sgml-mode-map "\C-c\C-u\C-e" 'sgml-unfold-element)
@@ -885,76 +894,61 @@ as that may change."
 ;;;; Menu bar
 
 (easy-menu-define
- sgml-dtd-menu sgml-mode-map "DTD menu"
- '("DTD"
-    ["Parse DTD"  sgml-parse-prolog t]
-    ("Insert DTD")
-    ("Info"
-     ["General DTD info"	sgml-general-dtd-info           t]
-     ["Describe element type"	sgml-describe-element-type	t]
-     ["Describe entity"		sgml-describe-entity		t]
-     ["List elements" 		sgml-list-elements 		t]
-     ["List attributes" 	sgml-list-attributes 		t]
-     ["List terminals" 		sgml-list-terminals 		t]
-     ["List content elements" 	sgml-list-content-elements 	t]
-     ["List occur in elements" 	sgml-list-occur-in-elements 	t]
-     )
-    "--"
-    ["Load Parsed DTD"  sgml-load-dtd t]
-    ["Save Parsed DTD"  sgml-save-dtd t]
-   ))
-
-(easy-menu-define
- sgml-view-menu sgml-mode-map "View menu"
- '("View"
-   ["Fold Element"	sgml-fold-element	t]
-   ["Fold Subelement"	sgml-fold-subelement	t]
-   ["Unfold Line"	sgml-unfold-line	t]
-   ["Unfold Element"	sgml-unfold-element	t]
-   ["Expand"		sgml-expand-element	t]
-   ["Fold Region"	sgml-fold-region	t]
-   ["Unfold All"	sgml-unfold-all		t]
-   ["Hide Tags"		sgml-hide-tags		t]
-   ["Hide Attributes"	sgml-hide-attributes	t]
-   ["Show All Tags"	sgml-show-tags		t]
-   ))
-
-
-(easy-menu-define
- sgml-markup-menu sgml-mode-map "Markup menu"
- '("Markup"
-   ["Insert Element"	sgml-element-menu	t]
-   ["Insert Start-Tag" sgml-start-tag-menu	t]
-   ["Insert End-Tag"	sgml-end-tag-menu	t]
-   ["End Current Element"	sgml-insert-end-tag t]
-   ["Tag Region"	sgml-tag-region-menu	t]
-   ["Insert Attribute"  sgml-attrib-menu	t]
-   ["Insert Entity"	sgml-entities-menu	t]
-   ["Add Element to Element"	sgml-add-element-menu	t]
-   ("Custom markup"   "---")
-   ))
-
-(easy-menu-define
- sgml-move-menu sgml-mode-map "Menu of move commands"
- '("Move"
-   ["Next trouble spot" sgml-next-trouble-spot t]
-   ["Next data field"   sgml-next-data-field   t]
-   ["Forward element"	sgml-forward-element t]
-   ["Backward element"  sgml-backward-element t]
-   ["Up element"	sgml-up-element t]
-   ["Down element"	sgml-down-element t]
-   ["Backward up element" sgml-backward-up-element t]
-   ["Beginning of element" sgml-beginning-of-element t]
-   ["End of element"	sgml-end-of-element t]
-   ))
-
-(easy-menu-define
- sgml-modify-menu sgml-mode-map "Menu of modification commands"
- '("Modify"
-   ["Normalize"			sgml-normalize	t]
-   ["Expand All Short References"	sgml-expand-all-shortrefs t]
-   ["Expand Entity Reference"	sgml-expand-entity-reference t]
+ sgml-main-menu sgml-mode-map "Main menu"
+ '("SGML"
+   ["Parse DTD"  sgml-parse-prolog t]
+   ("DTD Info"
+    ["General DTD info"	sgml-general-dtd-info           t]
+    ["Describe element type"	sgml-describe-element-type	t]
+    ["Describe entity"		sgml-describe-entity		t]
+    ["List elements" 		sgml-list-elements 		t]
+    ["List attributes" 	sgml-list-attributes 		t]
+    ["List terminals" 		sgml-list-terminals 		t]
+    ["List content elements" 	sgml-list-content-elements 	t]
+    ["List occur in elements" 	sgml-list-occur-in-elements 	t])
+   ("Insert Markup"
+    ["Insert Element"	sgml-element-menu	t]
+    ["Insert Start-Tag" sgml-start-tag-menu	t]
+    ["Insert End-Tag"	sgml-end-tag-menu	t]
+    ["End Current Element"	sgml-insert-end-tag t]
+    ["Tag Region"	sgml-tag-region-menu	t]
+    ["Insert Attribute"  sgml-attrib-menu	t]
+    ["Insert Entity"	sgml-entities-menu	t]
+    ["Add Element to Element"	sgml-add-element-menu	t]
+    ("Insert DTD")   
+    ("Custom markup"   "---"))
+   "--"
+   ["Show Context"	sgml-show-context t]
+   ["What Element"	sgml-what-element t]
+   ["List Valid Tags"	sgml-list-valid-tags t]
+   ["Validate"		sgml-validate t]
+   "--"
+   ("Move"
+    ["Next trouble spot" sgml-next-trouble-spot t]
+    ["Next data field"   sgml-next-data-field   t]
+    ["Forward element"	sgml-forward-element t]
+    ["Backward element"  sgml-backward-element t]
+    ["Up element"	sgml-up-element t]
+    ["Down element"	sgml-down-element t]
+    ["Backward up element" sgml-backward-up-element t]
+    ["Beginning of element" sgml-beginning-of-element t]
+    ["End of element"	sgml-end-of-element t])
+   ("View"
+    ["Fold Element"	sgml-fold-element	t]
+    ["Fold Subelement"	sgml-fold-subelement	t]
+    ["Unfold Line"	sgml-unfold-line	t]
+    ["Unfold Element"	sgml-unfold-element	t]
+    ["Expand"		sgml-expand-element	t]
+    ["Fold Region"	sgml-fold-region	t]
+    ["Unfold All"	sgml-unfold-all		t]
+    ["Hide Tags"		sgml-hide-tags		t]
+    ["Hide Attributes"	sgml-hide-attributes	t]
+    ["Show All Tags"	sgml-show-tags		t])
+   "--"
+   ["Normalize Document"        sgml-normalize	t]
    ["Normalize Element"		sgml-normalize-element t]
+   ["Expand All Short References" sgml-expand-all-shortrefs (not sgml-xml-p)]
+   ["Expand Entity Reference"	sgml-expand-entity-reference t]
    ["Make Character Reference"	sgml-make-character-reference t]
    ["Unmake Character Reference"	(sgml-make-character-reference t) t]
    ["Fill Element"		sgml-fill-element t]
@@ -966,19 +960,10 @@ as that may change."
    ["Trim and leave element"	sgml-trim-and-leave-element t]
    ["Decode Character Entities"  sgml-charent-to-display-char t]
    ["Encode Characters"		sgml-display-char-to-charent t]
-   )
- )
-
-(easy-menu-define
- sgml-main-menu sgml-mode-map "Main menu"
- '("SGML"
-   ["Reset Buffer"	normal-mode t]
-   ["Show Context"	sgml-show-context t]
-   ["What Element"	sgml-what-element t]
-   ["List Valid Tags"	sgml-list-valid-tags t]
-   ["Validate"		sgml-validate t]
+   "--"
    ("File Options"   "---")
    ("User Options"   "---")
+   ["Reset Buffer"	normal-mode t]
    ["Submit Bug Report"  sgml-submit-bug-report t]
    ))
 
@@ -1071,10 +1056,10 @@ as that may change."
 		(numberp button3))
       (local-set-key [button3] button3))
     (when sgml-custom-dtd
-      (easy-menu-change '("DTD") "Insert DTD"
+      (easy-menu-change '("SGML" "Insert Markup") "Insert DTD"
 			(sgml-compute-insert-dtd-items)))
     (when sgml-custom-markup
-      (easy-menu-change '("Markup") "Custom markup"
+      (easy-menu-change '("SGML" "Insert Markup") "Custom markup"
 			(sgml-compute-custom-markup-items))))
   nil)
 
@@ -1254,11 +1239,6 @@ All bindings:
 	    nil 'local)
   (run-hooks 'text-mode-hook 'sgml-mode-hook)
   (easy-menu-add sgml-main-menu)
-  (easy-menu-add sgml-modify-menu)
-  (easy-menu-add sgml-move-menu)
-  (easy-menu-add sgml-markup-menu)
-  (easy-menu-add sgml-view-menu)
-  (easy-menu-add sgml-dtd-menu)
   (sgml-build-custom-menus))
 
 ;; It would be nice to generalize the `auto-mode-interpreter-regexp'
