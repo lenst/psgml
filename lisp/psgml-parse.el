@@ -446,6 +446,18 @@ to point to the next scratch buffer.")
 
 ;;; Using states
 
+(defsubst sgml-final (state)
+  (if (sgml-normal-state-p state)
+      (sgml-state-final-p state)
+    (sgml-final-and state)))
+
+(defun sgml-final-and (state)
+  (and (sgml-final (sgml-and-state-substate state))
+       (loop for s in (sgml-and-state-dfas state)
+	     always (sgml-state-final-p s))
+       (sgml-state-final-p (sgml-and-state-next state))))
+
+
 ;; get-move: State x Token --> State|nil
 
 (defsubst sgml-get-move (state token)
@@ -501,18 +513,6 @@ If this is not possible, but all DFAS are final, move by TOKEN in NEXT."
         (loop for s in (sgml-and-state-dfas state)
               nconc (sgml-tokens-of-moves (sgml-state-reqs s)))
         (sgml-tokens-of-moves (sgml-state-reqs (sgml-and-state-next state))))))
-
-
-(defsubst sgml-final (state)
-  (if (sgml-normal-state-p state)
-      (sgml-state-final-p state)
-    (sgml-final-and state)))
-
-(defun sgml-final-and (state)
-  (and (sgml-final (sgml-and-state-substate state))
-       (loop for s in (sgml-and-state-dfas state)
-	     always (sgml-state-final-p s))
-       (sgml-state-final-p (sgml-and-state-next state))))
 
 (defun sgml-optional-tokens (state)
   (if (sgml-normal-state-p state)
@@ -1953,8 +1953,12 @@ the entity name."
 		       (or name "?")
 		       pubid 
 		       (sgml-extid-sysid extid))
-    (or (if sgml-system-identifiers-are-preferred
-	    (sgml-lookup-sysid-as-file extid))
+    (or (if (and sgml-system-identifiers-are-preferred
+		 (sgml-extid-sysid extid))
+	    (or (sgml-lookup-sysid-as-file extid)
+		(sgml-path-lookup  ;Try the path also, but only using sysid
+		 (sgml-make-extid nil (sgml-extid-sysid extid))
+		 nil nil)))
 	(sgml-catalog-lookup sgml-current-localcat pubid type name)
 	(sgml-catalog-lookup sgml-catalog-files pubid type name)
 	(if (not sgml-system-identifiers-are-preferred)
