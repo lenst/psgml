@@ -1,5 +1,12 @@
 Thu May 14 20:02:42 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* Version 1.1.1
+
+	* psgml.el (psgml-version): new version 1.1.1
+
+	* psgml-dtd.el (sgml-parse-character-reference): upcase funchar
+	names.
+
 	* psgml-edit.el (sgml-indent-line): compute indentation from
 	context, not element under point. Removed special handling of
 	start-tag and document context. Extra indentation if in markup.
