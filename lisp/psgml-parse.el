@@ -2053,11 +2053,13 @@ representation of the catalog."
     (apply (function sgml-log-message) args)))
 
 
-(defun sgml-catalog-lookup (files pubid type name)
-  "Look up the public identifier/entity name in catalogs.
-The result is a file name or nil.  FILES is a list of catalogs to use.
-PUBID is the public identifier \(if any). TYPE is the entity type and
-NAME is the entity name."
+(defun sgml-catalog-lookup (files pubid sysid type name initial-override)
+  "Look up the an entity in the catalogs.
+The entity is identified by a public identifier PUBID, system
+identifier SYSID and entity TYPE and NAME. If INITIAL-OVERRIDE is
+true, the system identifier will be used unless the catalog specifies
+otherwise. The result is a file name or nil. FILES is a list of
+catalogs to use."
   (cond ((eq type 'param)
 	 (setq name (format "%%%s" name)
 	       type 'entity))
@@ -2068,6 +2070,7 @@ NAME is the entity name."
 	(file nil))
     (while (and remaining (null file))
       (let ((additional nil)		; Extra catalogs to search
+            (override initial-override)
 	    (cat (sgml-cache-catalog (car remaining) 'sgml-catalog-assoc
 				     (function sgml-parse-catalog-buffer)
 				     (sgml-main-directory))))
@@ -2075,28 +2078,31 @@ NAME is the entity name."
 			   (expand-file-name (car remaining)
 					     (sgml-main-directory))
 			   (if (null cat) "empty/non existent" "exists"))
+        (when sysid                     ; SYSTEM has first call
+          (loop for (key cname cfile) in cat while (not file) do
+		(when (and (eq 'system key) (string= sysid cname))
+		  (sgml-trace-lookup "  >> %s [by system]" cfile)
+                  (setq file cfile))))
 	(when pubid
 	  ;; Giv PUBLIC entries priority over ENTITY and DOCTYPE
-	  (loop for (key cname cfile) in cat
-		while (not file) do
-		(when (and (eq 'public key)
-			   (string= pubid cname))
+	  (loop for (key cname cfile) in cat while (not file) do
+		(when (and (or override (not sysid))
+                           (eq 'public key) (string= pubid cname))
 		  (when (file-readable-p cfile) (setq file cfile))
 		  (sgml-trace-lookup "  >> %s [by pubid]%s"
-				     cfile (if file "" " !unreadable")))))
-	(loop for (key cname cfile) in cat
-	      while (not file) do
-	      (when (eq 'catalog key)
-		(push cfile additional))
-	      (when (and (eq type key)
-			 (or (null cname)
-			     (string= name cname)))
-		(when (file-readable-p cfile) (setq file cfile))
-		(sgml-trace-lookup "  >> %s [by %s %s]%s"
-				   cfile key cname
-				   (if file "" " !unreadable"))))
-	(setq remaining
-	      (nconc (nreverse additional) (cdr remaining)))))
+				     cfile (if file "" " !unreadable")))
+                (when (eq key 'override) (setq override cname))))
+        (loop for (key cname cfile) in cat while (not file) do
+              (when (eq 'catalog key) (push cfile additional))
+              (when (and (or override (not sysid))
+                         (eq type key)
+                         (or (null cname) (string= name cname)))
+                (when (file-readable-p cfile) (setq file cfile))
+                (sgml-trace-lookup "  >> %s [by %s %s]%s" cfile key cname
+                                   (if file "" " !unreadable")))
+              (when (eq key 'override) (setq override cname)))
+        (setq remaining
+              (nconc (nreverse additional) (cdr remaining)))))
     file))
 
 
@@ -2125,37 +2131,26 @@ NAME is the entity name."
 	       (not (file-directory-p cand))
 	       cand))))
 
+
 (defun sgml-external-file (extid &optional type name)
   "Return file name for entity with external identifier EXTID.
 Optional argument TYPE should be the type of entity and NAME should be
 the entity name."
-  ;; extid is (pubid . sysid)
-  (let ((pubid (sgml-extid-pubid extid)))
+  (let ((pubid (sgml-extid-pubid extid))
+        (sysid (sgml-extid-sysid extid))
+        (override (not sgml-system-identifiers-are-preferred)))
     (when pubid (setq pubid (sgml-canonize-pubid pubid)))
     (sgml-trace-lookup "Start looking for %s entity %s public %s system %s"
-		       (or type "-")
-		       (or name "?")
-		       pubid
-		       (sgml-extid-sysid extid))
-    (or (if (and sgml-system-identifiers-are-preferred
-		 (sgml-extid-sysid extid))
-	    (or (sgml-lookup-sysid-as-file extid)
-		(sgml-path-lookup  ;Try the path also, but only using sysid
-		 (sgml-make-extid nil (sgml-extid-sysid extid))
-		 nil nil)))
-	(sgml-catalog-lookup sgml-current-localcat pubid type name)
-	(sgml-catalog-lookup sgml-catalog-files pubid type name)
-	(if (not sgml-system-identifiers-are-preferred)
-	    (sgml-lookup-sysid-as-file extid))
+		       (or type "-") (or name "?") pubid sysid)
+    (or (sgml-catalog-lookup sgml-current-localcat
+                             pubid sysid type name override)
+        (sgml-catalog-lookup sgml-catalog-files
+                             pubid sysid type name override)
+        (and sysid
+             (file-readable-p (setq sysid (sgml-extid-expand sysid extid)))
+             sysid)
 	(sgml-path-lookup extid type name))))
 
-(defun sgml-lookup-sysid-as-file (extid)
-  (let ((sysid (sgml-extid-sysid extid)))
-    (and sysid
-	 (loop for pat in sgml-public-map
-	       never (string-match "%[Ss]" pat))
-	 (file-readable-p (setq sysid (sgml-extid-expand sysid extid)))
-	 sysid)))
 
 (defun sgml-insert-external-entity (extid &optional type name)
   "Insert the contents of an external entity at point.
@@ -2196,7 +2191,9 @@ Returns nil if entity is not found."
                                     ("entity" . name)   ("linktype" . name)
                                     ("doctype" . name)  ("sgmldecl" . noname)
                                     ("document" . noname)
-                                    ("catalog"  . noname))))
+                                    ("catalog"  . noname)
+                                    ("system" . two-files)
+                                    ("override" . flag))))
      when (not (null class))
      collect
      (let* ((name
@@ -2206,9 +2203,13 @@ Returns nil if entity is not found."
                    ((string= type "doctype")
                     (sgml-general-case (sgml-check-cat-literal)))
                    ((eq class 'name)
-                    (sgml-entity-case (sgml-check-cat-literal)))))
-            (file
-             (expand-file-name (sgml-check-cat-literal))))
+                    (sgml-entity-case (sgml-check-cat-literal)))
+                   ((eq class 'two-files)
+                    (sgml-check-cat-literal))
+                   ((eq class 'flag)
+                    (equal "yes" (downcase (sgml-check-cat-literal))))))
+            (file (or (eq class 'flag)
+                      (expand-file-name (sgml-check-cat-literal)))))
        (list (intern type) name file)))))
 
 
