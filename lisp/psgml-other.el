@@ -115,7 +115,9 @@ if the item is selected."
 	    (before-change-function nil) ; obsolete variable
 	    (after-change-functions nil)
 	    (before-change-functions nil))
-	(put-text-property start end 'face face)))
+	(put-text-property start end 'face face)
+        (when (< start end)
+          (put-text-property (1- end) end 'rear-nonsticky '(face)))))
      (t
       (let ((current (overlays-at start))
 	    (pos start)

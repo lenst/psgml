@@ -1068,7 +1068,9 @@ buffers local variables list."
 	   (setq vars (cdr vars)))
 	  ((car vars)			; Avoid nil
 	   (sgml-set-local-variable (car vars) (cadr vars))
-	   (setq vars (cddr vars)))))
+	   (setq vars (cddr vars)))
+          (t
+  	   (setq vars (cddr vars)))))
   (setq sgml-top-tree nil))
 
 (defun sgml-attrib-menu (event)

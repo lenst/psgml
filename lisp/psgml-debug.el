@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: 1999-08-09 23:38:43 lenst
+;;;\Last edited: 1999-12-16 22:57:33 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -282,12 +282,12 @@
 
 (defun profile-sgml (&optional file)
   (interactive)
-  (or file (setq file (expand-file-name "~/work/config/metaspec.xml")))
+  (or file (setq file (expand-file-name "~/work/sigmalink/BBB/config/configspec.xml")))
   (find-file file)
   (sgml-need-dtd)
   (sgml-instrument-parser)
   (elp-reset-all)
-  (dotimes (i 10)
+  (dotimes (i 5)
     (garbage-collect)
     (sgml-reparse-buffer (function sgml-handle-shortref)))
   (elp-results))

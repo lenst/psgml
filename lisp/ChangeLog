@@ -1,3 +1,19 @@
+Tue Dec 21 20:50:31 1999  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-other.el (sgml-set-face-for): set rear-nonsticky for face
+	when sgml-use-text-properties is true. (Suggested by Dirk Frömbgen)
+
+Sat Dec 18 18:55:02 1999  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-charent.el (sgml-charent-to-display-char): use
+	buffer-substring-no-properties to allow for using text properties
+	for fontification.
+
+1999-11-02  Tim Bradshaw  <tfb@tfeb.org>
+
+ 	* psgml-edit.el (sgml-doctype-insert): made it not loop when it
+ 	gets a bogus nil
+
 1999-12-16  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml-parse.el (sgml-parse-prolog): restore buffer modified
