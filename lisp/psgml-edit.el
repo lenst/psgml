@@ -1225,17 +1225,19 @@ Editing is done in a separate window."
 	   (cb (current-buffer))
 	   (quote sgml-always-quote-attributes)
 	   (xml-p sgml-xml-p))
-       (switch-to-buffer-other-window
-	(sgml-attribute-buffer element asl))
-       (sgml-edit-attrib-mode)
-       (make-local-variable 'sgml-start-attributes)
-       (setq sgml-start-attributes start)
-       (make-local-variable 'sgml-always-quote-attributes)
-       (setq sgml-always-quote-attributes quote)
-       (make-local-variable 'sgml-main-buffer)
-       (setq sgml-main-buffer cb)
-       (make-local-variable 'sgml-xml-p)
-       (setq sgml-xml-p xml-p))))
+      (unless asl
+        (error "This tag has no editable attributes"))
+      (switch-to-buffer-other-window
+       (sgml-attribute-buffer element asl))
+      (sgml-edit-attrib-mode)
+      (make-local-variable 'sgml-start-attributes)
+      (setq sgml-start-attributes start)
+      (make-local-variable 'sgml-always-quote-attributes)
+      (setq sgml-always-quote-attributes quote)
+      (make-local-variable 'sgml-main-buffer)
+      (setq sgml-main-buffer cb)
+      (make-local-variable 'sgml-xml-p)
+      (setq sgml-xml-p xml-p))))
 
 
 (defun sgml-effective-attlist (eltype)
