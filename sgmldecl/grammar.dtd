@@ -1,0 +1,47 @@
+
+<!element grammar	- o	(title, prod*) 	>
+
+<!element title		- o	(#pcdata)	>
+
+<!element prod		- o	(name, group)	>
+<!attlist prod
+	n	cdata		#required	>
+
+<!element name		o o	(#pcdata)	>
+
+<!element group		o o	(token|delim|nt|group)*	>
+<!attlist group	
+	status	(opt|must)		"must"
+	occur	(once|many)		"once"
+	order	(seq|alt)		"seq"
+	var	name			#IMPLIED	>
+
+<!element nt		- o	empty		>
+<!attlist nt
+	n	cdata			#required
+	name	cdata			#implied	>
+
+<!element token		- o	(#pcdata)	>
+<!element delim		- o	(#pcdata)	>
+
+
+<!entity begtoken	starttag "token"	>
+<!entity endtoken	endtag "token"		>
+<!entity endname	endtag "name"		>
+
+<!shortref docmap
+	'"'	begtoken
+	'='	endname
+>
+<!shortref tokmap
+	'"'	endtoken
+>
+
+<!-- usemap tokmap token -->
+
+<!entity psp	-- ps+ --
+ "<group many><nt n='65' name='ps'></group>" >
+
+<!entity pss	-- ps* --
+ "<group opt many><nt n='65' name='ps'></group>" >
+

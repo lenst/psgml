@@ -1220,6 +1220,7 @@ All bindings:
   (setq sgml-minimize-attributes nil)
   (setq sgml-always-quote-attributes t)
   (setq sgml-validate-command "nsgmls -wxml -s %s %s")
+  ;; FIXME: why conditional?
   (unless sgml-declaration
     (make-local-variable 'sgml-declaration)
     (setq sgml-declaration sgml-xml-declaration)))

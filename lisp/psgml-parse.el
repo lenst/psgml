@@ -2226,9 +2226,7 @@ Skips any leading spaces/comments."
 	  (sgml-in-file-eval (car sgml-parent-document)
 			     '(sgml-declaration)))
       ;; *** check for sgmldecl comment
-      (sgml-external-file nil 'sgmldecl)
-      )
-  )
+      (sgml-external-file nil 'sgmldecl)))
 
 (defun sgml-in-file-eval (file expr)
   (let ((cb (current-buffer)))
