@@ -716,21 +716,32 @@ If ATTSPEC is nil, nil is returned."
 
 
 ;;;; External identifier
-;; extid = (pubid? sysid?)
-;; *** extend to include default-directory
-;; Representation as (pubid . sysid)
+;; extid = (pubid? sysid? dir)
+;; Representation as (pubid  sysid . dir)
 ;; where pubid = nil | string
 ;;       sysid = nil | string
+;;       dir   = string
 
-(defun sgml-make-extid (pubid sysid)
-  (cons pubid sysid))
+(defun sgml-make-extid (pubid sysid &optional dir)
+  (cons pubid (cons sysid (or dir default-directory))))
 
 (defun sgml-extid-pubid (extid)
   (car extid))
 
 (defun sgml-extid-sysid (extid)
-  (cdr extid))
+  (if (consp (cdr extid))
+      (cadr extid)
+    (cdr extid)))
 
+(defun sgml-extid-dir (extid)
+  "Directory where EXTID was declared"
+  (if (consp (cdr extid))
+      (cddr extid)
+    nil))
+
+(defun sgml-extid-expand (file extid)
+  "Expand file name FILE in the context of EXTID."
+  (expand-file-name file (sgml-extid-dir extid)))
 
 ;;;; DTD 
 
@@ -1188,6 +1199,12 @@ buffer is assumend to be empty to start with."
 					    params2)))
 		   (unless (or (null other)
 			       (equal entity other))
+		     (sgml-log-message
+		      "Parameter %s in complied DTD has wrong value;\
+ is '%s' should be '%s'"
+		      (sgml-entity-name entity)
+		      (sgml-entity-text other)
+		      (sgml-entity-text entity))
 		     (return-from check-entities nil)))))
      params1)
     t))
@@ -1715,8 +1732,6 @@ a RNI must be followed by NAME."
 		    (sysid		; the system id
 		     (progn (sgml-skip-ps)
 			    (sgml-parse-literal))))
-	       (when sysid		;*** also avoid special sysids
-		 (setq sysid (expand-file-name sysid)))
 	       (sgml-make-extid pubid sysid)))
 	    (t
 	     (goto-char p)
@@ -1899,7 +1914,9 @@ FILES is a list of catalogs to use. PUBID is the public identifier
 	  thereis
 	  (and (setq cand (sgml-subst-expand cand subst))
 	       (file-readable-p
-		(setq cand (substitute-in-file-name cand)))
+		(setq cand
+		      (sgml-extid-expand (substitute-in-file-name cand)
+					 extid)))
 	       (not (file-directory-p cand))
 	       cand))))
 
@@ -1911,19 +1928,20 @@ the entity name."
   (let ((pubid (sgml-extid-pubid extid)))
     (when pubid (setq pubid (sgml-canonize-pubid pubid)))
     (or (if sgml-system-identifiers-are-preferred
-	    (sgml-lookup-sysid-as-file (sgml-extid-sysid extid)))
+	    (sgml-lookup-sysid-as-file extid))
 	(sgml-catalog-lookup sgml-current-localcat pubid type name)
 	(sgml-catalog-lookup sgml-catalog-files pubid type name)
 	(if (not sgml-system-identifiers-are-preferred)
-	    (sgml-lookup-sysid-as-file (sgml-extid-sysid extid)))
+	    (sgml-lookup-sysid-as-file extid))
 	(sgml-path-lookup extid type name))))
 
-(defun sgml-lookup-sysid-as-file (sysid)
-  (and sysid
-       (loop for pat in sgml-public-map
-	     never (string-match "%[Ss]" pat))
-       (file-readable-p sysid)
-       sysid))
+(defun sgml-lookup-sysid-as-file (extid)
+  (let ((sysid (sgml-extid-sysid extid)))
+    (and sysid
+	 (loop for pat in sgml-public-map
+	       never (string-match "%[Ss]" pat))
+	 (file-readable-p (setq sysid (sgml-extid-expand sysid extid)))
+	 sysid)))
 
 (defun sgml-insert-external-entity (extid &optional type name)
   "Insert the contents of an external entity at point.
@@ -2300,8 +2318,8 @@ overrides the entity type in entity look up."
 	    0))
     (cond
      ((stringp entity)			; a file name
-      (setq default-directory (file-name-directory entity))
-      (save-excursion (insert-file-contents entity)))
+      (save-excursion (insert-file-contents entity))
+      (setq default-directory (file-name-directory entity)))
      ((and sgml-parsing-dtd
 	   (consp (sgml-entity-text entity))) ; external id?
       (let ((file (sgml-entity-file entity type)))
@@ -2314,8 +2332,8 @@ overrides the entity type in entity look up."
 	 (file
 	  ;; fifth arg not available in early v19
 	  (erase-buffer)
-	  (setq default-directory (file-name-directory file))
 	  (insert-file-contents file nil nil nil)
+	  (setq default-directory (file-name-directory file))
 	  (goto-char (point-min))
 	  (push file (sgml-dtd-dependencies sgml-dtd-info)))
 	 (t
