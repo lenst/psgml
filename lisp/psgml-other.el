@@ -106,26 +106,50 @@ if the item is selected."
 		   format
 		   args))
     (when (and sgml-write-protect-intagible
-	       (getf props 'intangible))
-	  (setf (getf props 'read-only) t))
+	       (plist-get props 'intangible))
+	  (plist-put props 'read-only t))
     (add-text-properties start (point) props)))
 
 
 ;;;; Set face of markup
 
-(defvar sgml-use-text-properties nil)
+(defvar sgml-use-text-properties t
+  "Non-nil means use text properties for highlighting, not overlays.
+Overlays are significantly less efficient in large buffers.")
+
+(eval-and-compile
+  (if (boundp 'inhibit-modification-hooks) ; Emacs 21
+      (defmacro sgml-with-modification-state (&rest body)
+	`(let ((modified (buffer-modified-p))
+	       (inhibit-read-only t)
+	       (inhibit-modification-hooks t)
+	       (buffer-undo-list t)
+	       (deactivate-mark nil))
+	   ,@body
+	   (when (not modified)
+	     (sgml-restore-buffer-modified-p nil))))
+    (defmacro sgml-with-modification-state (&rest body)
+      `(let ((modified (buffer-modified-p))
+	     (inhibit-read-only t)
+	     (after-change-functions nil)
+	     (before-change-functions nil)
+	     (buffer-undo-list t)
+	     (deactivate-mark nil))
+	 ,@body
+	 (when (not modified)
+	   (sgml-restore-buffer-modified-p nil))))))
+
+(defconst sgml-default-nonsticky (boundp 'text-property-default-nonsticky)
+  "Non-nil means use `text-property-default-nonsticky'. locally.
+Otherwise put explicit properties.")
 
 (defun sgml-set-face-for (start end type)
   (let ((face (cdr (assq type sgml-markup-faces))))
     (cond
      (sgml-use-text-properties
-      (let ((inhibit-read-only t)
-            (after-change-functions nil)
-            (before-change-functions nil)
-            (buffer-undo-list t)
-            (deactivate-mark nil))
+      (sgml-with-modification-state
 	(put-text-property start end 'face face)
-        (when (< start end)
+        (when (and sgml-default-nonsticky (< start end))
           (put-text-property (1- end) end 'rear-nonsticky '(face)))))
      (t
       (let ((current (overlays-at start))
@@ -173,13 +197,11 @@ if the item is selected."
   (when nil
     (move-overlay overlay end (overlay-end overlay))))
 
-(defalias 'next-overlay-at 'next-overlay-change) ; fix bug in cl.el
-
 (defun sgml-clear-faces ()
   (interactive)
-  (loop for o being the overlays
-	if (overlay-get o 'sgml-type)
-	do (delete-overlay o)))
+  (dolist (o (overlays-in (point-min) (point-max)))
+    (if (overlay-get o 'sgml-type)
+	(delete-overlay o))))
 
 
 ;;;; Emacs before 19.29

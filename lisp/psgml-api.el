@@ -30,7 +30,7 @@
 (provide 'psgml-api)
 (require 'psgml)
 (require 'psgml-parse)
-
+(eval-when-compile (require 'cl))
 
 ;;;; Mapping: map and modify
 

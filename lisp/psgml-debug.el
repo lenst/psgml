@@ -11,6 +11,10 @@
 (require 'psgml-edit)
 (require 'psgml-dtd)
 (autoload 'sgml-translate-model "psgml-dtd" "" nil)
+(eval-when-compile
+  (require 'cl)
+  (require 'elp)
+  (require 'edebug))
 
 ;;;; Debugging
 
@@ -794,4 +798,4 @@ after the first tag inserted."
           (insert "</tr>")))))))
 
 
-;¤¤\end{codeseg}
+;\end{codeseg}

@@ -1,3 +1,111 @@
+2002-04-25  Lennart Staflin  <lenst@lysator.liu.se>
+
+	fixing merge of Dave Loves patch.
+	
+2002-02-08  Dave Love  <fx@gnu.org>
+	[Merging from 1.2.4 branch /lenst]
+	
+	Changes for various things: Useful DTD-less XML editing; avoiding
+	CL at runtime; some Emacs portability; Mule-related fixes,
+	particularly for non-ASCII names in DTD.
+
+	* psgml-maint.el (psgml-find-source-dir): Fix version number.
+
+	* psgml-info.el (sgml-set-difference, sgml-union): New functions.
+	(sgml-eltype-refrenced-elements): Use them and also use
+	add-to-list instead of pushnew.
+
+	* psgml-dtd.el: Doc and message fixes.
+	(sgml-write-dtd): Use sgml-set-buffer-multibyte and bind
+	coding-system-for-write around write-region.
+	(sgml-merge-attlists): Use copy-sequence, not copy-list.
+
+	* psgml-edit.el: Require cl when compiling.  Don't set
+	byte-compile-warnings.
+	(sgml-quote-attribute-value, sgml-tag-regexp)
+	(sgml-edit-attrib-next): Use documented way of including `-' in
+	regexp range.
+	(sgml-change-start-tag, sgml-insert-attribute)
+	(sgml-make-attrib-menu, sgml-menu-ask): Fix to work without a DTD.
+	(sgml-edit-attrib-next, sgml-tag-regexp): Maybe allow non-ASCII.
+	(sgml--all-possible-elements): Kludge for DTD-less case.
+	(sgml-make-character-reference): Take care over multibyteness.
+	Maybe deal with unicodes.
+	(sgml-edit-attrib-specification-list, sgml-edit-attrib-default)
+	(sgml-edit-attrib-default, sgml-edit-attrib-clear)
+	(sgml-edit-attrib-field-start, sgml-attribute-buffer): Use
+	property name `sgml-category', not `category', which is special in
+	Emacs. [backed out //lenst]
+	(sgml-operate-on-tags): Use sgml-restore-buffer-modified-p.
+
+	* psgml-lucid.el (sgml-insert): Use property name `sgml-category',
+	not `category'. [backed out //lenst]
+	
+	* psgml.el: Require cl only when compiling.  Doc fixes.
+	(sgml-mode): Set text-property-default-nonsticky.  In Emacs, use
+	which-fun-mode hook instead of trying to modify mode-line-format.
+	<paragraph-separate>: Maybe allow non-ASCII.
+	(sgml-mode-map): Define unconditionally. [backed out //lenst]
+	(sgml-running-lucid): Defconst, not defvar.
+	(sgml-have-re-char-clases): New constant.
+	(sgml-markup-faces): Default to font-lock faces if available.
+	(sgml-start-tag-regex, sgml-close-angle): Allow non-ASCII if
+	possible.
+	(sgml-angle-distance, sgml-slash-distance): Defvar, not defconst,
+	since it's a user variable.
+	(sgml-restore-buffer-modified-p): New alias.
+	(sgml-parse-colon-path): Use parse-colon-path, if available.
+	[backed out, parse-colon-path is for directories //lenst]
+	(sgml-command-post, sgml-mode): Assume make-local-hook exists.
+
+	* psgml-parse.el: Doc and message fixes.
+	(sgml-dtd-less): New buffer-local variable.
+	(sgml-eltype-name, sgml-eltype-defined, sgml-eltype-token)
+	(sgml-token-eltype, sgml-eltype-mixed, sgml-check-name)
+	(sgml-element-etag-optional, sgml-element-mixed, sgml-parse-name):
+	Avoid unnecessary compiler macros.
+	(sgml-read-element-type, sgml-read-element-name): DTRT for non-nil
+	sgml-dtd-less.
+	(sgml-push-to-entity): Obey sgml-warn-about-undefined-entities.
+	Don't make the buffer unibyte here.  Ensure an old one is
+	multibyte.
+	(sgml-parse-prolog): Set sgml-dtd-less.
+	(sgml-attdecl-default-value): Avoid caddr.
+	(sgml-entity-marked-undefined-p): Avoid cddddr.  Avoid (CL
+	runtime) setter for nthcdr.
+	(sgml-load-dtd): Avoid mapcan.
+	(sgml-bdtd-load): Set buffer unibyte.
+	(sgml-bdtd-merge): Don't set buffer unibyte here.
+	(sgml-set-active-dtd-indicator): Set which-func-mode.
+	(sgml-merge-eltypes): Use copy-sequence, not copy-list.
+	(sgml-open-element-hook, sgml-close-element-hook)
+	(sgml-map-eltypes): Remove redundant level of lambda.
+	(sgml-entity-case, sgml-general-case): Moved before
+	sgml-entity-case use.
+	(sgml-update-display): Call force-mode-line-update.
+	(sgml-parse-attribute-specification-list): Use sgml-dtd-less.
+	
+	* psgml-other.el (sgml-insert): Use plist-get rather than CL
+	runtime's getf.
+	(sgml-use-text-properties): Default to t.
+	(sgml-with-modification-state): New macro.
+	(sgml-default-nonsticky): New constant.
+	(sgml-set-face-for): Use sgml-with-modification-state,
+	sgml-default-nonsticky.
+	(sgml-clear-faces): Avoid CL runtime.
+	(next-overlay-at): Remove as consequence of above.
+
+	* psgml-fs.el: Require cl and ps-print when compiling.
+	(fs-do-style, fs-do-style, fs-do-style): Use plist-get rather than
+	CL runtime's getf.
+	(fs-element-with-id): Use compare-strings, not equalp.
+
+	* psgml-dtd.el, psgml-charent.el, psgml-api.el, psgml-info.el:
+	Require cl when compiling.
+
+	* psgml-debug.el: Require cl, elp and edebug when compiling.
+
+	
 2002-04-19  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.2.5 released

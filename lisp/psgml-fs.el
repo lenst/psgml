@@ -29,19 +29,21 @@
 ;; To try it load this file and open the test file example.sgml. Then
 ;; run the emacs command `M-x style-format'.
 
-;; The style file should contain a single Lisp list. The elements of
-;; this list, are them self lists, describe the style for an element type.
+;; The style file should contain a single Lisp list.  The elements of
+;; this list, themsleves lists, describe the style for an element type.
 ;; The sublists begin with the generic identifier for the element types and
-;; the rest of the list are characteristic/value pairs.
+;; the rest of the lists are characteristic/value pairs.
 
 ;; E.g.  ("p"  block t  left 4  top 2)
 
 ;; Defines the style for p-elements to be blocks with left margin 4 and
-;; at least to blank lines before the block.
+;; at least two blank lines before the block.
 
 
 ;;; Code:
 (require 'psgml-api)
+(eval-when-compile (require 'cl)
+		   (require 'ps-print))
 
 ;;;; Formatting parameters
 
@@ -186,7 +188,7 @@
   "*Style sheet to use for `style-format'.
 The value can be the style-sheet list, or it can be a file name
 \(string) of a file containing the style sheet or it can be the name
-\(symbol) of a variable containing the style sheet." )
+\(symbol) of a variable containing the style sheet.")
 
 (put 'fs-style 'variable-interactive
      "fStyle file: ")
@@ -212,7 +214,7 @@ The value can be the style-sheet list, or it can be a file name
 			(assq t fs-style)))))
 
 (defun fs-do-style (fs-current-element style)
-  (let ((hang-from (eval (getf style 'hang-from))))
+  (let ((hang-from (eval (plist-get style 'hang-from))))
     (when hang-from
       (setq fs-hang-from
 	    (format "%s%s "
@@ -226,18 +228,18 @@ The value can be the style-sheet list, or it can be a file name
 			collect (cons (car st)
 				      (eval (cadr st))))
 		  fs-char)))
-    (when (getf style 'block)
+    (when (plist-get style 'block)
       (fs-para)
-      (fs-addvspace (or (getf style 'top)
+      (fs-addvspace (or (plist-get style 'top)
 			(fs-char 'default-top))))
-    (let ((before (getf style 'before)))
+    (let ((before (plist-get style 'before)))
       (when before
 	(fs-do-style e before)))
     (let ((fs-style
-           (append (getf style 'sub-style)
+           (append (plist-get style 'sub-style)
                    fs-style)))
-      (cond ((getf style 'text)
-             (let ((text (eval (getf style 'text))))
+      (cond ((plist-get style 'text)
+             (let ((text (eval (plist-get style 'text))))
                (when (stringp text)
                  (fs-paraform-data text))))
             (t
@@ -246,18 +248,18 @@ The value can be the style-sheet list, or it can be a file name
                                (function fs-paraform-data)
                                nil
                                (function fs-paraform-entity)))))
-    (let ((title (getf style 'title)))
+    (let ((title (plist-get style 'title)))
       (when title
         (setq title (eval title))
         (save-excursion
           (set-buffer fs-buffer)
           (setq fs-title title))))
-    (let ((after (getf style 'after)))
+    (let ((after (plist-get style 'after)))
       (when after
 	(fs-do-style e after)))
-    (when (getf style 'block)
+    (when (plist-get style 'block)
       (fs-para)
-      (fs-addvspace (or (getf style 'bottom)
+      (fs-addvspace (or (plist-get style 'bottom)
 			(fs-char 'default-bottom))))))
 
 ;;;###autoload
@@ -332,8 +334,10 @@ The value can be the style-sheet list, or it can be a file name
         (let ((attlist (sgml-element-attlist element)))
           (loop for attdecl in attlist
                 if (eq 'ID (sgml-attdecl-declared-value attdecl))
-                do (if (equalp id (sgml-element-attval element
-                                                       (sgml-attdecl-name attdecl)))
+                do (if (compare-strings id nil nil
+					(sgml-element-attval
+					 element (sgml-attdecl-name attdecl))
+					nil nil)
                        (return-from func element))))
         ;; Next element
         (if (sgml-element-content element)

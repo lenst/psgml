@@ -31,9 +31,10 @@
 (provide 'psgml-edit)
 (require 'psgml)
 (require 'psgml-parse)
+(eval-when-compile (require 'cl))
 
-(eval-when-compile
-  (setq byte-compile-warnings '(free-vars unresolved callargs redefine)))
+;; (eval-when-compile
+;;   (setq byte-compile-warnings '(free-vars unresolved callargs redefine)))
 
 
 ;;;; Variables
@@ -783,7 +784,7 @@ AVL should be a assoc list mapping symbols to strings."
   (let ((quote ""))
 	(cond ((and (not sgml-always-quote-attributes)
 		    sgml-shorttag
-		    (string-match "\\`[.A-Za-z0-9---]+\\'" value))
+		    (string-match "\\`[-.A-Za-z0-9]+\\'" value))
 	       ) ; no need to quote
 	      ((not (string-match "\"" value)) ; can use "" quotes
 	       (setq quote "\""))
@@ -849,6 +850,13 @@ AVL should be a assoc list mapping symbols to strings."
 (defun sgml-change-start-tag (element asl)
   (let ((name (sgml-element-gi element))
 	(attlist (sgml-element-attlist element)))
+    ;; Concoct an attribute specification list using the names of the
+    ;; existing attributes and those ot be changed.
+    (when (and (not attlist) sgml-dtd-less)
+      (dolist (elt (mapcar 'car asl))
+	(unless (assoc elt attlist)	; avoid duplicates
+	  (push (sgml-make-attdecl elt 'CDATA 'REQUIRED) attlist)))
+      (setq attlist (nreverse attlist)))
     (assert (sgml-bpos-p (sgml-element-stag-epos element)))
     (goto-char (sgml-element-start element))
     (delete-char (sgml-element-stag-len element))
@@ -901,13 +909,18 @@ CURVALUE is nil or a string that will be used as default value."
             (let ((completion-ignore-case sgml-namecase-general))
               (completing-read
                "Attribute name: "
-               (mapcar (function (lambda (a) (list (sgml-attdecl-name a))))
-                       (sgml-non-fixed-attributes (sgml-element-attlist el)))
-               nil t)))))
+               (mapcar
+		(function (lambda (a) (list (sgml-attdecl-name a))))
+		(if sgml-dtd-less
+		    (sgml-tree-asl el)
+		  (sgml-non-fixed-attributes (sgml-element-attlist el))))
+               nil (not sgml-dtd-less))))))
      (list name
 	   (sgml-read-attribute-value
-	    (sgml-lookup-attdecl name (sgml-element-attlist el))
-			(sgml-element-name el)
+	    (if sgml-dtd-less
+		(list name)
+	      (sgml-lookup-attdecl name (sgml-element-attlist el)))
+	    (sgml-element-name el)
 	    (sgml-element-attval el name)))))
   ;; Body
   (assert (stringp name))
@@ -1057,14 +1070,23 @@ tag inserted."
 	      (nconc tab
 		     (mapcar (function sgml-start-tag-of)
 			     (sgml-current-list-of-valid-eltypes)))))))
+    (if sgml-dtd-less
+	;; The best we can do is assemble a list of elements we've
+	;; seen so far.
+	(dolist (n (append (sgml-dtd-eltypes sgml-dtd-info) '())
+		   ;; Space avoids possible clash with valid element.
+		   (setq tab (cons "Any " (cons "--" tab))))
+	  (when (and (symbolp n) (not (memq n tab)))
+	    (push (symbol-name n) tab))))
     (or tab
 	(error "No valid %s at this point" type))
-    (or
-     (sgml-popup-menu event
-		      title
-		      (mapcar (function (lambda (x) (cons x x)))
-			      tab))
-     (message nil))))
+    (let ((elt (sgml-popup-menu event
+				title
+				(mapcar (function (lambda (x) (cons x x)))
+					tab))))
+      (if (equal elt "Any ")
+	  (setq elt (sgml-read-element-name "Element: ")))
+      (or elt (message nil)))))
 
 (defun sgml-entities-menu (event)
   (interactive "*e")
@@ -1116,6 +1138,20 @@ buffers local variables list."
 
 (defun sgml-make-attrib-menu (el)
   (let ((attlist (sgml-non-fixed-attributes (sgml-element-attlist el))))
+    (if (and (not attlist) sgml-dtd-less)
+      (let ((name
+	     (sgml-general-case
+	      (let ((completion-ignore-case sgml-namecase-general))
+		(completing-read
+		 "Attribute name: "
+		 (mapcar
+		  (lambda (a) (list (sgml-attdecl-name a)))
+		  (if sgml-dtd-less
+		      (sgml-tree-asl el)
+		    (sgml-non-fixed-attributes (sgml-element-attlist el))))
+		 nil (not sgml-dtd-less))))))
+	(if name
+	    (setq attlist (list (sgml-make-attdecl name 'CDATA nil))))))
     (or attlist
 	(error "No non-fixed attributes for element"))
     (loop for attdecl in attlist
@@ -1338,10 +1374,10 @@ Editing is done in a separate window."
 	      (def-value (sgml-attdecl-default-value attr))
 	      (cur-value (sgml-lookup-attspec aname asl)))
 	 (sgml-insert			; atribute name
-	  '(read-only t category sgml-form) " %s =" aname)
+	  '(read-only t sgml-category sgml-form) " %s =" aname)
 	 (cond				; attribute value
 	  ((sgml-default-value-type-p 'FIXED def-value)
-	   (sgml-insert '(read-only t category sgml-fixed)
+	   (sgml-insert '(read-only t sgml-category sgml-fixed)
 			" #FIXED %s"
 			(sgml-default-value-attval def-value)))
 	  ((and (null cur-value)
@@ -1353,8 +1389,8 @@ Editing is done in a separate window."
 	   (sgml-insert '(category sgml-default rear-nonsticky (category))
 			"#DEFAULT"))
 	  (t
-           (sgml-insert '(read-only t category sgml-form
-                                    rear-nonsticky (read-only category))
+           (sgml-insert '(read-only t sgml-category sgml-form
+                                    rear-nonsticky (read-only sgml-category))
                         " ")
            (when (not (null cur-value))
              (sgml-insert nil "%s" (sgml-attspec-attval cur-value)))))
@@ -1439,7 +1475,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
        (sgml-parse-s)
        (sgml-check-nametoken)		; attribute name, should match head of al
        (forward-char 3)
-       (unless (memq (get-text-property (point) 'category)
+       (unless (memq (get-text-property (point) 'sgml-category)
 		     '(sgml-default sgml-fixed))
 	 (push
 	  (sgml-make-attspec (sgml-attdecl-name (car al))
@@ -1494,7 +1530,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
       (put-text-property (point) end 'read-only nil)
       (let ((inhibit-read-only t))
         (put-text-property (1- (point)) (point)
-                           'rear-nonsticky '(read-only category)))
+                           'rear-nonsticky '(read-only sgml-category)))
       (kill-region (point) end))))
 
 
@@ -1512,8 +1548,8 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
     (beginning-of-line 1)
     (while (not (eq t (get-text-property (point) 'read-only)))
       (beginning-of-line 0))
-    (while (eq 'sgml-form (get-text-property (point) 'category))
-      (setq start (next-single-property-change (point) 'category))
+    (while (eq 'sgml-form (get-text-property (point) 'sgml-category))
+      (setq start (next-single-property-change (point) 'sgml-category))
       (unless start (error "No attribute value here"))
       (assert (number-or-marker-p start))
       (goto-char start))))
@@ -1534,14 +1570,18 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
   (interactive)
   (if (eq t (get-text-property (point) 'read-only))
       (beginning-of-line 1))
-  (or (search-forward-regexp "^ *[_.:A-Za-z0-9---]+ *= ?" nil t)
+  (or (search-forward-regexp (if sgml-have-re-char-clases
+				 "^ *[-_.:[:alnum:]]+ *= ?"
+			       "^ *[-_.:A-Za-z0-9]+ *= ?") nil t)
       (goto-char (point-min))))
 
 
 ;;;; SGML mode: Hiding tags/attributes
 
 (defconst sgml-tag-regexp
-  "\\(</?>\\|</?[_A-Za-z][---_:A-Za-z0-9.]*\\(\\([^'\"></]\\|'[^']*'\\|\"[^\"]*\"\\)*\\)/?>?\\)")
+  (if sgml-have-re-char-clases
+      "\\(</?>\\|</?[_[:alpha:]][-_:[:alnum:].]*\\(\\([^'\"></]\\|'[^']*'\\|\"[^\"]*\"\\)*\\)/?>?\\)"
+    "\\(</?>\\|</?[_A-Za-z][-_:A-Za-z0-9.]*\\(\\([^'\"></]\\|'[^']*'\\|\"[^\"]*\"\\)*\\)/?>?\\)"))
 
 (defun sgml-operate-on-tags (action &optional attr-p)
   (let ((buffer-modified-p (buffer-modified-p))
@@ -1573,7 +1613,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 				      '(invisible nil)))
 	     (t (error "Invalid action: %s" action)))
 	    (incf tagcount)))
-      (set-buffer-modified-p buffer-modified-p))))
+      (sgml-restore-buffer-modified-p buffer-modified-p))))
 
 (defun sgml-hide-tags ()
   "Hide all tags in buffer."
@@ -1712,7 +1752,9 @@ elements with omitted end-tags."
   "Convert character after point into a character reference.
 If called with a numeric argument, convert a character reference back
 to a normal character.  If called from a program, set optional
-argument INVERT to non-nil."
+argument INVERT to non-nil.  If the function `decode-char' is defined,
+convert to and from Unicodes.  Otherwise will only work for ASCII or 8-bit
+characters in the current coding system."
   (interactive "*P")
   (cond
    (invert
@@ -1722,11 +1764,20 @@ argument INVERT to non-nil."
 					      (match-end 1)))))
       (delete-region (match-beginning 0)
 		     (match-end 0))
+      (if (fboundp 'decode-char)	; Emacs 21, Mule-UCS
+	  (setq c (decode-char 'ucs c))
+	;; Else have to assume 8-bit character.
+	(if (fboundp 'unibyte-char-to-multibyte) ; Emacs 20
+	    (setq c (unibyte-char-to-multibyte c))))
       (insert c)))
    ;; Convert character to &#nn;
    (t
     (let ((c (following-char)))
       (delete-char 1)
+      (if (fboundp 'encode-char)
+	  (setq c (encode-char c 'ucs))
+	(if (fboundp 'multibyte-char-to-unibyte)
+	    (setq c (multibyte-char-to-unibyte c))))
       (insert (format "&#%d;" c))))))
 
 (defun sgml-expand-entity-reference ()
@@ -1943,6 +1994,7 @@ If it is something else complete with ispell-complete-word."
     (when var
       (sgml-do-set-option var event))))
 
+;; Fixme: Use Customize for this.
 (defun sgml-do-set-option (var &optional event)
   (let ((type (sgml-variable-type var))
 	(val (symbol-value var)))
@@ -2048,13 +2100,16 @@ will reset the variable.")
         (s (sgml-element-model el))
         (found nil))
     (loop do
-          (dolist (tok (nconc (sgml-optional-tokens s)
-                              (sgml-required-tokens s)))
-            (unless (memq tok found)
-              ;; tok is optional here and not already found -- check that
-              ;; it would not make the content invalid
-              (when (sgml--add-before-p tok s c)
-                  (push tok found))))
+	  ;; Fixme: this test avoids an error when DTD-less, but it's
+	  ;; probably an inappropriate kludge.  -- fx
+          (when (not (eq s 'ANY))
+	    (dolist (tok (nconc (sgml-optional-tokens s)
+				(sgml-required-tokens s)))
+	      (unless (memq tok found)
+		;; tok is optional here and not already found -- check that
+		;; it would not make the content invalid
+		(when (sgml--add-before-p tok s c)
+                  (push tok found)))))
           while c do
           (setq s (sgml-element-pstate c))
           (setq c (sgml-element-next c)))

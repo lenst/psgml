@@ -27,11 +27,14 @@
 ;;  Functions to convert character entities into displayable characters
 ;;  and displayable characters back into character entities.
 
+;; This should either use iso-cvt or do better with a multilingual set of entities 
+
 
 ;;;; Code:
 
 (provide 'psgml-charent)
 (require 'psgml-parse)
+(eval-when-compile (require 'cl))
 
 
 ;;;; Variable declarations
@@ -61,10 +64,11 @@ Alist with entity name as key and display character as content."
   (let (key disp-char alist)
     (while (re-search-forward "^\\([0-9]+\\)[ \t]+\\(.+\\)$" nil t)
       (setq key (buffer-substring (match-beginning 2) (match-end 2)))
-      (setq disp-char
-	    (char-to-string
-	     (string-to-number
-	      (buffer-substring (match-beginning 1) (match-end 1)))))
+      (setq disp-char (string-to-number (buffer-substring (match-beginning 1)
+							  (match-end 1))))
+      (if (fboundp 'unibyte-char-to-multibyte)
+	  (setq disp-char (unibyte-char-to-multibyte disp-char)))
+      (setq disp-char (char-to-string disp-char))
       (push (cons key disp-char)
 	    alist))
     alist))
