@@ -345,6 +345,16 @@ to point to the next scratch buffer.")
          (set-buffer-modified-p buffer-modified)
          (sgml-debug "Restoring buffer mod: %s" buffer-modified)))))
 
+(defsubst sgml-set-buffer-multibyte (flag)
+  (cond ((featurep 'xemacs)
+         flag)
+        ((and (boundp 'emacs-major-version) (>= emacs-major-version 20))
+         (set-buffer-multibyte flag))
+	((boundp 'MULE)
+         (set 'mc-flag flag))
+        (t
+         flag)))
+
 
 ;;;; State machine
 
@@ -1243,6 +1253,8 @@ buffer is assumed to be empty to start with."
     (sgml-check-dtd-subset)
     (sgml-pop-entity)
     (erase-buffer)
+    ;; For Mule
+    (sgml-set-buffer-multibyte nil)
     (sgml-write-dtd sgml-dtd-info to-file)
     t))
 
@@ -1270,6 +1282,8 @@ buffer is assumed to be empty to start with."
   "Merge the binary coded dtd in the current buffer with the current dtd.
 The current dtd is the variable sgml-dtd-info.  Return t if the merge
 was successful or nil if failed."
+  ;; for mule
+  (sgml-set-buffer-multibyte nil)
   (goto-char (point-min))
   (sgml-read-sexp)			; skip filev
   (let ((dependencies (sgml-read-sexp))
@@ -2118,7 +2132,7 @@ Returns nil if entity is not found."
 	(let ((file (sgml-external-file extid type name)))
 	  (and file (insert-file-contents file)))
 	(progn
-	  (sgml-log-warning "External entity %s not found" name)
+	  (sgml-log-warning "External entity %s not found." name)
 	  (when pubid
 	    (sgml-log-warning "  Public identifier %s" pubid))
 	  (when sysid
@@ -2487,9 +2501,8 @@ overrides the entity type in entity look up."
 			      (sgml-epos (or ref-start (point)))
 			      (sgml-epos (point)))))
     (set-buffer sgml-scratch-buffer)
-    ;; For MULE to not misinterpret binary data set the mc-flag
-    ;; (reported by Jeffrey Friedl <jfriedl@nff.ncl.omron.co.jp>)
-    (set 'mc-flag nil)			
+    ;; for mule
+    (sgml-set-buffer-multibyte nil)
     (when (eq sgml-scratch-buffer (default-value 'sgml-scratch-buffer))
       (make-local-variable 'sgml-scratch-buffer)
       (setq sgml-scratch-buffer nil))
@@ -2799,7 +2812,7 @@ overrides the entity type in entity look up."
       (let ((deactivate-mark nil))
 	(sgml-need-dtd)
 	(let ((eol-pos (save-excursion (end-of-line 1) (point))))
-	  (let ((quiet (< (- (point) (sgml-max-pos-in-tree sgml-current-tree))
+	  (let ((quiet (< (- (point) (sgml-max-pos-in-tree sgml-top-tree))
                           500)))
 	    (when (if quiet
 		      t
