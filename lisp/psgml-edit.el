@@ -1864,5 +1864,75 @@ If it is something else complete with ispell-complete-word."
                              gis "\\"))))
 
 (define-key sgml-mode-map "\C-c\C-y" 'sgml-position)
+
+
+(defun sgml--add-before-p (tok state child)
+  ;; Can TOK be added in STATE followed by CHILD 
+  (let ((snext (sgml-get-move state tok))
+        (c child))
+    (when snext
+      (while c
+        (setq snext (sgml-get-move snext
+                                   (sgml-eltype-token
+                                    (sgml-element-eltype c))))
+        (setq c (and snext (sgml-element-next c)))))
+    ;; If snext is still non nill it can be inserted 
+    snext))
+
+(defun sgml--all-possible-elements (el)
+  (let ((c (sgml-element-content el))
+        (s (sgml-element-model el))
+        (found nil))
+    (loop do
+          (dolist (tok (nconc (sgml-optional-tokens s)
+                              (sgml-required-tokens s)))
+            (unless (memq tok found)
+              ;; tok is optional here and not already found -- check that
+              ;; it would not make the content invalid
+              (when (sgml--add-before-p tok s c)
+                  (push tok found))))
+          while c do
+          (setq s (sgml-element-pstate c))
+          (setq c (sgml-element-next c)))
+    (mapcar #'sgml-token-eltype found)))
+
+
+(defun sgml-add-element-to-element (gi)
+  (interactive
+   (let ((tab
+          (mapcar (lambda (et) (cons (sgml-eltype-name et) nil))
+                  (sgml--all-possible-elements
+                   (sgml-find-context-of (point))))))
+     (cond ((null tab)
+            (error "No element possible"))
+           (t
+            (let ((completion-ignore-case sgml-namecase-general))
+              (list (completing-read "Element: " tab nil t
+                                     (and (null (cdr tab)) (caar tab)))))))))
+  ;;
+  ;; Find point in current element to insert an element with GI
+  ;;
+  (let ((el (sgml-find-context-of (point)))
+        (et (sgml-lookup-eltype (sgml-general-case gi))))
+    (let ((c (sgml-element-content el))
+          (s (sgml-element-model el))
+          (tok (sgml-eltype-token et)))
+      (while (cond
+              ((sgml--add-before-p tok s c)
+               (goto-char (if c (sgml-element-start c)
+			    (sgml-element-etag-start el)))
+               (sgml-insert-element gi)
+               nil)
+              (c
+               (setq s (sgml-element-pstate c))
+               (setq c (sgml-element-next c))
+               t)
+              (t
+               (error "A %s element is not valid in current element" gi)))))))
+
+
+(define-key sgml-mode-map "\C-c\C-i" 'sgml-add-element-to-element)
+
+
 
 ;;; psgml-edit.el ends here
