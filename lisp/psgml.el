@@ -353,19 +353,6 @@ running the sgml-validate-command.")
     ()
   (setq sgml-mode-map (make-sparse-keymap)))
 
-;;; Menu bar
-
-(eval-when-compile
-  (autoload 'sgml-build-custom-menus "psgml-ohter")) ; Avoid compiler warnings
-
-(cond
- (sgml-running-lucid
-  (require 'psgml-lucid)
-  (add-hook 'sgml-mode-hook 'sgml-install-lucid-menus))
- (t
-  (require 'psgml-other)))
-
-
 ;;; Key commands
 
 (define-key sgml-mode-map "\t" 'sgml-indent-or-tab)
@@ -411,6 +398,14 @@ running the sgml-validate-command.")
 (define-key sgml-mode-map "\e\C-h"   'sgml-fold-element)
 (define-key sgml-mode-map "\e\C-t"   'sgml-transpose-element)
 (define-key sgml-mode-map "\M-\t"    'sgml-complete)
+
+;;; Menu bar
+
+(eval-when-compile
+  (autoload 'sgml-build-custom-menus "psgml-other")) ; Avoid compiler warnings
+
+;; load menu file at the end
+
 
 ;;;; SGML mode: major mode definition
 
@@ -860,7 +855,16 @@ insted of the whole buffer."
 	  nil
 	  t nil)
 
+
+;;;; Last provisions
 (provide 'psgml)
 (provide 'sgml-mode)
+
+(cond
+ (sgml-running-lucid
+  (require 'psgml-lucid)
+  (add-hook 'sgml-mode-hook 'sgml-install-lucid-menus))
+ (t
+  (require 'psgml-other)))
 
 ;;; psgml.el ends here
