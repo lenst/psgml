@@ -155,7 +155,7 @@ short reference is `sgml-markup-start' and point.")
   "Function called with entity referenced at current point in parse.")
 
 (defvar sgml-pi-function nil
-  "Function called with parsed process instruction.")
+  "Function called with parsed processing instruction.")
 
 (defvar sgml-signal-data-function nil
   "Called when some data characters are conceptually parsed.
@@ -1260,6 +1260,7 @@ buffer is assumed to be empty to start with."
 	  do (sgml-entity-declare name parameters 'text val))
     (sgml-push-to-entity dtd-file)
     (sgml-check-dtd-subset)
+    (sgml-debug "sgml-compile-dtd: poping entity")
     (sgml-pop-entity)
     (erase-buffer)
     (sgml-write-dtd sgml-dtd-info to-file)
@@ -1594,7 +1595,7 @@ in any of them."
         for et = (sgml-lookup-eltype name)
         do (setf (sgml-eltype-appdata et flagsym) t)
         (message "Defining element %s as %s" name flagsym)
-        (sgml-skip-cs)))
+        (sgml-parse-s)))
 
 (defun sgml-do-processing-instruction (in-declaration)
   (let ((start (point))
@@ -1642,15 +1643,15 @@ in any of them."
 
 
 (defun sgml--pi-element-handler ()
-  (sgml-skip-ps)
+  (sgml-parse-s)
   (let ((eltype (sgml-lookup-eltype (sgml-parse-name)))
         name value)
-    (sgml-skip-ps)
+    (sgml-parse-s)
     (while (setq name (sgml-parse-name))
       ;; FIXME: check name not reserved
-      (sgml-skip-ps)
+      (sgml-parse-s)
       (cond ((sgml-parse-delim "VI")
-             (sgml-skip-ps)
+             (sgml-parse-s)
              (setq value
                    (if (looking-at "['\"]")
                        (sgml-parse-literal)
@@ -1659,7 +1660,7 @@ in any of them."
              (setq value t)))
       (message "%s = %S" name value)
       (setf (sgml-eltype-appdata eltype (intern (downcase name))) value)
-      (sgml-skip-ps))))
+      (sgml-parse-s))))
 
 
 ;;[lenst/1998-03-09 19:52:08]  Perhaps not the right place
@@ -2522,11 +2523,6 @@ text.  Otherwise buffer position will be after entity reference."
 ENTITY can also be a file name.  Optional argument REF-START should be
 the start point of the entity reference.  Optional argument TYPE,
 overrides the entity type in entity look up."
-  (sgml-debug "Push to %s"
-	      (cond ((stringp entity)
-		     (format "string '%s'" entity))
-		    (t
-		     (sgml-entity-name entity))))
   (when ref-start
     ;; don't consider a RS shortref here again
     (setq sgml-rs-ignore-pos ref-start))
@@ -2534,6 +2530,7 @@ overrides the entity type in entity look up."
 	       (buffer-name sgml-scratch-buffer)
 	       ;; An existing buffer may have been left unibyte by
 	       ;; processing a cdtd.
+               ;; FIXME: looks strange, we haven't changed bufferw yet
 	       (sgml-set-buffer-multibyte t))
     (setq sgml-scratch-buffer (generate-new-buffer " *entity*")))
   (let ((cb (current-buffer))
@@ -2574,6 +2571,9 @@ overrides the entity type in entity look up."
     (cond
      ((stringp entity)			; a file name
       ;;(save-excursion ) test remove [lenst/1998-06-19 12:49:47]
+      (sgml-debug "Push to %s: FILE %s"
+                  (current-buffer) entity)
+
       (insert-file-contents entity)
       (setq sgml-current-file entity)
       ;; (goto-char (point-min)) ??
@@ -2587,7 +2587,7 @@ overrides the entity type in entity look up."
 	(when sgml-parsing-dtd
 	  (push (or file t)
 		(sgml-dtd-dependencies sgml-dtd-info)))
-	(sgml-debug "Push to %s = %s" extid file)
+	(sgml-debug "Push to %s: %s = %s" (current-buffer) extid file)
 	(cond
 	 ((and file sgml-parsing-dtd
 	       (sgml-try-merge-compiled-dtd (sgml-extid-pubid extid)
@@ -2615,17 +2615,18 @@ overrides the entity type in entity look up."
                          (sgml-entity-name entity) pubid sysid))
 		    nil))))))))
      (t ;; internal entity
+      (sgml-debug "Push to %s: string '%s'"
+                  (current-buffer) (sgml-entity-text entity))
       (save-excursion
 	(insert (sgml-entity-text entity)))))))
-
-
 
 
 
 (defun sgml-pop-entity ()
   (cond ((and (boundp 'sgml-previous-buffer)
 	      (bufferp sgml-previous-buffer))
-	 (sgml-debug "Exit entity")
+	 (sgml-debug "Exit entity %s => %s"
+                     (current-buffer) sgml-previous-buffer)
 	 (setq sgml-last-entity-buffer sgml-previous-buffer)
 	 (set-buffer sgml-previous-buffer)
 	 t)))
