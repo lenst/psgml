@@ -1347,26 +1347,28 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 
 ;;;; SGML mode: Normalize (and misc manipulations)
 
-(defun sgml-expand-shortref-to-text (entity)
-  (let (before-change-function)
-    (cond ((sgml-entity-data-p entity)
-	   (sgml-expand-shortref-to-entity entity))
-	  (t
-	   (delete-region sgml-markup-start (point))
-	   (sgml-entity-insert-text entity)
-	   ;; now parse the entity text
-	   (goto-char sgml-markup-start)))))
+(defun sgml-expand-shortref-to-text (name)
+  (let (before-change-function
+	(entity (sgml-lookup-entity name (sgml-dtd-entities sgml-dtd-info))))
+    (cond
+     ((null entity) (sgml-error "Undefined entity %s" name))
+     ((sgml-entity-data-p entity)
+      (sgml-expand-shortref-to-entity name))
+     (t
+      (delete-region sgml-markup-start (point))
+      (sgml-entity-insert-text entity)
+      ;; now parse the entity text
+      (goto-char (setq sgml-last-start-pos sgml-markup-start))))))
 
-(defun sgml-expand-shortref-to-entity (entity)
+(defun sgml-expand-shortref-to-entity (name)
   (let ((end (point))
 	(re-found nil)
 	before-change-function)
     (goto-char sgml-markup-start)
     (setq re-found (search-forward "\n" end t))
     (delete-region sgml-markup-start end)	   
-    (insert "&" (sgml-entity-name entity)
-	    (if re-found "\n" ";"))
-    (goto-char sgml-markup-start)))
+    (insert "&" name (if re-found "\n" ";"))
+    (goto-char (setq sgml-last-start-pos sgml-markup-start))))
 
 (defun sgml-expand-all-shortrefs (to-entity)
   "Expand all short references in the buffer.
@@ -1415,8 +1417,8 @@ elements with omitted end-tags."
     (while content
       (setq element (car content))
       ;; Progress report
-      (message "Normalizing %d%% left"
-	       (/ (point) (/ (point-max) 100)))
+      (sgml-lazy-message "Normalizing %d%% left"
+			 (/ (point) (/ (point-max) 100)))
       ;; Fix the end-tag
       (sgml-normalize-end-tag element)
       ;; Fix tags of content
