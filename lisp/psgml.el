@@ -336,22 +336,28 @@ running the sgml-validate-command.")
   '("Save options" . sgml-save-options))
 (define-key sgml-mode-map [menu-bar sgml options]
   '("Options..." . sgml-options-menu))
+(define-key sgml-mode-map [menu-bar sgml fill]
+  '("Fill element        [C-c C-q]" . sgml-fill-element))
+(define-key sgml-mode-map [menu-bar sgml normalize]
+  '("Normalize                " . sgml-normalize))
 (define-key sgml-mode-map [menu-bar sgml show-log]
-  '("Show warning log  [C-c C-l]" . sgml-show-or-clear-log))
+  '("Show/hide warning log  [C-c C-l]" . sgml-show-or-clear-log))
 (define-key sgml-mode-map [menu-bar sgml show-tags]
-  '("Show valid tags   [C-c C-t]" . sgml-list-valid-tags))
+  '("List valid tags     [C-c C-t]" . sgml-list-valid-tags))
 (define-key sgml-mode-map [menu-bar sgml change-name]
   '("Change element name [C-c =]" . sgml-change-element-name))
 (define-key sgml-mode-map [menu-bar sgml edit-attributes]
-  '("Edit attributes   [C-c C-a]" . sgml-edit-attributes))
+  '("Edit attributes     [C-c C-a]" . sgml-edit-attributes))
 (define-key sgml-mode-map [menu-bar sgml next-trouble]
-  '("Next trouble spot [C-c C-o]" . sgml-next-trouble-spot)) 
+  '("Next trouble spot   [C-c C-o]" . sgml-next-trouble-spot)) 
+(define-key sgml-mode-map [menu-bar sgml what-element]
+  '("What element        [C-c C-w]" . sgml-what-element))
 (define-key sgml-mode-map [menu-bar sgml show-context]
-  '("Show context      [C-c C-c]" . sgml-show-context))
+  '("Show context        [C-c C-c]" . sgml-show-context))
 (define-key sgml-mode-map [menu-bar sgml insert-end-tag]
-  '("End element       [C-c /]" . sgml-insert-end-tag))
+  '("End element         [C-c /]" . sgml-insert-end-tag))
 (define-key sgml-mode-map [menu-bar sgml next-data]
-  '("Next data field   [C-c C-d]" . sgml-next-data-field))
+  '("Next data field     [C-c C-d]" . sgml-next-data-field))
 
 
 ;;; DTD menu
@@ -367,19 +373,19 @@ running the sgml-validate-command.")
 ;;; Fold menu
 
 (define-key sgml-mode-map [menu-bar sgml-fold unfold-all]
-  '("Unfold all               " . sgml-unfold-all))
+  '("Unfold all      [C-c C-u C-a]" . sgml-unfold-all))
 (define-key sgml-mode-map [menu-bar sgml-fold fold-region]
-  '("Fold region              " . sgml-fold-region))
+  '("Fold region     [C-c C-f C-r]" . sgml-fold-region))
 (define-key sgml-mode-map [menu-bar sgml-fold expand]
-  '("Expand                   " . sgml-expand-element))
+  '("Expand          [C-c C-f C-x]" . sgml-expand-element))
 (define-key sgml-mode-map [menu-bar sgml-fold unfold-element]
-  '("Unfold element           " . sgml-unfold-element))
+  '("Unfold element  [C-c C-u C-e]" . sgml-unfold-element))
 (define-key sgml-mode-map [menu-bar sgml-fold unfold]
   '("Unfold line     [C-c C-s]" . sgml-unfold-line))
 (define-key sgml-mode-map [menu-bar sgml-fold subfold]
-  '("Fold subelement        "   . sgml-fold-subelement))
+  '("Fold subelement [C-c C-f C-s]"   . sgml-fold-subelement))
 (define-key sgml-mode-map [menu-bar sgml-fold fold]
-  '("Fold element    [C-M-h]"   . sgml-fold-element))
+  '("Fold element    [C-c C-f C-e]"   . sgml-fold-element))
 
 
 ;;; Markup menu
@@ -772,7 +778,10 @@ and move to the line in the SGML document that caused it."
 	  t nil)
 
 (autoload 'sgml-indent-line "psgml-parse"
-	  nil
+	  "Indent line, calling parser to determine level unless COL or ELEMENT
+is given.  If COL is given it should be the column to indent to.  If
+ELEMENT is given it should be a parse tree node, from which the level
+is determined."
 	  nil nil)
 
 (autoload 'sgml-load-dtd "psgml-parse"
@@ -895,6 +904,16 @@ This uses the selective display feature."
 	  "Show all hidden lines in buffer."
 	  t nil)
 (autoload 'sgml-entities-menu "psgml-parse"
+	  nil
+	  t nil)
+
+(autoload 'sgml-fill-element "xtra"
+	  nil
+	  t nil)
+(autoload 'sgml-normalize "xtra"
+	  "Normalize buffer by filling in omitted tags and expanding empty tags."
+	  t nil)
+(autoload 'sgml-what-element "xtra"
 	  nil
 	  t nil)
 
