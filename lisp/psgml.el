@@ -1,7 +1,7 @@
 ;;; psgml.el --- SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1993-1999 Lennart Staflin
+;; Copyright (C) 1993-2002 Lennart Staflin
 ;; Copyright (C) 1992 Free Software Foundation, Inc.
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
@@ -784,6 +784,12 @@ as that may change."
 (if sgml-mode-map
     ()
   (setq sgml-mode-map (make-sparse-keymap)))
+
+(defvar sgml-prefix-f-map (make-sparse-keymap))
+(defvar sgml-prefix-u-map (make-sparse-keymap))
+
+(define-key sgml-mode-map "\C-c\C-f" sgml-prefix-f-map)
+(define-key sgml-mode-map "\C-c\C-u" sgml-prefix-u-map) 
 
 ;;; Key commands
 
