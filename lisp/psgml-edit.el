@@ -361,9 +361,14 @@ is determined."
 	(setq element
 	      (let ((sgml-throw-on-error 'parse-error))
 		(catch sgml-throw-on-error
-		  (if (eobp)
-		      (sgml-find-context-of (point))
-		    (sgml-find-element-of (point)))))))
+                  ;; This used to be (sgml-find-element-of (point))
+                  ;; Why? Possibly to handle omitted end-tags
+                  (sgml-find-context-of (point))))))
+      ;; Fix for omitted end-tag
+      (while (and (not (eobp))
+                  (= (point) (sgml-element-end element)))
+        (setq element (sgml-element-parent element)))
+
       (when (eq element sgml-top-tree)	; not in a element at all
 	(setq element nil)		; forget element
 	(goto-char here))		; insert normal tab insted)
@@ -372,7 +377,8 @@ is determined."
 	 (let ((stag (sgml-is-start-tag))
 	       (etag (sgml-is-end-tag)))
            (cond ((and (> (point) (sgml-element-start element))
-                       (< (point) (sgml-element-stag-end element)))
+                       (< (point) (sgml-element-stag-end element))
+                       (not (sgml-element-data-p (sgml-element-parent element))))
                   (setq col
                         (+ (save-excursion
                              (goto-char (sgml-element-start element))
@@ -386,7 +392,7 @@ is determined."
                               element))))
                   (setq col
                         (* sgml-indent-step
-                           (+ (if (or stag etag) -1 0)
+                           (+ (if (or etag) -1 0)
                               (sgml-element-level element)))))))))
       (when (and col (/= col (current-column)))
 	(beginning-of-line 1)    
@@ -1113,8 +1119,8 @@ buffers local variables list."
 			      (format "Default: %s"
 				      (sgml-default-value-attval defval))
 			    "#IMPLIED")
-			  (list 'sgml-insert-attribute name nil))))))))
-  )
+			  (list 'sgml-insert-attribute name nil)))))))))
+
 
 ;;;; SGML mode: Fill 
 
@@ -1166,6 +1172,8 @@ subelements."
 	  (setq c (sgml-element-next c)))
 	;; Fill the last region in content of element,
 	;; but get a fresh parse tree, if it has change due to other fills.
+        (goto-char last-pos)
+        (when (bolp) (sgml-indent-line))
 	(sgml-fill-region last-pos
 			  (sgml-element-etag-start
 			   (sgml-find-element-of
@@ -1177,7 +1185,11 @@ subelements."
       ;; If element is not mixed, fill subelements recursively
       (let ((c (sgml-element-content element)))
 	(while c
+	  (goto-char (sgml-element-etag-start c))
+          (sgml-indent-line)
 	  (goto-char (sgml-element-start c))
+          (sgml-indent-line)
+          (setq c (sgml-find-element-of (point)))
 	  (sgml-do-fill c)
 	  (setq c (sgml-element-next (sgml-find-element-of (point))))))))))
 
@@ -1188,27 +1200,33 @@ subelements."
     (skip-chars-backward " \t\n")
     (while (progn (beginning-of-line 1)
 		  (< start (point)))
-      (delete-horizontal-space)
       (delete-char -1)
+      (delete-horizontal-space)
       (insert " "))
     (end-of-line 1)
-    (let (give-up prev-column opoint)
+    (let (give-up prev-column opoint oopoint)
       (while (and (not give-up) (> (current-column) fill-column))
 	(setq prev-column (current-column))
-	(setq opoint (point))
+	(setq oopoint (point))
 	(move-to-column (1+ fill-column))
 	(skip-chars-backward "^ \t\n")
-	(if (bolp)
-	    (re-search-forward "[ \t]" opoint t))
 	(setq opoint (point))
 	(skip-chars-backward " \t")
 	(if (bolp)
-	    (setq give-up t)
-	(delete-region (point) opoint)
-	(newline)
-	(sgml-indent-line)
-	(end-of-line 1)
-	(setq give-up (>= (current-column) prev-column)))))))
+            (progn
+              (goto-char opoint)
+              (if (re-search-forward "[ \t]" oopoint t)
+                  (save-excursion
+                    (skip-chars-forward " \t")
+                    (setq opoint (point)))
+                (setq give-up t))))
+        (if (not give-up)
+            (progn 
+              (delete-region (point) opoint)
+              (newline)
+              (sgml-indent-line)
+              (end-of-line 1)
+              (setq give-up (>= (current-column) prev-column))))))))
 
 ;;;; SGML mode: Attribute editing
 
