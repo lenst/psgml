@@ -122,6 +122,7 @@ if the item is selected."
 	    old-overlay)
 	(while current
 	  (cond ((and (null old-overlay)
+                      type
 		      (eq type (overlay-get (car current) 'sgml-type)))
 		 (setq old-overlay (car current)))
 		((overlay-get (car current) 'sgml-type)
