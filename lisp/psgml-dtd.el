@@ -84,7 +84,7 @@
 	(setq m (sgml-move-dest (car ms))
 	      ms (cdr ms))
 	(unless (sgml-normal-state-p m)
-	  (setq m (sgml-&node-next m)))
+	  (setq m (sgml-and-node-next m)))
 	(unless (memq m states)
 	  (nconc states (list m))))
       (setq l (cdr l)))
@@ -156,7 +156,6 @@ Syntax: var dfa-expr &body forms"
 	(no (list s))
 	(l (sgml-state-reqs s))
 	(nl (sgml-state-opts s))
-	(res s)
 	dest)
     (while (or l (setq l (prog1 nl (setq nl nil))))
       (cond
@@ -238,7 +237,7 @@ Syntax: var dfa-expr &body forms"
   (car l))
 
 (defun sgml-make-& (dfas)
-  (let ((&n (sgml-make-&node dfas (sgml-make-state)))
+  (let ((&n (sgml-make-and-node dfas (sgml-make-state)))
 	(s (sgml-make-state))
 	(l dfas))
     (while l				; For each si:
@@ -759,7 +758,7 @@ Case transformed for general names."
 	     (sgml-translate-moves (sgml-state-opts (caar p)))
 	     (sgml-translate-moves (sgml-state-reqs (caar p))))
 	    (t
-	     (sgml-translate-node (sgml-&node-next (caar p)))))
+	     (sgml-translate-node (sgml-and-node-next (caar p)))))
       (setq p (cdr p)))
     sgml-translate-table))
 
@@ -832,8 +831,8 @@ FORMS should produce the binary coding of element in VAR."
 	  (sgml-code-move x)))
        (t				; s is a &-node
 	(insert 255)			; Tag &-node
-	(insert (sgml-code-xlate (sgml-&node-next s)))
-	(sgml-code-sequence (m (sgml-&node-dfas s))
+	(insert (sgml-code-xlate (sgml-and-node-next s)))
+	(sgml-code-sequence (m (sgml-and-node-dfas s))
 	  (sgml-code-model m)))))))
 
 (defun sgml-code-element (et)
