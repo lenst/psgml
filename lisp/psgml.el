@@ -55,8 +55,6 @@
 ;;  attributes.
 ;; Hiding attributes (first test done).
 ;; Fold all elements with GI
-;; Use read-only for all but edit field in edit attrib buffer.  Also
-;;  use special attribute for #DEFAULT and command to insert #DEFAULT.
 
 ;; BUGS
 ;;  "*SGML LOG*" buffer handling is confusing
@@ -182,6 +180,12 @@ Example:
      (\"docbook\" \"<!doctype docbook system 'docbook.dtd'>\"
 		    \"~/sgml/docbook.ced\"))
 ")
+
+
+;;; Faces used in edit attribute buffer:
+(put 'sgml-default 'face 'underline)	; Face for #DEFAULT
+(put 'sgml-fixed 'face 'underline)	; Face of #FIXED "..."
+
 
 ;;; sgmls is a free SGML parser available from
 ;;; ftp.uu.net:pub/text-processing/sgml
@@ -577,9 +581,9 @@ All bindings:
   (make-local-variable 'indent-line-function)
   (setq indent-line-function 'sgml-indent-line)
   (make-local-variable 'sgml-default-dtd-file)
-  (setq sgml-default-dtd-file (sgml-default-dtd-file))
-  (unless (file-exists-p sgml-default-dtd-file)
-    (setq sgml-default-dtd-file nil))
+  (when (setq sgml-default-dtd-file (sgml-default-dtd-file))
+    (unless (file-exists-p sgml-default-dtd-file)
+      (setq sgml-default-dtd-file nil)))
   
   ;; Build custom menus
   (when sgml-custom-markup
