@@ -635,12 +635,7 @@ Deprecated: ELEMENT"
 
 
 (defun sgml-insert-tag (tag &optional silent no-nl-after)
-  "Insert a tag, reading tag name in minibuffer with completion.
-If the variable sgml-balanced-tag-edit is t, also inserts the
-corresponding end tag. If sgml-leave-point-after-insert is t, the point
-is left after the inserted tag(s), unless the element has som required
-content.  If sgml-leave-point-after-insert is nil the point is left
-after the first tag inserted."
+  "Insert a tag, reading tag name in minibuffer with completion."
   (interactive 
    (list
     (let ((completion-ignore-case sgml-namecase-general))
@@ -668,7 +663,11 @@ after the first tag inserted."
   (function sgml-default-asl))
 
 (defun sgml-insert-element (name &optional after silent)
-  "Reads element name from minibuffer and inserts start and end tags."
+  "Reads element name from minibuffer and inserts start and end tags.
+If sgml-leave-point-after-insert is t, the point
+is left after the inserted tag(s), unless the element has som required
+content.  If sgml-leave-point-after-insert is nil the point is left
+after the first tag inserted."
   (interactive (list (sgml-read-element-name "Element: ")
 		     sgml-leave-point-after-insert))
   (let (newpos				; position to leave cursor at
@@ -722,7 +721,7 @@ after the first tag inserted."
 	collect
 	(sgml-make-attspec
 	 (sgml-attdecl-name attdecl)
-	 (sgml-read-attribute-value attdecl nil))))
+	 (sgml-read-attribute-value attdecl (sgml-element-name element) nil))))
 
 (defun sgml-tag-region (element start end)
   "Reads element name from minibuffer and inserts start and end tags."
@@ -858,7 +857,7 @@ AVL should be a assoc list mapping symbols to strings."
                                (sgml-element-empty element)
                              (eq t (sgml-element-net-enabled element))))))
 
-(defun sgml-read-attribute-value (attdecl curvalue)
+(defun sgml-read-attribute-value (attdecl element curvalue)
   "Return the attribute value read from user.
 ATTDECL is the attribute declaration for the attribute to read.
 CURVALUE is nil or a string that will be used as default value."
@@ -871,8 +870,8 @@ CURVALUE is nil or a string that will be used as default value."
 		     (notations "NOTATION")
 		     (t (symbol-name dv))))
 	 (prompt
-	  (format "Value for %s (%s%s): "
-		  name type
+	  (format "Value for %s in %s (%s%s): "
+		  name element type 
 		  (if curvalue
 		      (format " Default: %s" curvalue)
 		    "")))
@@ -908,6 +907,7 @@ CURVALUE is nil or a string that will be used as default value."
      (list name
 	   (sgml-read-attribute-value
 	    (sgml-lookup-attdecl name (sgml-element-attlist el))
+			(sgml-element-name el)
 	    (sgml-element-attval el name)))))
   ;; Body
   (assert (stringp name))
@@ -989,7 +989,7 @@ after the first tag inserted."
      (t
       (let ((what
 	     (sgml-menu-ask event (if (or end sgml-balanced-tag-edit)
-				  'element 'tags))))
+                                      'element 'tags))))
 	(cond
 	 ((null what))
 	 (end
@@ -1139,6 +1139,7 @@ buffers local variables list."
 			   (sgml-attdecl-name attdecl) 
 			   (list 'sgml-read-attribute-value
 				 (list 'quote attdecl)
+				 (list 'quote (sgml-element-name el))
 				 (sgml-element-attval el name))))))
 	    (if (sgml-default-value-type-p 'REQUIRED defval)
 		nil
