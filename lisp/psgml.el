@@ -896,54 +896,55 @@ as that may change."
 (easy-menu-define
  sgml-main-menu sgml-mode-map "Main menu"
  '("SGML"
-   ["Parse DTD"  sgml-parse-prolog t]
+   ["Load Doctype"              sgml-load-doctype               t]
    ("DTD Info"
-    ["General DTD info"	sgml-general-dtd-info           t]
+    ["General DTD info"         sgml-describe-dtd               t]
     ["Describe element type"	sgml-describe-element-type	t]
     ["Describe entity"		sgml-describe-entity		t]
     ["List elements" 		sgml-list-elements 		t]
-    ["List attributes" 	sgml-list-attributes 		t]
+    ["List attributes"          sgml-list-attributes 		t]
     ["List terminals" 		sgml-list-terminals 		t]
     ["List content elements" 	sgml-list-content-elements 	t]
     ["List occur in elements" 	sgml-list-occur-in-elements 	t])
    ("Insert Markup"
-    ["Insert Element"	sgml-element-menu	t]
-    ["Insert Start-Tag" sgml-start-tag-menu	t]
-    ["Insert End-Tag"	sgml-end-tag-menu	t]
-    ["End Current Element"	sgml-insert-end-tag t]
-    ["Tag Region"	sgml-tag-region-menu	t]
-    ["Insert Attribute"  sgml-attrib-menu	t]
-    ["Insert Entity"	sgml-entities-menu	t]
+    ["Insert Element"           sgml-element-menu	t]
+    ["Insert Start-Tag"         sgml-start-tag-menu	t]
+    ["Insert End-Tag"           sgml-end-tag-menu	t]
+    ["End Current Element"	sgml-insert-end-tag     t]
+    ["Tag Region"               sgml-tag-region-menu	t]
+    ["Insert Attribute"         sgml-attrib-menu	t]
+    ["Insert Entity"            sgml-entities-menu	t]
     ["Add Element to Element"	sgml-add-element-menu	t]
     ("Insert DTD")   
     ("Custom markup"   "---"))
    "--"
-   ["Show Context"	sgml-show-context t]
-   ["What Element"	sgml-what-element t]
-   ["List Valid Tags"	sgml-list-valid-tags t]
-   ["Validate"		sgml-validate t]
+   ["Show Context"              sgml-show-context       t]
+   ["What Element"              sgml-what-element       t]
+   ["List Valid Tags"           sgml-list-valid-tags    t]
+   ["Validate"                  sgml-validate           t]
+   ["Show Structure"            sgml-show-structure     t]
    "--"
    ("Move"
-    ["Next trouble spot" sgml-next-trouble-spot t]
-    ["Next data field"   sgml-next-data-field   t]
-    ["Forward element"	sgml-forward-element t]
-    ["Backward element"  sgml-backward-element t]
-    ["Up element"	sgml-up-element t]
-    ["Down element"	sgml-down-element t]
-    ["Backward up element" sgml-backward-up-element t]
-    ["Beginning of element" sgml-beginning-of-element t]
-    ["End of element"	sgml-end-of-element t])
+    ["Next trouble spot"        sgml-next-trouble-spot  t]
+    ["Next data field"          sgml-next-data-field    t]
+    ["Forward element"          sgml-forward-element    t]
+    ["Backward element"         sgml-backward-element   t]
+    ["Up element"               sgml-up-element         t]
+    ["Down element"             sgml-down-element       t]
+    ["Backward up element"      sgml-backward-up-element        t]
+    ["Beginning of element"     sgml-beginning-of-element       t]
+    ["End of element"           sgml-end-of-element     t])
    ("View"
-    ["Fold Element"	sgml-fold-element	t]
-    ["Fold Subelement"	sgml-fold-subelement	t]
-    ["Unfold Line"	sgml-unfold-line	t]
-    ["Unfold Element"	sgml-unfold-element	t]
-    ["Expand"		sgml-expand-element	t]
-    ["Fold Region"	sgml-fold-region	t]
-    ["Unfold All"	sgml-unfold-all		t]
+    ["Fold Element"             sgml-fold-element       t]
+    ["Fold Subelement"          sgml-fold-subelement    t]
+    ["Unfold Line"              sgml-unfold-line        t]
+    ["Unfold Element"           sgml-unfold-element     t]
+    ["Expand"                   sgml-expand-element     t]
+    ["Fold Region"              sgml-fold-region        t]
+    ["Unfold All"               sgml-unfold-all         t]
     ["Hide Tags"		sgml-hide-tags		t]
-    ["Hide Attributes"	sgml-hide-attributes	t]
-    ["Show All Tags"	sgml-show-tags		t])
+    ["Hide Attributes"          sgml-hide-attributes    t]
+    ["Show All Tags"            sgml-show-tags  t])
    "--"
    ["Normalize Document"        sgml-normalize	t]
    ["Normalize Element"		sgml-normalize-element t]
