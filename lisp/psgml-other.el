@@ -42,7 +42,8 @@ into several panes.")
 ;; Doesn't this work in Lucid? ***
 (define-key sgml-mode-map [?\M-\C-\ ] 'sgml-mark-element)
 
-(define-key sgml-mode-map [S-mouse-3] 'sgml-tags-menu)
+;;(define-key sgml-mode-map [S-mouse-3] 'sgml-tags-menu)
+(define-key sgml-mode-map [S-mouse-3] 'sgml-right-menu)
 
 
 ;;;; Pop Up Menus
@@ -141,6 +142,8 @@ Overlays are significantly less efficient in large buffers.")
 
 (defun sgml-set-face-for (start end type)
   (let ((face (cdr (assq type sgml-markup-faces))))
+    (if (and (null type) sgml-current-tree)
+        (setq face (sgml-element-appdata sgml-current-tree 'face)))
     (cond
      (sgml-use-text-properties
       (sgml-with-modification-state
