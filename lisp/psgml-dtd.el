@@ -272,26 +272,35 @@ Syntax: var dfa-expr &body forms"
 (defun sgml-parse-parameter-literal ()
   (let ((qchar (following-char))
 	qregexp
-	value)
-    (cond ((memq qchar '(?\" ?\'))
-	   (forward-char 1)
-	   (setq qregexp (format "^%c%%" qchar))
-	   (setq value "")
-	   (while (not (sgml-parse-char qchar))
-	     (setq value (concat value
-				 (buffer-substring
-				  (point)
-				  (goto-char
-				   (progn (skip-chars-forward qregexp)
-					  (point))))))
-	     (cond ((sgml-parse-char ?%)	;parameter entity reference
-		    (if (sgml-startnm-char-next)
-			(sgml-push-to-param (sgml-check-entity-ref))
-		      (setq value (concat value "%"))))
-		   ((eobp)
-		    (or (sgml-pop-param)
-			(sgml-error "Parameter literal unterminated")))))
-	   value))))
+	value
+	(level 0)			; Open parameters
+	)
+    (cond
+     ((memq qchar '(?\" ?\'))
+      (forward-char 1)
+      (setq qregexp (format "^%c%%" qchar))
+      (setq value "")
+      (while (not (and (zerop level)
+		       (sgml-parse-char qchar)))
+	(setq value
+	      (concat value
+		      (buffer-substring
+		       (point)
+		       (progn (skip-chars-forward (if (zerop level)
+						      qregexp
+						    "^%"))
+			      (point)))))
+	(cond ((sgml-parse-char ?%)	;parameter entity reference
+	       (cond ((sgml-startnm-char-next)
+		      (sgml-push-to-param (sgml-check-entity-ref))
+		      (setq level (1+ level)))
+		     (t
+		      (setq value (concat value "%")))))
+	      ((eobp)
+	       (or (sgml-pop-param)
+		   (sgml-error "Parameter literal unterminated"))
+	       (setq level (1- level)))))
+      value))))
 
 (defun sgml-check-parameter-literal ()
   (or (sgml-parse-parameter-literal)
