@@ -2602,10 +2602,9 @@ Editing is done in a separate window."
       (setq buf (get-buffer-create bname))
       (set-buffer buf)
       (erase-buffer)
-      (sgml-insert '(read-only t)
-		   "<%s  -- Edit values and finish with C-c C-c --\n>"
+      (sgml-insert '(read-only t end-open t rear-nonsticky (read-only))
+		   "<%s  -- Edit values and finish with C-c C-c --\n"
 		   (sgml-element-name element))
-      (forward-char -1)
       (loop
        for attr in (sgml-element-attlist element) do
        ;; Produce text like
@@ -2616,7 +2615,7 @@ Editing is done in a separate window."
 	      (def-value (sgml-attribute-default-value attr))
 	      (cur-value (assq aname asl)))
 	 (sgml-insert			; atribute name
-	  '(read-only t rear-nonsticky (read-only))
+	  '(read-only t rear-nonsticky (read-only) end-open t)
 	  " %s = " aname)
 	 (cond				; attribute value
 	  ((and (consp def-value)
@@ -2640,6 +2639,7 @@ Editing is done in a separate window."
 	  (if (consp def-value)		; Default value
 	      (cadr def-value)
 	    (concat "#" (upcase (symbol-name def-value)))))))
+      (sgml-insert '(read-only t) ">")
       (goto-char (point-min))
       (sgml-edit-attrib-next))
     buf))
