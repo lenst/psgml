@@ -126,7 +126,7 @@ Tested by sgml-close-element to see if the parse should be ended.")
        (unwind-protect
 	   (progn (,@ body))
 	 (set-syntax-table normal-syntax-table)))))
-
+(put 'sgml-with-parser-syntax 'edebug-form-hook '(&rest form))
 
 ;;;; State machine
 
@@ -2478,8 +2478,8 @@ Editing is done in a separate window."
 	 (tag-beg (sgml-element-start element)))
     (push-mark)
     (goto-char (1+ tag-beg))
-    (sgml-check-name)
     (sgml-with-parser-syntax
+     (sgml-check-name)
      (let* ((start (point-marker))
 	    (asl (sgml-parse-attribute-specification-list element))
 	    (end (point-marker))
@@ -2499,44 +2499,68 @@ Editing is done in a separate window."
        (make-local-variable 'sgml-main-buffer)
        (setq sgml-main-buffer cb)))))
 
+(defun sgml-insert (props format &rest args)
+  (let ((start (point)))
+    (insert (apply (function format)
+		   format
+		   args))
+    (add-text-properties start (point) props)))
+
 (defun sgml-attribute-buffer (element asl)
-  (with-output-to-temp-buffer "*Edit attributes*"
-    (princ (format "<%s  -- Edit values and finish with C-c C-c --\n"
-		   (sgml-element-name element)))
-    (loop for attr in (sgml-element-attlist element) do
-	  (let* ((aname (sgml-attribute-name attr))
-		 (dcl-value (sgml-attribute-declared-value attr))
-		 (def-value (sgml-attribute-default-value attr))
-		 (cur-value (assq aname asl)))
-	    (princ
-	     (format " %s = %s\n\t-- %s: %s --\n"
-		     aname		; attribute name
-		     (cond		; attribute value
-		      ((and (consp def-value)
-			    (eq (car def-value) 'fixed))
-		       (concat "#FIXED " (cadr def-value)))
-		      ((and (null cur-value)
-			    (or (memq def-value '(implied conref current))
-				(consp def-value)))
-		       "#DEFAULT")
-		      ((null cur-value)
-		       "")
-		      (t  (cadr cur-value)))
-		     (if (consp dcl-value) ; Declared value
-			 (if (eq (car dcl-value) 'notation)
-			     (format "NOTATION %s" (cadr dcl-value))
-			   (cadr dcl-value))
-		       dcl-value)
-		     (if (consp def-value) ; Default value
-			 (cadr def-value)
-		       (concat "#" (upcase (symbol-name def-value))))))))
-    (princ ">")
-    standard-output))			; return buffer
-
-
+  (let ((buf (get-buffer-create "*Edit attributes*"))
+	(inhibit-read-only t))
+    (save-excursion
+      (set-buffer buf)
+      (erase-buffer)
+      (sgml-insert '(read-only t)
+		   "<%s  -- Edit values and finish with C-c C-c --\n>"
+		   (sgml-element-name element))
+      (forward-char -1)
+      (loop
+       for attr in (sgml-element-attlist element) do
+       ;; Produce text like
+       ;;  name = value
+       ;;  -- declaration : default --
+       (let* ((aname (sgml-attribute-name attr))
+	      (dcl-value (sgml-attribute-declared-value attr))
+	      (def-value (sgml-attribute-default-value attr))
+	      (cur-value (assq aname asl)))
+	 (sgml-insert			; atribute name
+	  '(read-only t rear-nonsticky (read-only))
+	  " %s = " aname)
+	 (cond				; attribute value
+	  ((and (consp def-value)
+		(eq (car def-value) 'fixed))
+	   (sgml-insert '(read-only t category sgml-fixed)
+			"#FIXED %s" (cadr def-value)))
+	  ((and (null cur-value)
+		(or (memq def-value '(implied conref current))
+		    (consp def-value)))
+	   (sgml-insert '(category sgml-default) "#DEFAULT"))
+	  ((not (null cur-value))
+	   (sgml-insert nil "%s" (cadr cur-value))))
+	 (sgml-insert
+	  '(read-only 1)
+	  "\n\t-- %s: %s --\n"
+	  (if (consp dcl-value)		; Declared value
+	      (if (eq (car dcl-value) 'notation)
+		  (format "NOTATION %s" (cadr dcl-value))
+		(cadr dcl-value))
+	    dcl-value)
+	  (if (consp def-value)		; Default value
+	      (cadr def-value)
+	    (concat "#" (upcase (symbol-name def-value)))))))
+      (goto-char (point-min))
+      (sgml-edit-attrib-next))
+    buf))
 
 (defvar sgml-edit-attrib-mode-map (make-sparse-keymap))
 (define-key sgml-edit-attrib-mode-map "\C-c\C-c" 'sgml-edit-attrib-finish)
+(define-key sgml-edit-attrib-mode-map "\C-c\C-d" 'sgml-edit-attrib-default)
+(define-key sgml-edit-attrib-mode-map "\C-c\C-k" 'sgml-edit-attrib-clear)
+
+(define-key sgml-edit-attrib-mode-map "\C-a"  'sgml-edit-attrib-field-start)
+(define-key sgml-edit-attrib-mode-map "\C-e"  'sgml-edit-attrib-field-end)
 (define-key sgml-edit-attrib-mode-map "\t"  'sgml-edit-attrib-next)
 
 (defun sgml-edit-attrib-mode ()
@@ -2595,38 +2619,32 @@ To finsh edit use \\[sgml-edit-attrib-finish].
 
 (defun sgml-attribute-value-list ()
   (goto-char (point-min))
+  (forward-line 1)
   (sgml-with-parser-syntax
    (let ((avl nil))
-     (while (not (or (eobp)
-		     (eq ?> (following-char))))
+     (while (not (eq ?> (following-char)))
        (sgml-skip-s)
        (let ((name (sgml-parse-nametoken)))
-	 (when (and (symbolp name) (not (eq name '--)))
-	   (sgml-skip-s)
-	   (sgml-check-char ?=)
-	   (sgml-parse-char ? )	;allow one space after =
-	   (unless (looking-at " *#")
-	     (setq avl (cons (cons name (sgml-extract-attribute-value))
-			     avl))))
-	 (beginning-of-line 2)))
+	 (forward-char 3)
+	 (unless (memq (get-text-property (point) 'category)
+		       '(sgml-default sgml-fixed))
+	   (setq avl (cons (cons name (sgml-extract-attribute-value))
+			   avl)))
+	 (while (progn (beginning-of-line 2)
+		       (not (eq t (get-text-property (point) 'read-only)))))))
      (reverse avl))))
 
 (defun sgml-extract-attribute-value ()
   (save-excursion
-    (let ((start (point))
-	  (end nil)
-	  (quote ""))
-      (while
-	  (progn (beginning-of-line 2)
-		 (not (or (looking-at "[\t ]*[--->]")
-			  (eobp)))))
-      (skip-chars-backward " \t\n")
-      (setq end (point))
-      (save-restriction
-	(narrow-to-region start end)
-	(subst-char-in-region start end ?\n ? )
-	(goto-char (point-min))
-	(delete-horizontal-space)
+    (save-restriction
+      (narrow-to-region (point)
+			(progn (sgml-edit-attrib-field-end)
+			       (point)))
+      (subst-char-in-region (point-min) (point-max) ?\n ? )
+      (delete-horizontal-space)
+      (goto-char (point-min))
+      (delete-horizontal-space)
+      (let ((quote ""))
 	(cond ((and (not sgml-always-quote-attributes)
 		    (looking-at "^[.A-Za-z0-9---]+$"))) ; no need to quote
 	      ((not (search-forward "\"" nil t)) ; can use "" quotes
@@ -2636,6 +2654,42 @@ To finsh edit use \\[sgml-edit-attrib-finish].
 		 (replace-match "&#39;"))
 	       (setq quote "'")))
 	(concat quote (buffer-string) quote)))))
+
+(defun sgml-edit-attrib-default ()
+  "Set current attribute value to default."
+  (interactive)
+  (sgml-edit-attrib-clear)
+  (save-excursion
+    (sgml-insert '(category sgml-default)
+		 "#DEFAULT")))
+
+(defun sgml-edit-attrib-clear ()
+  "Kill the value of current attribute."
+  (interactive)
+  (kill-region
+   (progn (sgml-edit-attrib-field-start) (point))
+   (progn (sgml-edit-attrib-field-end) (point))))
+
+(defun sgml-edit-attrib-field-start ()
+  "Go to the start of the attribute value field."
+  (interactive)
+  (let (start)
+        (beginning-of-line 1)
+    (while (not (eq t (get-text-property (point) 'read-only)))
+      (beginning-of-line 0))
+    (setq start (next-single-property-change (point) 'read-only))
+    (unless start (error "No attribute value here"))
+    (assert (number-or-marker-p start))
+    (goto-char start)))
+
+(defun sgml-edit-attrib-field-end ()
+  "Go to the end of the attribute value field."
+  (interactive)
+  (let ((end (if (eq 1 (get-text-property (point) 'read-only))
+		 (point)
+	       (next-single-property-change (point) 'read-only))))
+    (assert (number-or-marker-p end))
+    (goto-char end)))
 
 (defun sgml-edit-attrib-next ()
   "Move to next attribute value."
