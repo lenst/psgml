@@ -114,9 +114,10 @@ short reference is `sgml-markup-start' and point.")
 (defvar sgml-dtd-info nil
   "Holds the `sgml-dtd' structure describing the current DTD.")
 
-(defvar sgml-current-entity-map (make-vector 4 nil)
+(defvar sgml-current-entity-map (make-vector 5 nil)
   "The current values of `sgml-local-catalogs', `sgml-catalog-files',
-`sgml-system-path', and `sgml-public-map' as a vector.")
+`sgml-system-path', `sgml-public-map', and `default-directory' as a
+vector.")
 
 (defvar sgml-current-omittag nil
   "Value of `sgml-omittag' in main buffer. Valid during parsing.")
@@ -430,6 +431,17 @@ If this is not possible, but all DFAS are final, move by TOKEN in NEXT."
         (sgml-tokens-of-moves (sgml-state-reqs (sgml-&state-next state))))))
 
 
+(defsubst sgml-final (state)
+  (if (sgml-normal-state-p state)
+      (sgml-state-final-p state)
+    (sgml-final& state)))
+
+(defun sgml-final& (state)
+  (and (sgml-final (sgml-&state-substate state))
+       (loop for s in (sgml-&state-dfas state)
+	     always (sgml-state-final-p s))
+       (sgml-state-final-p (sgml-&state-next state))))
+
 (defun sgml-optional-tokens (state)
   (if (sgml-normal-state-p state)
       (sgml-tokens-of-moves (sgml-state-opts state))
@@ -441,18 +453,6 @@ If this is not possible, but all DFAS are final, move by TOKEN in NEXT."
      (if (loop for s in (sgml-&state-dfas state)
                always (sgml-state-final-p s))
 	 (sgml-tokens-of-moves (sgml-state-opts (sgml-&state-next state)))))))
-
-
-(defsubst sgml-final (state)
-  (if (sgml-normal-state-p state)
-      (sgml-state-final-p state)
-    (sgml-final& state)))
-
-(defun sgml-final& (state)
-  (and (sgml-final (sgml-&state-substate state))
-       (loop for s in (sgml-&state-dfas state)
-	     always (sgml-state-final-p s))
-       (sgml-state-final-p (sgml-&state-next state))))
 
 
 ;;;; Attribute Types
@@ -673,7 +673,6 @@ If ATTSPEC is nil, nil is returned."
    (sgml-make-entity-table))
   (shortmaps				; ALIST
    (sgml-make-shortref-table)))
-
 
 
 ;;;; Element type objects
@@ -999,15 +998,17 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   "True if ENTITY is a data entity, that is not a text entity."
   (not (eq (sgml-entity-type entity) 'text)))
 
-(defun sgml-entity-insert-text (entity)
-  "Insert the text of ENTITY."
+(defun sgml-entity-insert-text (entity &optional ptype)
+  "Insert the text of ENTITY.
+PTYPE can be 'param if this is a parameter entity."
   (let ((text (sgml-entity-text entity)))
     (cond
      ((stringp text)
       (insert text))
      (t
       (sgml-insert-external-entity text
-				   (sgml-entity-type entity)
+				   (or ptype
+				       (sgml-entity-type entity))
 				   (sgml-entity-name entity))))))
 
 ;;; Entity tables
@@ -1042,7 +1043,12 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (setq sgml-computed-map
 	  (nconc (loop for file in (append (elt sgml-current-entity-map 0)
 					   (elt sgml-current-entity-map 1))
-		       nconc (sgml-load-catalog file))
+		       nconc
+		       (if (file-readable-p
+			    (setq file (expand-file-name
+					file
+					(elt sgml-current-entity-map 4))))
+			   (sgml-load-catalog file)))
 		 (mapcar (function (lambda (s) (concat s "/%s")))
 			 (elt sgml-current-entity-map 2))
 		 (elt sgml-current-entity-map 3))
@@ -1051,6 +1057,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-update-catalog ()
   "Reload catalog files."
   (interactive)
+  (sgml-set-global)
   (setq sgml-computed-map nil)
   (sgml-compute-map))
 
@@ -1098,8 +1105,9 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	 (setq res (sgml-pub-expand (second entry) subst))))
        (when res
 	 (sgml-debug "file-readable-p? %S" res)
-	 (unless (file-readable-p
-		  (setq res (substitute-in-file-name res)))
+	 (unless (and (file-readable-p
+		       (setq res (substitute-in-file-name res)))
+		      (not (file-directory-p res)))
 	   (setq res nil))))
       (cond
        (res (insert-file-contents res))
@@ -1165,13 +1173,6 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
        (setq map (nconc map (list (list type name sysid)))))
      map)))
 
-(defun sgml-skip-cs ()
-  "Skip over the separator used in the catalog."
-  (while (or (sgml-parse-s)
-	     (sgml-parse-comment))))
-
-
-
 (defconst sgml-formal-pubid-regexp
   (concat
    "^\\(+//\\|-//\\|\\)"		; Registered indicator  [1]
@@ -1217,15 +1218,15 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
        (if (match-beginning 9)
 	   (sgml-matched-string pubid 10) ""))))
 
-(defun sgml-pub-expand-char (c parts)
-  (cdr-safe (assq (downcase c) parts)))
-
 (defun sgml-transliterate-file (string)
   (mapconcat (function (lambda (c)
 			 (char-to-string
 			  (or (cdr-safe (assq c sgml-public-transliterations))
 			      c))))
 	     string ""))
+
+(defun sgml-pub-expand-char (c parts)
+  (cdr-safe (assq (downcase c) parts)))
 
 (defun sgml-pub-expand (s parts)
   (loop for i from 0 to (1- (length s))
@@ -1234,7 +1235,6 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 		   (or (sgml-pub-expand-char (aref s (incf i)) parts)
 		       (return nil)) 
 		 (char-to-string (aref s i)))))
-
 
 (defun sgml-matched-string (string n &optional regexp noerror)
   (let ((res (if regexp
@@ -1300,11 +1300,12 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 
 (defvar sgml-scratch-buffer nil)
 
-(defun sgml-push-to-entity (entity &optional ref-start)
+(defun sgml-push-to-entity (entity &optional ref-start type)
   (unless (and sgml-scratch-buffer
 	       (buffer-name sgml-scratch-buffer))
     (setq sgml-scratch-buffer (generate-new-buffer " *entity*")))
   (let ((cb (current-buffer))
+	(dd default-directory)
 	(buf (if (null sgml-current-eref) ; First entity ref uses scratch buf
 		 sgml-scratch-buffer
 	       (generate-new-buffer " *entity*")))
@@ -1318,6 +1319,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (sgml-debug "Enter entity ref %S" eref)
     (set-buffer buf)
     (erase-buffer)
+    (setq default-directory dd)
     (make-local-variable 'sgml-current-eref)
     (setq sgml-current-eref eref)
     (set-syntax-table sgml-parser-syntax)
@@ -1325,7 +1327,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (setq sgml-previous-buffer cb)
     (make-local-variable 'sgml-parameter-name)
     (setq sgml-parameter-name entity)
-    (sgml-entity-insert-text entity)
+    (sgml-entity-insert-text entity type)
     (goto-char (point-min))))
 
 (defun sgml-pop-entity ()
@@ -2200,8 +2202,8 @@ in any of them."
 
 (define-compiler-macro sgml-check-name (&optional entity-name)
   (`(or (, (if entity-name
-	       '(sgml-parse-name)
-	     (`(sgml-parse-name (, entity-name)))))
+	       (`(sgml-parse-name (, entity-name)))
+	     '(sgml-parse-name)))
 	(sgml-parse-error "Name expected"))))
 
 
@@ -2236,7 +2238,7 @@ in any of them."
 	 (ent (sgml-lookup-entity name
 				  (sgml-dtd-entities sgml-dtd-info))))
     (or (sgml-parse-delim "REFC")
-	(sgml-parse-char ?\n))
+	(sgml-parse-RE))
     (sgml-set-markup-type 'entity)
     (cond ((null ent)
 	   (sgml-log-warning
@@ -2258,7 +2260,7 @@ in any of them."
 	    (sgml-parse-char ?\n))
 	;;(sgml-set-markup-type 'param)
 	(cond (ent
-	       (sgml-push-to-entity ent))
+	       (sgml-push-to-entity ent sgml-markup-start 'param))
 	      (t
 	       (sgml-log-warning
 		"Undefined parameter entity %s" name)))
@@ -2269,6 +2271,11 @@ in any of them."
       (progn (sgml-skip-upto "COM")
 	     (sgml-check-delim "COM")
 	     t)))
+
+(defun sgml-skip-cs ()
+  "Skip over the separator used in the catalog."
+  (while (or (sgml-parse-s)
+	     (sgml-parse-comment))))
 
 (defun sgml-skip-ps ()
   "Move point forward stopping before a char that isn't a parameter separator."
@@ -2572,12 +2579,17 @@ Assumes starts with point inside a markup declaration."
     (cond
      ((sgml-is-delim "MDC")
       (sgml-debug "USEMAP %s" (if mapname mapname "#EMPTY"))
-      (setq sgml-current-shortmap
-	    (if mapname
-		(or (sgml-lookup-shortref-map
-		     (sgml-dtd-shortmaps sgml-dtd-info)
-		     mapname)
-		    (sgml-error "Undefined shortref map %s" mapname)))))
+      (cond (sgml-dtd-info
+	     (setq sgml-current-shortmap
+		   (if mapname
+		       (or (sgml-lookup-shortref-map
+			    (sgml-dtd-shortmaps sgml-dtd-info)
+			    mapname)
+			   (sgml-error "Undefined shortref map %s" mapname)))))
+	    ;; If in prolog
+	    (t
+	     (sgml-log-warning
+	      "USEMAP without associated element type in prolog"))))
      (t
       ;; Should be handled by psgml-dtd
       (sgml-do-usemap-element mapname)))))
@@ -2761,8 +2773,8 @@ VALUE is a string.  Returns nil or an attdecl."
   (aset sgml-current-entity-map 0 sgml-local-catalogs)
   (aset sgml-current-entity-map 1 sgml-catalog-files)
   (aset sgml-current-entity-map 2 sgml-system-path)
-  (aset sgml-current-entity-map 3 sgml-public-map))
-
+  (aset sgml-current-entity-map 3 sgml-public-map)
+  (aset sgml-current-entity-map 4 default-directory))
 
 (defun sgml-parse-until-end-of (sgml-close-element-trap &optional extra-cond)
   "Parse until the SGML-CLOSE-ELEMENT-TRAP has ended,
@@ -3247,6 +3259,10 @@ This is a list of (attname value) lists."
 (defun sgml-top-element ()
   "Return the document element."
   (sgml-element-content (sgml-find-context-of (point-min))))
+
+(defun sgml-off-top-p (element)
+  "True if ELEMENT is the pseudo element above the document element."
+  (null (sgml-tree-parent element)))
 
 ;;;; Provide
 
