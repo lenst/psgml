@@ -1,3 +1,7 @@
+Sat Aug 14 22:34:59 1999  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-tag-regexp): Recognize XMLs empty tags.
+
 1998-11-16  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el (sgml-set-local-variable): insert "mode: xml" for
