@@ -310,7 +310,9 @@ Syntax: var dfa-expr &body forms"
 		   (sgml-error "Parameter literal unterminated")))
 	      ((sgml-parse-parameter-entity-ref))
 	      ((setq temp (sgml-parse-character-reference dofunchar))
-	       (setq value (concat value (format "%c" temp))))
+	       (setq value (concat value (if (< temp 256)
+					     (format "%c" temp)
+					   (format "&#%d;" temp)))))
 	      (t
 	       (setq value
 		     (concat value
