@@ -62,7 +62,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "0.4a1"
+(defconst psgml-version "0.4a2"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -78,8 +78,41 @@
 ;;;; Variables
 ;;; User settable options:
 
+(defvar sgml-markup-faces '((start-tag . bold)
+			    (end-tag . bold)
+			    (comment . italic)
+			    (pi . bold)
+			    (sgml . bold)
+			    (doctype . bold))
+  "*Alist of markup to face mappings.
+Each element looks like (MARKUP-TYPE . FACE).
+Possible values for MARKUP-TYPE is:
+comment	- comment declaration
+doctype	- doctype declaration
+end-tag 
+ignored	- ignored marked section
+ms-end	- marked section start, if not ignored 
+ms-start - marked section end, if not ignored
+pi	- processing instruction
+sgml	- SGML declaration
+start-tag")
+
+(defvar sgml-buggy-subst-char-in-region t
+  "*If non-nil, work around a bug in subst-char-in-region.
+The bug sets the buffer modified.  If this is set, folding commands
+will be slower.")
+
+(defvar sgml-set-face nil
+  "*If non-nil, psgml will set the face of parsed markup.")
+
+(defvar sgml-live-element-indicator nil
+  "*If non-nil, indicate current element in mode line.
+NOTE: this implies that every command can cause a parse.
+Setting this variable automatically makes it local to the current buffer.")
+(make-variable-buffer-local 'sgml-live-element-indicator)
+
 (defvar sgml-offer-save t
-  "*If non-nil, ask about saving modified buffers before M-x sgml-validate is run.")
+  "*If non-nil, ask about saving modified buffers before \\[sgml-validate] is run.")
 
 (defvar sgml-parent-document nil
   "*File name (a string) of a file containing a DOCTYPE declaration to use,
@@ -203,17 +236,26 @@ Example:
 ")
 
 (defvar sgml-custom-dtd nil
-  "*Menu entries to be added to the DTD menu.
-The value should be a list of lists of three strings.  The first
-string is the menu entry.  The second string is a doctype declaration
-(this can be nil if no doctype).  The third string is the file name of
-the saved DTD (this may also be nil).
+  "Menu entries to be added to the DTD menu.
+The value should be a list of entrys to be added to the DTD menu.
+Every entry should be a list. The first element of the entry is a string
+used as the menu entry.  The second element is a string containing a
+doctype declaration (this can be nil if no doctype).  The rest of the
+list should be a list of variables and values.  For backward
+compatibility a singel string instead of a variable is assigned to
+sgml-default-dtd-file.  All variables are made buffer local and are also
+added to the buffers local variables list.
 
 Example:
-
-    ((\"Html\" nil \"~/sgml/html.ced\")
-     (\"docbook\" \"<!doctype docbook system 'docbook.dtd'>\"
-		    \"~/sgml/docbook.ced\"))
+   ((\"HTML\" nil
+     sgml-default-dtd-file \"~/sgml/html.ced\"
+     sgml-omittag nil sgml-shorttag nil)
+    (\"HTML+\" \"<!doctype htmlplus system 'htmlplus.dtd'>\"
+     \"~/sgml/htmlplus.ced\"
+     sgml-omittag t sgml-shorttag nil)
+    (\"DOCBOOK\" \"<!doctype docbook system 'docbook.dtd'>\"
+     \"~/sgml/docbook.ced\"
+     sgml-omittag nil sgml-shorttag t)))
 ")
 
 
@@ -256,6 +298,8 @@ running the sgml-validate-command.")
 ;;;; Local variables editing
 
 (defun sgml-set-local-variable (var val)
+  "Set the value of variable VAR to VAL in buffer and local variables list."
+  (set (make-local-variable var) val)
   (save-excursion
     (let ((prefix "") 
 	  (suffix "")
@@ -306,7 +350,9 @@ running the sgml-validate-command.")
 	     sgml-normalize-trims
 	     sgml-omittag
 	     sgml-shorttag
-	     sgml-minimize-attributes))
+	     sgml-minimize-attributes
+	     sgml-live-element-indicator
+	     sgml-set-face))
 	(bv (buffer-local-variables)))
     (while l
       (when (assq (car l) bv)
@@ -449,7 +495,7 @@ running the sgml-validate-command.")
 (define-key sgml-mode-map "\e\C-k"   'sgml-kill-element)
 (define-key sgml-mode-map "\e\C-@"   'sgml-mark-element)
 ;;(define-key sgml-mode-map [?\M-\C-\ ] 'sgml-mark-element)
-(define-key sgml-mode-map "\e\C-h"   'sgml-fold-element)
+(define-key sgml-mode-map "\e\C-h"   'sgml-mark-current-element)
 (define-key sgml-mode-map "\e\C-t"   'sgml-transpose-element)
 (define-key sgml-mode-map "\M-\t"    'sgml-complete)
 
@@ -767,7 +813,7 @@ and move to the line in the SGML document that caused it."
 
 
 
-;;;; Autoloads and provides
+;;;; Autoloads and hooks
 
 (autoload 'sgml-doctype-insert "psgml-parse"
 	  nil
@@ -946,6 +992,7 @@ If it is something else complete with ispell-complete-word."
 	  t nil)
 (autoload 'sgml-untag-element "psgml-parse" "" t)
 (autoload 'sgml-kill-markup "psgml-parse" "" t)
+(autoload 'sgml-mark-current-element "psgml-parse" "" t)
 
 
 ;;;; Last provisions
