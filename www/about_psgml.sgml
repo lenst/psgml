@@ -1,5 +1,5 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
-<!ENTITY last.ed  'Time-stamp: "2001-05-31 22:52:49 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "2001-11-09 20:37:04 lenst"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
@@ -23,6 +23,7 @@
 <!ENTITY psgml1.2.0 "&psgml.dir;psgml-1.2.0.tar.gz">
 <!ENTITY psgml1.2.1 "psgml-1.2.1.tar.gz">
 <!ENTITY psgml1.2.2 "psgml-1.2.2.tar.gz">
+<!ENTITY psgml1.2.3 "psgml-1.2.3.tar.gz">
 <!ENTITY ftp-dir    "&psgml.dir;">
 
 <!ENTITY olddoc.url "&base.url;/psgml_toc.html">
@@ -100,6 +101,13 @@ HR.divider { width: 50%; align: center; }
 
    <DIV> <h2><A NAME="UPDATE">Update</A></h2>
     <DL>
+     <dt>2001-11-09</dt>
+     <dd><p>Release 1.2.3 fixes compatibility with Emacs 21.1 and is available
+       from <a href="&psgml.dir">lystor ftp</a>, <a
+        href="&base.url;/&psgml1.2.3;">http</a> or from <a
+        href="http://www.sourceforge.net/projects/psgml">source
+        forge</a></p></dd>
+
      <dt>2001-02-10</dt>
      <dd><p>Bugfix release 1.2.2 available from <a
         href="&psgml.dir">lystor ftp</a>, <a
@@ -137,13 +145,12 @@ HR.divider { width: 50%; align: center; }
      <DT>1998-06-03</DT>
      <DD>
       <P><acronym>XML</acronym> support is in an
-       <A HREF="&alpha.dir;">ALPHA stage</A>.</P>
+       ALPHA stage.</P>
      </DD>
 
      <dt>1996-11-20</dt>
      <dd>
-      <p>Version 1.0.3 of psgml. A bug fix release. <a
-         href="#V1.0.3">The release is available for download.</a></p>
+      <p>Version 1.0.3 of psgml. A bug fix release.</p>
      </dd>
 
      <dt>1996-11-11</dt>
@@ -167,8 +174,15 @@ HR.divider { width: 50%; align: center; }
      directory <samp>pub/sgml</samp>.</p>
 
     <dl>
-      <dt>1.2.2</dt>
+      <dt>1.2.3</dt>
       <dd><p>Latest stable release, available from <a
+        href="&psgml.dir">lystor ftp</a>, <a
+        href="&base.url;/&psgml1.2.3;">http</a> or from <a
+        href="http://www.sourceforge.net/projects/psgml">source
+        forge</a></p>
+
+     <dt>1.2.2</dt>
+      <dd><p>Previous release, available from <a
         href="&psgml.dir">lystor ftp</a>, <a
         href="&base.url;/&psgml1.2.2;">http</a> or from <a
         href="http://www.sourceforge.net/projects/psgml">source
@@ -176,7 +190,7 @@ HR.divider { width: 50%; align: center; }
 
      <dt><a>1.2.1</a></dt>
      <dd>
-      <p>Previous release. Available as &psgml1.2.1; via
+      <p>Old release. Available as &psgml1.2.1; via
        <a href="&ftp-dir;&psgml1.2.1;">ftp</a> or <a
        href="&psgml1.2.1">http</a>.
      </dd>
