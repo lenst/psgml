@@ -3888,23 +3888,20 @@ Optional argument EXTRA-COND should be a function.  This function is
 called in the parser loop, and the loop is exited if the function returns t.
 If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
   (sgml-need-dtd)
-
   (unless before-change-function
     (message "WARN: before-change-function has been lost, restoring (%s)"
 	     (current-buffer))
     (setq before-change-function 'sgml-note-change-at)
-    (setq after-change-function 'sgml-set-face-after-change)
-    )
-  
-  (sgml-find-start-point (min sgml-goal (point-max)))
-  (assert sgml-current-tree)
-  (let ((bigparse (and (not quiet) (> (- sgml-goal (point)) 10000))))
-    (when bigparse
-      (sgml-message "Parsing..."))
-    (sgml-with-parser-syntax
-     (sgml-parser-loop extra-cond))
-    (when bigparse
-      (sgml-message ""))))
+    (setq after-change-function 'sgml-set-face-after-change))
+  (sgml-with-parser-syntax
+   (sgml-find-start-point (min sgml-goal (point-max)))
+   (assert sgml-current-tree)
+   (let ((bigparse (and (not quiet) (> (- sgml-goal (point)) 10000))))
+     (when bigparse
+       (sgml-message "Parsing..."))
+     (sgml-parser-loop extra-cond)
+     (when bigparse
+       (sgml-message "")))))
 
 (defun sgml-parse-continue (sgml-goal &optional extra-cond quiet)
   "Parse until (at least) SGML-GOAL."
