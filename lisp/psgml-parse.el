@@ -2264,7 +2264,7 @@ overrides the entity type in entity look up."
 	    (:constructor sgml-make-tree
 			  (eltype stag-epos stag-len  parent level
 				  excludes includes pstate net-enabled
-				  conref &optional shortmap pshortmap)))
+				  conref &optional shortmap pshortmap asl)))
   eltype				; element object
   ;;start					; start point in buffer
   ;;end					; end point in buffer
@@ -2284,6 +2284,7 @@ overrides the entity type in entity look up."
   conref				; if conref attribute used
   shortmap				; shortmap at start of element
   pshortmap				; parents shortmap
+  asl					; attribute specification list
 )
 
 
@@ -2585,7 +2586,8 @@ entity hierarchy as possible."
 	      (if (sgml-tree-net-enabled sgml-current-tree) 1)
 	      conref
 	      newmap
-	      sgml-current-shortmap)))
+	      sgml-current-shortmap
+	      asl)))
 ;; (let ((u (sgml-tree-content sgml-current-tree)))
 ;;      (cond ((and u (> before-tag (sgml-element-start u)))
 ;;	     (while (and (sgml-tree-next u)
@@ -3828,15 +3830,16 @@ Returns parse tree; error if no element after POS."
 (defun sgml-element-attribute-specification-list (element)
   "Return the attribute specification list for ELEMENT.
 This is a list of (attname value) lists."
-  (if (> (sgml-element-stag-len element) 2)
-      (save-excursion
-	(sgml-with-parser-syntax
-	 (sgml-goto-epos (sgml-element-stag-epos element))       
-	 (sgml-check-delim "STAGO")
-	 (sgml-check-name)
-	 (prog1 (sgml-parse-attribute-specification-list
-		 (sgml-element-eltype element))
-	   (sgml-pop-all-entities))))))
+;;;  (if (> (sgml-element-stag-len element) 2)
+;;;      (save-excursion
+;;;	(sgml-with-parser-syntax
+;;;	 (sgml-goto-epos (sgml-element-stag-epos element))       
+;;;	 (sgml-check-delim "STAGO")
+;;;	 (sgml-check-name)
+;;;	 (prog1 (sgml-parse-attribute-specification-list
+;;;		 (sgml-element-eltype element))
+;;;	   (sgml-pop-all-entities)))))
+  (sgml-tree-asl element))
 
 (defun sgml-find-attribute-element ()
   "Return the element to which an attribute editing command should be applied."
