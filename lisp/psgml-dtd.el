@@ -32,6 +32,16 @@
 (require 'psgml-parse)
 
 
+;;;; Variables
+
+;; Variables used during doctype parsing and loading
+(defvar sgml-used-pcdata nil)		; True if model group built is mixed
+
+(defvar sgml-dtd-shortmaps nil
+  "List of short reference maps.
+Used while parsing the DTD.")
+
+
 ;;;; Constructing basic
 
 (defun sgml-copy-moves (s1 s2)
@@ -392,31 +402,41 @@ Case transformed for general names."
       (list (sgml-general-case (sgml-check-nametoken)))))))
 
 (defun sgml-check-element-type ()
-  "Parse and check an element type (name), returns list of strings."
+  "Parse and check an element type, returns list of strings."
+;;; 117  element type     =  [[30 generic identifier]]
+;;;                      |  [[69 name group]]
+;;;                      |  [[118 ranked element]]
+;;;                      |  [[119 ranked group]]
   (cond
    ((sgml-parse-delim GRPO)
     (sgml-skip-ts)
-    (let ((names (sgml-check-element-type)))
-      (while (progn (sgml-skip-ps)
+    (let ((names (list (sgml-check-name))))
+      (while (progn (sgml-skip-ts)
 		    (sgml-parse-connector))
 	(sgml-skip-ts)
-	(nconc names (sgml-check-element-type)))
+	(nconc names (list (sgml-check-name))))
       (sgml-check-delim GRPC)
-      names))
+      ;; A ranked group will have a rank suffix here
+      (sgml-skip-ps)
+      (if (sgml-is-delim "NULL" digit)
+	(let ((suffix (sgml-parse-nametoken)))
+	  (loop for n in names
+		collect (concat n suffix)))
+	names)))
    (t					; gi/ranked element
     (let ((name (sgml-check-name)))
       (sgml-skip-ps)
-      (list (if (and (>= (following-char) ?0)
-		     (<= (following-char) ?9))
-		(sgml-general-case
-		 (concat name (sgml-check-nametoken)))
+      (list (if (sgml-is-delim "NULL" digit)
+		(concat name (sgml-check-nametoken))
 	      name))))))
+
 
 (defun sgml-check-external ()
   (or (sgml-parse-external)
       (sgml-parse-error "Expecting a PUBLIC or SYSTEM")))
 
 ;;;; Parse doctype: notation
+
 (defun sgml-declare-notation ()
   ;;148  notation declaration = MDO, "NOTATION",
   ;;                        65 ps+, 41 notation name,
@@ -517,8 +537,11 @@ Case transformed for general names."
   (cond ((sgml-is-delim GRPO)
 	 (sgml-check-content-model))
 	(t
-	 (let ((dc (sgml-check-name)))	;CDATA or RCDATA or EMPTY
-	   (intern (upcase dc))))))
+	 ;; ANY, CDATA, RCDATA or EMPTY
+	 (let ((dc (intern (upcase (sgml-check-name))))) 
+	   (when (eq dc 'ANY)
+	     (setq sgml-used-pcdata t))
+	   dc))))
 
 (defun sgml-parse-exeption (type)
   (sgml-skip-ps)
@@ -685,12 +708,9 @@ Case transformed for general names."
 	     (sgml-skip-ps)
 	     (setq literal (sgml-parse-parameter-literal 'dofunchar)))
       (sgml-skip-ps)
-      (setq name (sgml-check-name))
+      (setq name (sgml-check-name t))
       (push (cons literal name) mappings))
-    (sgml-add-shortref-map
-     (sgml-dtd-shortmaps sgml-dtd-info)
-     mapname
-     (sgml-make-shortmap mappings))))
+    (push (cons mapname mappings) sgml-dtd-shortmaps)))
 
 ;;;152  short reference use declaration = MDO, "USEMAP",
 ;;;                        [[65 ps]]+, [[153 map specification]],
@@ -726,6 +746,7 @@ Case transformed for general names."
   (let ((docname (sgml-check-name))
 	(external (sgml-parse-external)))
     (setq sgml-dtd-info (sgml-make-dtd docname)) ; Create a empty DTD struct
+    (setq sgml-dtd-shortmaps nil)
     (sgml-skip-ps)
     (cond
      ((sgml-parse-delim "DSO")
@@ -735,6 +756,11 @@ Case transformed for general names."
 	   (sgml-push-to-entity (sgml-make-entity docname 'dtd external))
 	   (sgml-check-dtd-subset)))
     (sgml-skip-ps)
+    (loop for map in sgml-dtd-shortmaps do
+	  (sgml-add-shortref-map
+	   (sgml-dtd-shortmaps sgml-dtd-info)
+	   (car map)
+	   (sgml-make-shortmap (cdr map))))
     (sgml-set-initial-state sgml-dtd-info))
   (message "Parsing doctype...done")
   (run-hooks 'sgml-doctype-parsed-hook))
