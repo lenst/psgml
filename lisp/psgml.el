@@ -61,7 +61,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "0.3a1"
+(defconst psgml-version "0.3a2"
   "Version of psgml package.")
 
 (require 'cl)
@@ -347,7 +347,7 @@ running the sgml-validate-command.")
   '("Tags" . sgml-tags-menu))
 
 (define-key sgml-mode-map [menu-bar sgml]
-  (cons "Sgml" (make-sparse-keymap "Sgml")))
+  (cons "SGML" (make-sparse-keymap "SGML")))
 
 
 ;;; Sgml menu
@@ -463,6 +463,7 @@ running the sgml-validate-command.")
 (define-key sgml-mode-map "\C-c\C-s" 'sgml-unfold-line)
 (define-key sgml-mode-map "\C-c\C-t" 'sgml-list-valid-tags)
 (define-key sgml-mode-map "\C-c\C-q" 'sgml-fill-element)
+(define-key sgml-mode-map "\C-c\C-w" 'sgml-what-element)
 
 (define-key sgml-mode-map "\C-c\C-f\C-e" 'sgml-fold-element)
 (define-key sgml-mode-map "\C-c\C-f\C-r" 'sgml-fold-region)
@@ -539,6 +540,14 @@ sgml-leave-point-after-insert  If non-nil, the point will remain after
 	inserted tag(s).
 sgml-warn-about-undefined-elements  If non-nil, print a warning when a tag 
 	for a undefined element is found.
+sgml-max-menu-size  Max number of entries in Tags and Entities menus before
+ 	they are split into several panes.
+sgml-always-quote-attributes  If non-nil, quote all attribute values 
+	inserted after finishing edit attributes.
+sgml-minimize-attributes  Determines minimization of attributes inserted by 
+	edit-attributes.
+sgml-normalize-trims  If non-nil, sgml-normalize will trim off white space 
+	from end of element when adding end tag.
 sgml-indent-step  How much to increament indent for every element level.
 sgml-indent-data  If non-nil, indent in data/mixed context also.
 sgml-system-path  List of directorys used to look for system identifiers.
@@ -929,18 +938,20 @@ This uses the selective display feature."
 (autoload 'sgml-entities-menu "psgml-parse"
 	  nil
 	  t nil)
-
 (autoload 'sgml-fill-element "psgml-parse"
 	  nil
 	  t nil)
 (autoload 'sgml-normalize "psgml-parse"
-	  "Normalize buffer by filling in omitted tags and expanding empty tags."
+	  "Normalize buffer by filling in omitted tags and expanding empty tags.
+A  optional argument ELEMENT can be the element to normalize
+insted of the whole buffer."
 	  t nil)
 (autoload 'sgml-what-element "psgml-parse"
+	  "Display what element is under the cursor."
+	  t nil)
+(autoload 'sgml-complete "psgml-parse"
 	  nil
 	  t nil)
-
-(autoload 'sgml-complete "psgml-parse" nil t nil)
 
 (provide 'psgml)
 (provide 'sgml-mode)
