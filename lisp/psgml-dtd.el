@@ -656,10 +656,10 @@ Syntax: var dfa-expr &body forms"
   (cdr (assq node sgml-code-xlate)))
 
 (defun sgml-code-number (num)
-  (if (> num sgml-max-singel-octet-number)
-      (insert (+ (lsh (- num sgml-max-singel-octet-number) -8)
-		 sgml-max-singel-octet-number 1)
-	      (logand (- num sgml-max-singel-octet-number) 255))
+  (if (> num sgml-max-single-octet-number)
+      (insert (+ (lsh (- num sgml-max-single-octet-number) -8)
+		 sgml-max-single-octet-number 1)
+	      (logand (- num sgml-max-single-octet-number) 255))
     (insert num)))
 
 (defsubst sgml-code-token (token)
