@@ -1,9 +1,9 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
 
-<!ENTITY last.ed  'Time-stamp: "1999-10-10 18:14:40 lenst"'>
-<!ENTITY % HTML.Deprecated "IGNORE">
-
+<!ENTITY last.ed  'Time-stamp: "1999-10-19 22:27:36 lenst"'>
 <!ENTITY rcs.id "$Id$">
+
+<!ENTITY % HTML.Deprecated "IGNORE">
 
 <!ENTITY mail.url "mailto:">
 <!ENTITY my.email cdata "lenst@lysator.liu.se">
@@ -20,9 +20,10 @@
 <!entity ftp.url "ftp://ftp.lysator.liu.se/">
 <!entity psgml.dir "&ftp.url;pub/sgml/">
 <!ENTITY alpha.dir "&psgml.dir;ALPHA/">
-<!entity psgml0.4b3 "&psgml.dir;psgml-0.4b3.tar.gz">
 <!entity psgml1.0.3 "&psgml.dir;psgml-1.0.3.tar.gz">
 <!entity psgml1.2.0 "&psgml.dir;psgml-1.2.0.tar.gz">
+<!entity psgml1.2.1 "psgml-1.2.1.tar.gz">
+<!entity ftp-dir    "&psgml.dir;">
 
 <!entity olddoc.url "&base.url;/psgml_toc.html">
 <!entity newdoc.url "&base.url;/psgml_toc.html">
@@ -30,6 +31,7 @@
 
 <!entity nl     "<br>" >
 <!entity SGML   "<acronym>SGML</acronym>" >
+<!entity XML    "<acronym>XML</acronym>" >
 
 <?PSGML NOFILL body div pre>
 ]>
@@ -41,7 +43,7 @@
   <meta name="template-type" content="software">
   <meta name="category" content="Emacs mode">
   <meta name="author-name" content="Lennart Staflin">
-  <meta name="version" content="1.2.0">
+  <meta name="version" content="1.2.1">
   <meta name="description"
     content="PSGML is a GNU Emacs Major Mode for editing SGML coded documents.">
   <meta name="keywords" content="sgml, emacs, syntax directed editing">
@@ -64,7 +66,7 @@ HR.divider { width: 50%; align: center; }
   <hr>
   <DIV> <h1>Information about PSGML</h1>
    <p>
-    PSGML is a GNU Emacs Major Mode for editing &SGML; and XML coded
+    PSGML is a GNU Emacs Major Mode for editing &SGML; and &XML; coded
     documents.
    </p>
    <ul class="content">
@@ -98,6 +100,11 @@ HR.divider { width: 50%; align: center; }
 
    <DIV> <h2><A NAME="UPDATE">Update</A></h2>
     <DL>
+
+     <dt>1999-10-22</dt>
+     <dd><p>Version 1.2.1 of PSGML with som bugfixes from <a
+ href="&psgml.dir">lystor ftp</a> or <a href="&psgml1.2.1;">http</a></p>
+     </dd>
 
      <dt>1999-10-10</dt>
      <dd><p>Version 1.2.0 of PSGML with <acronym>XML</acronym> support is
@@ -138,9 +145,16 @@ HR.divider { width: 50%; align: center; }
      directory <samp>pub/sgml</samp>.</p>
 
     <dl>
+     <dt><a>1.2.1</a></dt>
+     <dd>
+      <p>This is the latest release. Available via as &psgml1.2.1;
+       <a href="&ftp-dir;&psgml1.2.1;">ftp</a> or via <a
+       href="&psgml1.2.1">http</a>.
+     </dd>
+
      <DT><A NAME="V1.2.0">1.2.0</A></dt>
      <dd>
-      <p>This is the latest release. Available via ftp as 
+      <p>This is the previous beta release. Available via ftp as 
        <a href="&psgml1.2.0;">psgml-1.2.0.tar.gz</a>
      </dd>
 
@@ -154,7 +168,7 @@ HR.divider { width: 50%; align: center; }
     </dl>
    </div>
    <div> <h2><a name="NEW12">News in version 1.2</a></h2>
-    <p>Support for XML.</p>
+    <p>Support for &XML;.</p>
     <p>More info forthcoming.</p>
    </div>
   </DIV>

@@ -7,14 +7,20 @@
 (require 'psgml-parse)
 
 (defconst psgml-test-cases
-  '(("tc1.sgml" (warning "Undefined entity.*"))
-    ("tc2.xml")))
+  '(("tc01.sgml" (warning "Undefined entity.*"))
+    ("tc02.xml")
+    ("tc03.xml")
+    ("tc04.sgml")
+    ("tc05.sgml")
+    ("tc07.sgml")))
 
 (defun testsuit-run-test-case (case-description)
   (let* ((file (first case-description))
          (expected (rest case-description))
          (sgml-show-warnings t))
     (sgml-reset-log)
+    (setq sgml-catalog-assoc nil)       ; To allow testing catalog parsing
+    (setq sgml-ecat-assoc nil)
     (message "Testing %s" file)
     (find-file file)
     (condition-case errcode
@@ -37,7 +43,7 @@
               (t
                (error "No %s warning" warning-pattern)))))
     (when expected
-      (error "The expected result %s didnt" expected))))
+      (error "The expected result %s didn't" expected))))
 
 (defun testsuit-run ()
   (loop for tc in psgml-test-cases

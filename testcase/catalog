@@ -1,0 +1,2 @@
+-- Testing catalog parsing for SGML/XML --
+PUBLIC "-//lenst//DTD Testcase 03 dtd//EN" tc03.dtd
