@@ -1,3 +1,11 @@
+1999-12-16  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-parse.el (sgml-parse-prolog): restore buffer modified
+	after parsing. To allow using text properties for fontification.
+	(sgml-parse-continue): dito.
+	(sgml-parse-to): call sgml-parse-continue instead of calling
+	sgml-parser-loop directly.
+
 1999-12-15  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml.el: autoload for sgml-do-set-option

@@ -126,7 +126,7 @@ if the item is selected."
 		      (eq type (overlay-get (car current) 'sgml-type)))
 		 (setq old-overlay (car current)))
 		((overlay-get (car current) 'sgml-type)
-		 (message "delov: %s" (overlay-get (car current) 'sgml-type))
+		 ;;(message "delov: %s" (overlay-get (car current) 'sgml-type))
 		 (delete-overlay (car current))))
 	  (setq current (cdr current)))
 	(while (< (setq pos (next-overlay-change pos))

@@ -3849,18 +3849,21 @@ VALUE is a string.  Returns nil or an attdecl."
   (sgml-set-global)
   (setq	sgml-dtd-info nil)
   (goto-char (point-min))
-  (sgml-with-parser-syntax
-   (while (progn (setq sgml-markup-start (point))
-		 (or (sgml-parse-s)
-                     (sgml-parse-processing-instruction)
-                     (and (sgml-parse-markup-declaration 'prolog)
-                          (null sgml-dtd-info)))))
-   (unless sgml-dtd-info		; Set up a default doctype
-     (let ((docname (or sgml-default-doctype-name
-			(if (sgml-parse-delim "STAGO" gi)
-			    (sgml-parse-name)))))
-       (when docname
-	 (sgml-setup-doctype docname '(nil))))))
+  (let ((buffer-modified (buffer-modified-p)))
+    (unwind-protect
+        (sgml-with-parser-syntax
+         (while (progn (setq sgml-markup-start (point))
+                       (or (sgml-parse-s)
+                           (sgml-parse-processing-instruction)
+                           (and (sgml-parse-markup-declaration 'prolog)
+                                (null sgml-dtd-info)))))
+         (unless sgml-dtd-info		; Set up a default doctype
+           (let ((docname (or sgml-default-doctype-name
+                              (if (sgml-parse-delim "STAGO" gi)
+                                  (sgml-parse-name)))))
+             (when docname
+               (sgml-setup-doctype docname '(nil))))))        
+      (set-buffer-modified-p buffer-modified)))
   (unless sgml-dtd-info
     (error "No document type defined by prolog"))
   (sgml-message "Parsing prolog...done"))
@@ -3895,21 +3898,18 @@ If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
     (setq after-change-function 'sgml-set-face-after-change))
   (sgml-with-parser-syntax
    (sgml-find-start-point (min sgml-goal (point-max)))
-   (assert sgml-current-tree)
-   (let ((bigparse (and (not quiet) (> (- sgml-goal (point)) 10000))))
-     (when bigparse
-       (sgml-message "Parsing..."))
-     (sgml-parser-loop extra-cond)
-     (when bigparse
-       (sgml-message "")))))
+   (sgml-parse-continue sgml-goal extra-cond
+                        (or quiet (< (- sgml-goal (point)) 10000)))))
 
 (defun sgml-parse-continue (sgml-goal &optional extra-cond quiet)
   "Parse until (at least) SGML-GOAL."
   (assert sgml-current-tree)
   (unless quiet
     (sgml-message "Parsing..."))
-  (sgml-with-parser-syntax
-     (sgml-parser-loop extra-cond))
+  (let ((buffer-modified (buffer-modified-p)))
+    (unwind-protect
+        (sgml-with-parser-syntax (sgml-parser-loop extra-cond))
+      (set-buffer-modified-p buffer-modified)))
   (unless quiet
     (sgml-message "")))
 
