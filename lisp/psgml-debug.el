@@ -457,6 +457,7 @@
 ;; Candidate for C-c C-t
 
 (autoload 'sgml-princ-names "psgml-info")
+(autoload 'sgml-eltype-refrenced-elements "psgml-info")
 
 (define-key sgml-mode-map "\C-c\C-t" 'sgml-show-current-element-type)
 
