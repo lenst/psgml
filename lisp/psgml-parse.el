@@ -70,7 +70,7 @@ These functions are invoked with `sgml-current-tree' bound to the
 element just parsed.")
 
 (defvar sgml-doctype-parsed-hook nil
-  "This hook is caled after the doctype has been parsed.
+  "This hook is called after the doctype has been parsed.
 It can be used to load any additional information into the DTD structure.")
 
 (defvar sgml-sysid-resolve-functions nil
@@ -236,7 +236,7 @@ In case markup closed element this is different from sgml-current-tree.
 Only valid after `sgml-parse-to'.")
 
 (defvar sgml-markup-start nil
-  "Start point of markup beeing parsed.")
+  "Start point of markup being parsed.")
 
 (defvar sgml-conref-flag nil
   "This variable is set by `sgml-parse-attribute-specification-list'
@@ -995,7 +995,7 @@ This may change ELTYPES1, ELTYPES2 is unchanged. Returns the new table."
       eltypes1)))
 
 (defun sgml-lookup-eltype (name &optional dtd)
-  "Lookup the element defintion for NAME (string)."
+  "Lookup the element definition for NAME (string)."
   (intern name (sgml-dtd-eltypes (or dtd sgml-dtd-info))))
 
 (defun sgml-eltype-completion-table (eltypes)
@@ -1054,7 +1054,7 @@ a default for the element type name."
 
 (defsubst sgml-read-number ()
   "Read a number.
-A number is 1: an octet [0--sgml-max-singel-octet-number]
+A number is 1: an octet [0--sgml-max-single-octet-number]
 or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (if (> (sgml-read-peek) sgml-max-single-octet-number)
       (+ (* (- (sgml-read-octet) (eval-when-compile
@@ -1198,7 +1198,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-bdtd-load (cfile dtdfile ents)
   "Load the compiled dtd from CFILE into the current buffer.
 If this file does not exists, is of an old version or out of date, a
-new compiled dtd will be creted from file DTDFILE and parameter entity
+new compiled dtd will be created from file DTDFILE and parameter entity
 settings in ENTS."
   ;;(Assume the current buffer is a scratch buffer and is empty)
   (sgml-debug "Trying to load compiled DTD from %s..." cfile)
@@ -1228,7 +1228,7 @@ If DEPENDENCIES contains the symbol `t', FILE is not considered newer."
   "Construct a binary code compiled dtd from DTD-FILE and write it to TO-FILE.
 The dtd will be constructed with the parameter entities set according
 to ENTS. The bdtd will be left in the current buffer.  The current
-buffer is assumend to be empty to start with."
+buffer is assumed to be empty to start with."
   (sgml-log-message "Recompiling DTD file %s..." dtd-file)
   (let* ((sgml-dtd-info (sgml-make-dtd nil))
 	 (parameters (sgml-dtd-parameters sgml-dtd-info))
@@ -1266,15 +1266,15 @@ buffer is assumend to be empty to start with."
 
 (defun sgml-bdtd-merge ()
   "Merge the binary coded dtd in the current buffer with the current dtd.
-The current dtd is the variable sgml-dtd-info.  Return t if mereged
-was successfull or nil if failed."
+The current dtd is the variable sgml-dtd-info.  Return t if the merge
+was successful or nil if failed."
   (goto-char (point-min))
   (sgml-read-sexp)			; skip filev
   (let ((dependencies (sgml-read-sexp))
 	(parameters (sgml-read-sexp))
 	(gc-cons-threshold (max gc-cons-threshold 500000))
 	temp)
-    ;; Check comaptibility of parameters
+    ;; Check compatibility of parameters
     (and (sgml-check-entities (sgml-dtd-parameters sgml-dtd-info)
 			      parameters)
 	 (progn
@@ -1792,7 +1792,7 @@ is not already in upper case."
   ;; FIXME: Perhaps only warn and upcase
   (or sgml-current-namecase-general
       (equal name (upcase name))
-      (sgml-parse-error "Uppercase keyword expected."))
+      (sgml-parse-error "Uppercase keyword expected (found %s)" name))
   name)
 
 (defun sgml-parse-literal ()
@@ -1812,7 +1812,7 @@ is not already in upper case."
 
 (defun sgml-check-literal ()
   (or (sgml-parse-literal)
-      (sgml-parse-error "A litteral expected")))
+      (sgml-parse-error "A literal expected")))
 
 (defun sgml-parse-minimum-literal ()
   "Parse a quoted SGML string and return it, if no string return nil."
@@ -1959,7 +1959,7 @@ PTYPE can be 'param if this is a parameter entity."
 				       (sgml-entity-type entity))
 				   (sgml-entity-name entity))))))
 
-;;;; External identifyer resolve
+;;;; External identifier resolve
 
 (defun sgml-cache-catalog (file cache-var parser-fun
 				&optional default-dir)
@@ -1967,7 +1967,7 @@ PTYPE can be 'param if this is a parameter entity."
 FILE is the file containing the catalog.  Maintains a cache of parsed
 catalog files in variable CACHE-VAR. The parsing is done by function
 PARSER-FUN that should parse the current buffer and return the parsed
-repreaentation of the catalog."
+representation of the catalog."
   (setq file (expand-file-name file default-dir))
   (and
    (file-readable-p file)
@@ -2120,7 +2120,7 @@ Returns nil if entity is not found."
 	  (when pubid
 	    (sgml-log-warning "  Public identifier %s" pubid))
 	  (when sysid
-	    (sgml-log-warning "  System identfier %s" sysid))
+	    (sgml-log-warning "  System identifier %s" sysid))
 	  nil))))
 
 
@@ -2271,7 +2271,7 @@ Skips any leading spaces/comments."
       (car epos)))
 
 (defun sgml-epos-pos (epos)
-  "The buffer position of EPOS withing its entity."
+  "The buffer position of EPOS within its entity."
   (if (consp epos)
       (cdr epos)
     epos))
@@ -2421,7 +2421,7 @@ text. Otherwise buffer position will be after entity reference."
 (defun sgml-try-merge-special-case (pubid file cfile ents)
   (let (cdtd)
     (sgml-debug "Merging special case")
-    ;; Look for a compiled dtd in som other buffer
+    ;; Look for a compiled dtd in some other buffer
     (let ((cb (current-buffer)))
       (loop for b in (buffer-list)
 	    until
@@ -2456,7 +2456,7 @@ text. Otherwise buffer position will be after entity reference."
       (setf (sgml-dtd-merged sgml-dtd-info) (cons cfile cdtd))))))
 
 
-;;;; Pushing and poping entities
+;;;; Pushing and popping entities
 
 (defun sgml-push-to-entity (entity &optional ref-start type)
   "Set current buffer to a buffer containing the entity ENTITY.
@@ -2554,7 +2554,7 @@ overrides the entity type in entity look up."
 		    (when pubid
 		      (sgml-log-warning "  Public identifier %s" pubid))
 		    (when sysid
-		      (sgml-log-warning "  System identfier %s" sysid))
+		      (sgml-log-warning "  System identifier %s" sysid))
 		    nil))))))))
      (t ;; internal entity
       (save-excursion
@@ -3125,7 +3125,7 @@ Where the latter represents end-tags."
 	 ((or (eq state sgml-empty)
 	      (and (sgml-final-p state)
 		   (not (eq tree sgml-top-tree))))
-	  (unless (eq state sgml-empty)	; not realy implied
+	  (unless (eq state sgml-empty)	; not really implied
 	    (push t imps))
 	  (setq state (sgml-tree-pstate tree)
 		tree (sgml-fake-close-element tree))
@@ -3643,7 +3643,7 @@ Assumes starts with point inside a markup declaration."
 
 
 (defun sgml-parse-markup-declaration (option)
-  "Parse a markup declartion.
+  "Parse a markup declaration.
 OPTION can be `prolog' if parsing the prolog or `dtd' if parsing the
 dtd or `ignore' if the declaration is to be ignored."
   (cond
@@ -3760,7 +3760,7 @@ VALUE is a string.  Returns nil or an attdecl."
 
 ;; The parser maintains a partial parse tree during the parse.  This tree
 ;; can be inspected to find information, and also be used to restart the
-;; parse.  The parser also has a postition in the current content model.
+;; parse.  The parser also has a position in the current content model.
 ;; (Called a state.)  The parser is used for several things:
 ;; 1) To find the state the parser would be in at a point in the buffer.
 ;;    (Point in emacs sense, I.e. between chararacters).
@@ -3915,7 +3915,7 @@ or if nil, until end of buffer."
   "Parse until (at least) SGML-GOAL.
 Optional argument EXTRA-COND should be a function.  This function is 
 called in the parser loop, and the loop is exited if the function returns t.
-If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
+If third argument QUIET is non-nil, no \"Parsing...\" message will be displayed."
   (sgml-need-dtd)
   (sgml-with-parser-syntax-ro
    (sgml-goto-start-point (min sgml-goal (point-max)))
@@ -3984,7 +3984,7 @@ pointing to start of short ref and point pointing to the end."
 
 
 (defun sgml-pcdata-move ()
-  "Moify parser state to reflect parsed data."
+  "Modify parser state to reflect parsed data."
   (sgml-do-move sgml-pcdata-token "data character"))
 
 (defsubst sgml-parse-pcdata ()
@@ -4052,7 +4052,6 @@ pointing to start of short ref and point pointing to the end."
        ((sgml-parse-processing-instruction))
        (t
 	(sgml-do-pcdata))))))
-
 
 (defun sgml-handle-shortref (name)
   (sgml-set-markup-type 'shortref)

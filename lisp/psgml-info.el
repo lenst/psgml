@@ -370,7 +370,7 @@
       (cond ((symbolp (sgml-eltype-model et)) (princ (sgml-eltype-model et)))
 	    (t
 	     (princ (if (sgml-eltype-mixed et) "mixed\n\n"
-                      "element\n\n"))	     
+                      "element\n\n"))
 	     (sgml-princ-names
 	      (mapcar #'symbol-name (sgml-eltype-refrenced-elements et)))))
       (let ((incl (sgml-eltype-includes et))

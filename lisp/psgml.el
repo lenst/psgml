@@ -104,8 +104,8 @@ Setting this variable automatically makes it local to the current buffer.")
 (defvar sgml-system-identifiers-are-preferred nil
   "*If nil, PSGML will look up external entities by searching the catalogs
 in `sgml-local-catalogs' and `sgml-catalog-files' and only if the
-entity is not found in the catalogs will a given system identifer be
-used. If the variable is non-nil and a system identifer is given, the
+entity is not found in the catalogs will a given system identifier be
+used. If the variable is non-nil and a system identifier is given, the
 system identifier will be used for the entity. If no system identifier
 is given the catalogs will searched.")
 
@@ -174,7 +174,7 @@ hierarchy. The variable should have the form
 
   (PARENT-FILE CONTEXT-ELEMENT* TOP-ELEMENT (HAS-SEEN-ELEMENT*)?)
 
-PARENT-FILE	is a string, the name of the file contatining the
+PARENT-FILE	is a string, the name of the file containing the
 		document entity.
 CONTEXT-ELEMENT is a string, that is the name of an element type.
 		It can occur 0 or more times and is used to set up
@@ -289,7 +289,7 @@ where and has content model ANY.")
   "*If non-nil, out of date compiled DTDs will be automatically recompiled.
 If the value is `ask', PSGML will ask before recompiling. A `nil'
 value will cause PSGML to silently load an out of date compiled DTD.
-A DTD that referes to undefined external entities is always out of
+A DTD that refers to undefined external entities is always out of
 date, thus in such case it can be useful to set this variable to
 `nil'.")
 (put 'sgml-recompile-out-of-date-cdtd 'sgml-type '(("No" . nil)
@@ -357,7 +357,7 @@ identifier.")
 
 (defvar sgml-local-catalogs nil
 "*A list of SGML entity catalogs to be searched first when parsing the buffer.
-This is used in addtion to `sgml-catalog-files',  and `sgml-public-map'.
+This is used in addition to `sgml-catalog-files',  and `sgml-public-map'.
 This variable is automatically local to the buffer.")
 (make-variable-buffer-local 'sgml-local-catalogs)
 (put 'sgml-local-catalogs 'sgml-type 'file-list)
@@ -408,7 +408,7 @@ use `setq-default' to set it to a value that is shared among buffers.")
 
 (defvar sgml-custom-markup nil
   "*Menu entries to be added to the Markup menu.
-The value should be a list of lists of two strings.  The first is a
+The value should be a list of lists of two strings.  The first
 string is the menu line and the second string is the text inserted
 when the menu item is chosen.  The second string can contain a \\r
 where the cursor should be left.  Also if a selection is made
@@ -424,12 +424,12 @@ Example:
 
 (defvar sgml-custom-dtd nil
   "Menu entries to be added to the DTD menu.
-The value should be a list of entrys to be added to the DTD menu.
+The value should be a list of entries to be added to the DTD menu.
 Every entry should be a list. The first element of the entry is a string
 used as the menu entry.  The second element is a string containing a
 doctype declaration (this can be nil if no doctype).  The rest of the
 list should be a list of variables and values.  For backward
-compatibility a singel string instead of a variable is assigned to
+compatibility a single string instead of a variable is assigned to
 sgml-default-dtd-file.  All variables are made buffer local and are also
 added to the buffers local variables list.
 
@@ -1093,7 +1093,7 @@ To tag a region with the mouse, use transient mark mode or secondary selection.
 
 Structure editing:
 \\[sgml-backward-element]  Moves backwards over the previous element.
-\\[sgml-forward-element]  Moves forward over the nex element.
+\\[sgml-forward-element]  Moves forward over the next element.
 \\[sgml-down-element]  Move forward and down one level in the element structure.
 \\[sgml-backward-up-element]  Move backward out of this element level.
 \\[sgml-beginning-of-element]  Move to after the start tag of the current element.
@@ -1115,7 +1115,7 @@ Folding and unfolding
 User options:
 
 sgml-omittag  Set this to reflect OMITTAG in the SGML declaration.
-sgml-shortag  Set this to reflect SHORTTAG in the SGML declaration.
+sgml-shorttag  Set this to reflect SHORTTAG in the SGML declaration.
 sgml-namecase-general  Set this to reflect NAMECASE GENERAL in the SGML declaration.
 sgml-auto-insert-required-elements  If non-nil, automatically insert required 
 	elements in the content of an inserted element.
@@ -1134,7 +1134,7 @@ sgml-minimize-attributes  Determines minimization of attributes inserted by
 	edit-attributes.
 sgml-normalize-trims  If non-nil, sgml-normalize will trim off white space 
 	from end of element when adding end tag.
-sgml-indent-step  How much to increament indent for every element level.
+sgml-indent-step  How much to increment indent for every element level.
 sgml-indent-data  If non-nil, indent in data/mixed context also.
 sgml-set-face     If non-nil, psgml will set the face of parsed markup.
 sgml-markup-faces The faces used when the above variable is non-nil.
@@ -1454,7 +1454,7 @@ That is move to before the start-tag or where a start-tag is implied." t)
 That is move to after the end-tag or where an end-tag is implied." t)
 (autoload 'sgml-forward-element "psgml-edit" "Move forward over next element." t)
 (autoload 'sgml-backward-element "psgml-edit" "Move backward over previous element at this level.
-With implied tags this is ambigous." t)
+With implied tags this is ambiguous." t)
 (autoload 'sgml-down-element "psgml-edit" "Move forward and down one level in the element structure." t)
 (autoload 'sgml-kill-element "psgml-edit" "Kill the element following the cursor." t)
 (autoload 'sgml-transpose-element "psgml-edit" "Interchange element before point with element after point, leave point after." t)
@@ -1484,7 +1484,7 @@ This uses the selective display feature." t)
 (autoload 'sgml-insert-tag "psgml-edit" "Insert a tag, reading tag name in minibuffer with completion.
 If the variable sgml-balanced-tag-edit is t, also inserts the
 corresponding end tag. If sgml-leave-point-after-insert is t, the point
-is left after the inserted tag(s), unless the element has som required
+is left after the inserted tag(s), unless the element has some required
 content.  If sgml-leave-point-after-insert is nil the point is left
 after the first tag inserted." t)
 (autoload 'sgml-insert-element "psgml-edit" "Reads element name from minibuffer and inserts start and end tags." t)
@@ -1496,10 +1496,10 @@ If repeated, the containing element will be split before the beginning
 of then current element." t)
 (autoload 'sgml-custom-dtd "psgml-edit" "Insert a DTD declaration from the sgml-custom-dtd alist." t)
 (autoload 'sgml-custom-markup "psgml-edit" "Insert markup from the sgml-custom-markup alist." t)
-(autoload 'sgml-tags-menu "psgml-edit" "Pop up a menu with valid tags and insert the choosen tag.
+(autoload 'sgml-tags-menu "psgml-edit" "Pop up a menu with valid tags and insert the chosen tag.
 If the variable sgml-balanced-tag-edit is t, also inserts the
 corresponding end tag. If sgml-leave-point-after-insert is t, the point
-is left after the inserted tag(s), unless the element has som required
+is left after the inserted tag(s), unless the element has some required
 content.  If sgml-leave-point-after-insert is nil the point is left
 after the first tag inserted." t)
 (autoload 'sgml-element-menu "psgml-edit" "Pop up a menu with valid elements and insert choice.
@@ -1510,8 +1510,8 @@ tag inserted." t)
 (autoload 'sgml-tag-region-menu "psgml-edit" "Pop up a menu with valid elements and tag current region with the choice." t)
 (autoload 'sgml-entities-menu "psgml-edit" nil t)
 (autoload 'sgml-attrib-menu "psgml-edit" "Pop up a menu of the attributes of the current element
-\(or the element whith start-tag before point)." t)
-(autoload 'sgml-fill-element "psgml-edit" "Fill bigest enclosing element with mixed content.
+\(or the element with start-tag before point)." t)
+(autoload 'sgml-fill-element "psgml-edit" "Fill biggest enclosing element with mixed content.
 If current element has pure element content, recursively fill the
 subelements." t)
 (autoload 'sgml-edit-attributes "psgml-edit" "Edit attributes of current element.
@@ -1528,14 +1528,14 @@ Editing is done in a separate window." t)
 (autoload 'sgml-show-attributes "psgml-edit" "Show all attribute specifications in the buffer." t)
 (autoload 'sgml-expand-all-shortrefs "psgml-edit" "Expand all short references in the buffer.
 Short references to text entities are expanded to the replacement text
-of the entity other short references are expanded into general entity
-references.  If argument, TO-ENTITY, is non-nil, or if called
-interactive with numeric prefix argument, all short references are
-replaced by generaly entity references." t)
+of the entity; other short references are expanded into general entity
+references.  If argument TO-ENTITY is non-nil, or if called
+interactively with a numeric prefix argument, all short references are
+replaced by general entity references." t)
 (autoload 'sgml-normalize "psgml-edit" "Normalize buffer by filling in omitted tags and expanding empty tags.
 Argument TO-ENTITY controls how short references are expanded as with
 `sgml-expand-all-shortrefs'.  An optional argument ELEMENT can be the
-element to normalize insted of the whole buffer, if used no short
+element to normalize instead of the whole buffer, if used no short
 references will be expanded." t)
 (autoload 'sgml-normalize-element "psgml-edit" nil t)
 (autoload 'sgml-make-character-reference "psgml-edit" "Convert character after point into a character reference.

@@ -1,3 +1,12 @@
+2001-02-10  Adrian Aichner  <adrian@xemacs.org>
+
+	* psgml-dtd.el: Fix typos.
+	* psgml-edit.el: Ditto.
+	* psgml-fs.el: Ditto.
+	* psgml-info.el: Ditto.
+	* psgml-parse.el: Ditto.
+	* psgml.el: Ditto.
+	
 Wed Feb 28 00:02:45 2001  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-fs.el (fs-split-tokens): new helper function for use in

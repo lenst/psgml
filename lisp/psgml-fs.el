@@ -55,7 +55,7 @@
 
 (defvar fs-special-styles
   '(top bottom before after hang-from text sub-style title)
-  "Style attribues that should not be entered in the characteristics table.")
+  "Style attributes that should not be entered in the characteristics table.")
 
 
 ;;; Dynamic variables
@@ -78,7 +78,7 @@
   "Accumulate text of paragraph")
 
 (defvar fs-hang-from nil
-  "Hanging indent of current pargraph")
+  "Hanging indent of current paragraph")
 
 (defvar fs-first-indent nil)
 (defvar fs-left-indent nil)

@@ -168,7 +168,7 @@ Syntax: var dfa-expr &body forms"
     (setq l (sgml-state-opts s)
 	  nl (sgml-state-reqs s))
     (when yes
-      (sgml-debug "OPT redundant-1: sucess %s" (length yes))
+      (sgml-debug "OPT redundant-1: success %s" (length yes))
       (while (or l (setq l (prog1 nl (setq nl nil))))
 	(cond ((memq (sgml-move-dest (car l)) yes)
 	       (setf (sgml-move-dest (car l)) s)))

@@ -98,7 +98,7 @@ That is move to after the end-tag or where an end-tag is implied."
 
 (defun sgml-backward-element ()
   "Move backward over previous element at this level.
-With implied tags this is ambigous."
+With implied tags this is ambiguous."
   (interactive)
   (let ((prev				; previous element
 	 (sgml-find-previous-element (point) (sgml-last-element))))
@@ -629,7 +629,12 @@ Deprecated: ELEMENT"
 
 
 (defun sgml-insert-tag (tag &optional silent no-nl-after)
-  "Insert a tag, reading tag name in minibuffer with completion."
+  "Insert a tag, reading tag name in minibuffer with completion.
+If the variable sgml-balanced-tag-edit is t, also inserts the
+corresponding end tag. If sgml-leave-point-after-insert is t, the point
+is left after the inserted tag(s), unless the element has some required
+content.  If sgml-leave-point-after-insert is nil the point is left
+after the first tag inserted."
   (interactive 
    (list
     (let ((completion-ignore-case sgml-namecase-general))
@@ -659,7 +664,7 @@ Deprecated: ELEMENT"
 (defun sgml-insert-element (name &optional after silent)
   "Reads element name from minibuffer and inserts start and end tags.
 If sgml-leave-point-after-insert is t, the point
-is left after the inserted tag(s), unless the element has som required
+is left after the inserted tag(s), unless the element has some required
 content.  If sgml-leave-point-after-insert is nil the point is left
 after the first tag inserted."
   (interactive (list (sgml-read-element-name "Element: ")
@@ -968,10 +973,10 @@ of then current element."
 ;;;; SGML mode: Menu inserting
 
 (defun sgml-tags-menu (event)
-  "Pop up a menu with valid tags and insert the choosen tag.
+  "Pop up a menu with valid tags and insert the chosen tag.
 If the variable sgml-balanced-tag-edit is t, also inserts the
 corresponding end tag. If sgml-leave-point-after-insert is t, the point
-is left after the inserted tag(s), unless the element has som required
+is left after the inserted tag(s), unless the element has some required
 content.  If sgml-leave-point-after-insert is nil the point is left
 after the first tag inserted."
   (interactive "*e")
@@ -1079,7 +1084,7 @@ tag inserted."
 (defun sgml-doctype-insert (doctype vars)
   "Insert string DOCTYPE (ignored if nil) and set variables in &rest VARS.
 VARS should be a list of variables and values.
-For backward compatibility a singel string instead of a variable is 
+For backward compatibility a single string instead of a variable is 
 assigned to sgml-default-dtd-file.
 All variables are made buffer local and are also added to the
 buffers local variables list."
@@ -1103,7 +1108,7 @@ buffers local variables list."
 
 (defun sgml-attrib-menu (event)
   "Pop up a menu of the attributes of the current element
-\(or the element whith start-tag before point)."
+\(or the element with start-tag before point)."
   (interactive "e")
     (let ((menu (sgml-make-attrib-menu (sgml-find-attribute-element))))
       (sgml-popup-multi-menu event "Attributes" menu)))
@@ -1152,14 +1157,14 @@ buffers local variables list."
        (not (sgml-element-appdata element 'nofill))))
 
 (defun sgml-fill-element (element)
-  "Fill bigest enclosing element with mixed content.
+  "Fill biggest enclosing element with mixed content.
 If current element has pure element content, recursively fill the
 subelements."
   (interactive (list (sgml-find-element-of (point))))
   ;;
   (message "Filling...")
   (when (sgml-element-fillable element)
-    ;; Find bigest enclosing fillable element
+    ;; Find biggest enclosing fillable element
     (while (sgml-element-fillable (sgml-element-parent element))
       (setq element (sgml-element-parent element))))
   ;; 
@@ -1184,7 +1189,7 @@ subelements."
 	   ((sgml-element-fillable c))
 	   (t
 	    ;; Put region before element on agenda.  Can't fill it now
-	    ;; that would mangle the parse tree that is beeing traversed.
+	    ;; that would mangle the parse tree that is being traversed.
 	    (push (cons last-pos (sgml-element-start c))
 		  agenda)
 	    (goto-char (sgml-element-start c))
@@ -1395,7 +1400,7 @@ Editing is done in a separate window."
 Use \\[sgml-edit-attrib-next] to move between input fields.  Use
 \\[sgml-edit-attrib-default] to make an attribute have its default
 value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
-\(\\[delete-window]).  To finsh edit use \\[sgml-edit-attrib-finish].
+\(\\[delete-window]).  To finish edit use \\[sgml-edit-attrib-finish].
 
 \\{sgml-edit-attrib-mode-map}"
   (setq mode-name "SGML edit attributes"
@@ -1616,10 +1621,10 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 (defun sgml-expand-all-shortrefs (to-entity)
   "Expand all short references in the buffer.
 Short references to text entities are expanded to the replacement text
-of the entity other short references are expanded into general entity
-references.  If argument, TO-ENTITY, is non-nil, or if called
-interactive with numeric prefix argument, all short references are
-replaced by generaly entity references."
+of the entity; other short references are expanded into general entity
+references.  If argument TO-ENTITY is non-nil, or if called
+interactively with a numeric prefix argument, all short references are
+replaced by general entity references."
   (interactive "*P")
   (sgml-reparse-buffer
    (if to-entity
@@ -1630,7 +1635,7 @@ replaced by generaly entity references."
   "Normalize buffer by filling in omitted tags and expanding empty tags.
 Argument TO-ENTITY controls how short references are expanded as with
 `sgml-expand-all-shortrefs'.  An optional argument ELEMENT can be the
-element to normalize insted of the whole buffer, if used no short
+element to normalize instead of the whole buffer, if used no short
 references will be expanded."
   (interactive "*P")
   (unless element
