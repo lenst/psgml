@@ -1,6 +1,6 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
 
-<!ENTITY last.ed  'Time-stamp: "1999-10-20 20:54:41 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "2000-10-28 19:46:07 lenst"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
@@ -100,6 +100,22 @@ HR.divider { width: 50%; align: center; }
 
    <DIV> <h2><A NAME="UPDATE">Update</A></h2>
     <DL>
+
+     <dt>2000-10-27</dt> <dd><p>The future of PSGML: It is currently
+       not in active development. I plan to put out one or two bug fix
+       releases and the move the sources to <a
+        href="http://www.sourceforge.net/projects/psgml">source
+        forge</a> (possibly after restructuring the code a bit and
+       merging in various patches and additions that has been send to
+       me.) I will then invite others to take an active part in the
+       future development of PSGML. To start this I have created two
+       mailing lists on source forge. A <code>psgml-user</code> for
+       general discussion and questions about PSGML and
+       <code>psgml-devel</code> for discussion about the future
+       development of PSGML. Visit the <a
+        href="http://sourceforge.net/mail/?group_id=9156">SourceForge:
+        Mailing Lists for PSGML</a> page to for subscription
+       info.</p></dd>
 
      <dt>1999-10-20</dt>
      <dd><p>Version 1.2.1 of PSGML with som bugfixes from <a

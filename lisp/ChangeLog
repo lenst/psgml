@@ -1,5 +1,16 @@
+Fri Feb  9 01:06:27 2001  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* Version 1.2.2 released
+
+	* psgml.el (sgml-mode-map): Bind (meta control h) instead of ESC
+	C-h, avoids redefining M-BS
+
+Thu Feb  8 20:08:47 2001  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-info.el: Add provide psgml-info
 
 Sun Oct 22 17:29:53 2000  Marc-Antoine Parent
+	
 	* patch from Marc-Antoine Parent
 	
 	* psgml-edit.el (sgml-read-attribute-value): include the element name, thus:

@@ -1,7 +1,7 @@
 TEXISRC=../doc/psgml.texi
 generated_html = about_psgml.html
-dest = sara:homepage/about_psgml
-dest2 = /usr/www/html/projects
+dest = sandra:homepage/about_psgml
+dest2 = sandra:/lysator/www/www-pages/html/projects
 destmisc = $(dest)/about_psgml
 
 about_psgml.html: about_psgml.sgml Makefile
@@ -21,6 +21,8 @@ clean:
 
 install: about_psgml.html
 	scp about_psgml.html $(dest)
+install2: about_psgml.html
+	scp about_psgml.html $(dest2)
 
 
 
