@@ -423,7 +423,7 @@
 
 ;;;; Print general info about the DTD.
 
-(defun sgml-general-dtd-info ()
+(defun sgml-describe-dtd ()
   "Display information about the current DTD."
   (interactive)
   (sgml-need-dtd)
@@ -462,5 +462,9 @@
 		     (princ (format fmt hdr (sgml-entity-name entity)))
 		     (setq hdr ""))))
        (sgml-dtd-parameters sgml-dtd-info)))))
+
+
+(defalias 'sgml-general-dtd-info 'sgml-describe-dtd)
+
 
 ;;; psgml-info.el ends here
