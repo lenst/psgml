@@ -1,6 +1,6 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
 
-<!ENTITY last.ed  'Time-stamp: "2000-10-28 19:46:07 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "01/02/10 08:01:00 lennarts"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
@@ -23,6 +23,7 @@
 <!entity psgml1.0.3 "&psgml.dir;psgml-1.0.3.tar.gz">
 <!entity psgml1.2.0 "&psgml.dir;psgml-1.2.0.tar.gz">
 <!entity psgml1.2.1 "psgml-1.2.1.tar.gz">
+<!entity psgml1.2.2 "psgml-1.2.2.tar.gz">
 <!entity ftp-dir    "&psgml.dir;">
 
 <!entity olddoc.url "&base.url;/psgml_toc.html">
@@ -100,6 +101,10 @@ HR.divider { width: 50%; align: center; }
 
    <DIV> <h2><A NAME="UPDATE">Update</A></h2>
     <DL>
+     <dt>2001-02-10</dt>
+     <dd><p>Bugfix release 1.2.2 available from <a
+        href="&psgml.dir">lystor ftp</a> or <a
+        href="&base.url;/&psgml1.2.2;">http</a></p></dd>
 
      <dt>2000-10-27</dt> <dd><p>The future of PSGML: It is currently
        not in active development. I plan to put out one or two bug fix

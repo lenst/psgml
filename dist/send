@@ -1,0 +1,3 @@
+
+rsync -essh psgml-1.2.2.tar.gz lenst@sandra.lysator.liu.se:
+#scp -v psgml-1.2.2.tar.gz lenst@sandra.lysator.liu.se:
