@@ -154,31 +154,45 @@ Tested by sgml-close-element to see if the parse should be ended.")
 ;;;; Set face of markup
 
 (defun sgml-set-face-for (start end type)
-  (let ((inhibit-read-only t)
-	before-change-function
-	after-change-function)
-    (cond
-     ((null window-system))
-     ((null type)			; data
-      (remove-text-properties start end '(face nil)))
-     (t
-      (put-text-property start end
-			 'face (cdr (assq
-				     type
-				     '((start-tag . bold)
-				       (end-tag . bold)
-				       (comment . italic)
-				       (pi . bold)
-				       (sgml . bold)
-				       (doctype . bold)))))))))
+  (let ((current (overlays-at start))
+	(face (cdr (assq type
+			 '((start-tag . bold)
+			   (end-tag . bold)
+			   (comment . italic)
+			   (pi . bold)
+			   (sgml . bold)
+			   (doctype . bold)))))
+	o)
+
+    (while current
+      (cond ((and (null o)
+		  (eq type (overlay-get (car current) 'type)))
+	     (setq o (car current)))
+	    (t (delete-overlay (car current))))
+      (setq current (cdr current)))
+    (cond (o
+	   (move-overlay o start end))
+	  (face
+	   (setq o (make-overlay start end))
+	   (overlay-put o 'type type)
+	   (overlay-put o 'face face)))))
 
 (defun sgml-set-face-after-change (start end &optional pre-len)
   (when sgml-set-face
-    (let (before-change-function
-	  after-change-function
-	  (bm (buffer-modified-p)))
-      (remove-text-properties start end '(face t))
-      (set-buffer-modified-p bm))))
+    (loop for o in (overlays-at start)
+	  do (cond
+	      ((= start (overlay-start o))
+	       (move-overlay o end (overlay-end o)))
+	      (t (delete-overlay o))))))
+
+(defalias 'next-overlay-at 'next-overlay-change) ; fix bug in cl.el
+
+(defun sgml-clear-faces ()
+  (interactive)
+  (loop for o being the overlays
+	if (overlay-get o 'type)
+	do (delete-overlay o)))
+
 
 ;;;; State machine
 
@@ -1870,18 +1884,13 @@ or if nil, until end of buffer."
   (sgml-find-start-point (min sgml-goal (point-max)))
   (assert sgml-current-tree)
   (let ((bigparse (> (- sgml-goal (point)) 10000))
-	(sgml-param-entities sgml-buffer-param-entities)
-	(bm (buffer-modified-p)))
+	(sgml-param-entities sgml-buffer-param-entities))
     (when bigparse
       (sgml-message "Parsing..."))
     (sgml-with-parser-syntax
      (sgml-parser-loop))
     (when bigparse
-      (sgml-message ""))
-    ;; Restore buffer modification status -- in case face change has
-    ;; modified the buffer.
-    (set-buffer-modified-p bm)))
-
+      (sgml-message ""))))
 
 (defun sgml-parser-loop ()
   (while (< (point) sgml-goal)
@@ -2627,7 +2636,6 @@ is determined."
   (interactive)
   (push-mark)
   (sgml-note-change-at (point))		; Prune the parse tree
-  (sgml-set-face-after-change (point) (point-max))
   (sgml-parse-to-here)
   (let ((sgml-throw-on-warning 'trouble))
     (or (catch sgml-throw-on-warning
