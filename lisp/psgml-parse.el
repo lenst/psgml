@@ -2268,6 +2268,14 @@ is determined."
 
 ;;;; SGML mode: inserting
 
+(defun sgml-doctype-insert (doctype saved-dtd)
+  (when doctype
+    (sgml-insert-markup doctype))
+  (when saved-dtd
+    (setq sgml-default-dtd-file saved-dtd)
+    (sgml-set-local-variable 'sgml-default-dtd-file saved-dtd))
+  (setq sgml-top-tree nil))
+
 (defun sgml-completion-table (&optional avoid-tags-in-cdata)
   (sgml-parse-to-here)
   (cond ((or (sgml-model-group-p sgml-current-state)
@@ -2581,10 +2589,15 @@ Editing is done in a separate window."
 		   args))
     (add-text-properties start (point) props)))
 
+
 (defun sgml-attribute-buffer (element asl)
-  (let ((buf (get-buffer-create "*Edit attributes*"))
+  (let ((bname "*Edit attributes*")
+	(buf nil)
 	(inhibit-read-only t))
     (save-excursion
+      (when (setq buf (get-buffer bname))
+	(kill-buffer buf))
+      (setq buf (get-buffer-create bname))
       (set-buffer buf)
       (erase-buffer)
       (sgml-insert '(read-only t)
