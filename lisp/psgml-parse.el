@@ -2608,8 +2608,16 @@ Editing is done in a separate window."
     (insert (apply (function format)
 		   format
 		   args))
-    (add-text-properties start (point) props)))
-
+    (when sgml-running-lucid		
+      (remf props 'rear-nonsticky))	; not useful in Lucid
+    (add-text-properties start (point) props)
+    ;; A read-only value of 1 is used for the text after values
+    ;; and this should in Lucid be open at the front.
+    (if (and sgml-running-lucid
+	     (eq 1 (getf props 'read-only)))
+      (set-extent-property
+       (extent-at start nil 'read-only)
+       'start-open t))))
 
 (defun sgml-attribute-buffer (element asl)
   (let ((bname "*Edit attributes*")
@@ -2621,7 +2629,7 @@ Editing is done in a separate window."
       (setq buf (get-buffer-create bname))
       (set-buffer buf)
       (erase-buffer)
-      (sgml-insert '(read-only t end-open t rear-nonsticky (read-only))
+      (sgml-insert '(read-only t rear-nonsticky (read-only))
 		   "<%s  -- Edit values and finish with C-c C-c --\n"
 		   (sgml-element-name element))
       (loop
@@ -2634,7 +2642,7 @@ Editing is done in a separate window."
 	      (def-value (sgml-attribute-default-value attr))
 	      (cur-value (assq aname asl)))
 	 (sgml-insert			; atribute name
-	  '(read-only t rear-nonsticky (read-only) end-open t)
+	  '(read-only t rear-nonsticky (read-only))
 	  " %s = " aname)
 	 (cond				; attribute value
 	  ((and (consp def-value)
@@ -2749,7 +2757,9 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 			      (sgml-attribute-declared-value (car al))))
 			   avl)))
 	 (while (progn (beginning-of-line 2)
-		       (not (eq t (get-text-property (point) 'read-only))))))
+		       (not (get-text-property (point) 'read-only)))))
+					; was (eq t)
+       (forward-line 1)
        (setq al (cdr al)))
      (reverse avl))))
 
@@ -2811,7 +2821,9 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 (defun sgml-edit-attrib-field-end ()
   "Go to the end of the attribute value field."
   (interactive)
-  (let ((end (if (eq 1 (get-text-property (point) 'read-only))
+  (sgml-edit-attrib-field-start)
+  (let ((end (if (and (eolp)
+		      (get-text-property (1+ (point)) 'read-only))
 		 (point)
 	       (next-single-property-change (point) 'read-only))))
     (assert (number-or-marker-p end))
@@ -3063,7 +3075,7 @@ If it is something else complete with ispell-complete-word."
 				 "v/" ""))
 		     (cons 'sgml-indent-step (cdr entry)))))
 	    indents)))
-    (setq chooice (x-popup-menu event (list "hepp" menu1 menu2)))
+    (setq chooice (x-popup-menu event (list "Options" menu1 menu2)))
     (let (var val)
       (cond
        ((consp chooice)
