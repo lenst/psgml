@@ -1,4 +1,11 @@
-TODO      [Time-stamp: "2000-05-15 19:06:48 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2001-02-20 23:55:00 lenst"]           -*- outline -*- 
+
+* before-change-functions
+
+Introduced in Emacs 19.23.
+Should PSGML still support earlier versions?
+Need to change the setup of these variables if so.
+    
 
 * Restore window config after edit-attr
 
