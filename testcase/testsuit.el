@@ -12,7 +12,8 @@
     ("tc03.xml")
     ("tc04.sgml")
     ("tc05.sgml")
-    ("tc07.sgml")))
+    ("tc07.sgml")
+    ("tc13.el")))
 
 (defun testsuit-run-test-case (case-description)
   (let* ((file (first case-description))
@@ -25,10 +26,11 @@
     (find-file file)
     (condition-case errcode
         (progn
-          (sgml-parse-prolog)
-          ;;(sgml-next-trouble-spot)
-          (sgml-parse-until-end-of nil)
-          )
+          (if (string-match "\\.el$" (buffer-file-name))
+              (progn (eval-buffer))
+            (sgml-parse-prolog)
+            ;;(sgml-next-trouble-spot)
+            (sgml-parse-until-end-of nil)))
       (error
        (if expected
            (case (caar expected)
