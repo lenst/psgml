@@ -2346,9 +2346,7 @@ overrides the entity type in entity look up."
 				  (sgml-make-entity entity nil nil)
 				entity)
 			      (sgml-epos (or ref-start (point)))
-			      (sgml-epos (point))))
-	(before-change-function nil)
-	(after-change-function nil))
+			      (sgml-epos (point)))))
     (set-buffer sgml-scratch-buffer)
     ;; For MULE to not misinterpret binary data set the mc-flag
     ;; (reported by Jeffrey Friedl <jfriedl@nff.ncl.omron.co.jp>)
@@ -2356,6 +2354,12 @@ overrides the entity type in entity look up."
     (when (eq sgml-scratch-buffer (default-value 'sgml-scratch-buffer))
       (make-local-variable 'sgml-scratch-buffer)
       (setq sgml-scratch-buffer nil))
+    (when after-change-function		;***
+      (message "OOPS: after-change-function not NIL in scratch buffer %s: %s"
+	       (current-buffer)
+	       after-change-function)
+      (setq before-change-function nil
+	    after-change-function nil))
     (setq sgml-last-entity-buffer (current-buffer))
     (erase-buffer)
     (setq default-directory dd)
@@ -2711,8 +2715,8 @@ overrides the entity type in entity look up."
   "Set initial state of parsing"
   (make-local-variable 'before-change-function)
   (setq before-change-function 'sgml-note-change-at)
-  (set (make-local-variable 'after-change-function)
-       'sgml-set-face-after-change)
+  (make-local-variable 'after-change-function)
+  (setq after-change-function 'sgml-set-face-after-change)
   (sgml-set-active-dtd-indicator (sgml-dtd-doctype dtd))
   (let ((top-type			; Fake element type for the top
 					; node of the parse tree
@@ -3320,6 +3324,12 @@ Assumes starts with point inside a markup declaration."
       (message "Parsing doctype...done"))))
   (setq sgml-markup-type 'doctype))
 
+(defun sgml-check-end-of-entity (type)
+  (unless (eobp)
+    (sgml-parse-error "Illegal character '%c' in %s"
+		      (following-char)
+		      type)))
+
 (defun sgml-setup-doctype (docname external)
   (let ((sgml-parsing-dtd t))
     (setq sgml-no-elements 0)
@@ -3328,14 +3338,16 @@ Assumes starts with point inside a markup declaration."
     (sgml-skip-ps)
     (cond
      ((sgml-parse-delim "DSO")
-      (sgml-check-dtd-subset)
-      (sgml-check-delim "DSC")))
+      (let ((original-buffer (current-buffer)))
+	(sgml-check-dtd-subset)
+	(if (eq (current-buffer) original-buffer)
+	    (sgml-check-delim "DSC")
+	  (sgml-parse-error "Illegal character '%c' in doctype declaration"
+			    (following-char))))))
     (cond (external
 	   (sgml-push-to-entity (sgml-make-entity docname 'dtd external))
-	   (unless (eobp)
-	     (sgml-check-dtd-subset)
-	     (unless (eobp)
-	       (sgml-parse-error "DTD subset ended")))
+	   (sgml-check-dtd-subset)
+	   (sgml-check-end-of-entity "DTD subset")
 	   (sgml-pop-entity)))
 ;;;    (loop for map in sgml-dtd-shortmaps do
 ;;;	  (sgml-add-shortref-map
@@ -3702,6 +3714,14 @@ Optional argument EXTRA-COND should be a function.  This function is
 called in the parser loop, and the loop is exited if the function returns t.
 If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
   (sgml-need-dtd)
+
+  (unless before-change-function
+    (message "WARN: before-change-function has been lost, restoring (%s)"
+	     (current-buffer))
+    (setq before-change-function 'sgml-note-change-at)
+    (setq after-change-function 'sgml-set-face-after-change)
+    )
+  
   (sgml-find-start-point (min sgml-goal (point-max)))
   (assert sgml-current-tree)
   (let ((bigparse (and (not quiet) (> (- sgml-goal (point)) 10000))))
