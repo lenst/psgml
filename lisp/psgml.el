@@ -50,7 +50,7 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.0a10"
+(defconst psgml-version "1.0a11"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -881,23 +881,27 @@ as that may change."
 
 (defun sgml-build-custom-menus ()
   "Build custom parts of Markup and DTD menus."
-  (easy-menu-define
-   sgml-markup-menu sgml-mode-map "Markup menu"
-   (append sgml-markup-root-menu
-	   (list "----")
-	   (loop for e in sgml-custom-markup collect
-		 (vector (first e)
-			 (` (sgml-insert-markup  (, (cadr e))))
-			 t))))
-  (easy-menu-define
-   sgml-dtd-menu sgml-mode-map "DTD menu"
-   (append sgml-dtd-root-menu
-	   (list "----")
-	   (loop for e in sgml-custom-dtd collect
-		 (vector (first e)
-			 (` (sgml-doctype-insert (, (cadr e))
-						 '(, (cddr e))))
-			 t)))))
+  (let ((button3 (lookup-key (current-local-map) [button3])))
+    (easy-menu-define
+     sgml-markup-menu sgml-mode-map "Markup menu"
+     (append sgml-markup-root-menu
+	     (list "----")
+	     (loop for e in sgml-custom-markup collect
+		   (vector (first e)
+			   (` (sgml-insert-markup  (, (cadr e))))
+			   t))))
+    (easy-menu-define
+     sgml-dtd-menu sgml-mode-map "DTD menu"
+     (append sgml-dtd-root-menu
+	     (list "----")
+	     (loop for e in sgml-custom-dtd collect
+		   (vector (first e)
+			   (` (sgml-doctype-insert (, (cadr e))
+						   '(, (cddr e))))
+			   t))))    
+    (unless (or (null button3)
+		(numberp button3))
+      (local-set-key [button3] button3))))
 
 
 ;;;; Post command hook 
