@@ -1,11 +1,15 @@
+2001-12-16  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-info.el (sgml-eltype-refrenced-elements): use built-in
+	function copy-sequence
+
 2001-12-14  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-set-buffer-multibyte): Mule/multibyte patch
-	from XX.
+	from Yasushi Abe.
 	(sgml-compile-dtd): dito.
 	(sgml-bdtd-merge): dito.
 	(sgml-push-to-entity): dito.
-	(sgml-update-display): bugfix, wrong variable
 	(sgml-do-entity-ref): fix sgml-warn-about-undefined-entities behviour.
 
 2001-12-06  Lennart Staflin  <lenst@lysator.liu.se>
