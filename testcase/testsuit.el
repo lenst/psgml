@@ -27,15 +27,16 @@
   (let* ((file (first case-description))
          (expected (rest case-description))
          (sgml-show-warnings t))
-    (sgml-reset-log)
     (setq sgml-catalog-assoc nil)       ; To allow testing catalog parsing
     (setq sgml-ecat-assoc nil)
-    (message "Testing %s" file)
+    (message "--Testing %s" file)
     (find-file file)
+    (setq sgml-warning-message-flag nil)
     (condition-case errcode
         (progn
           (if (string-match "\\.el$" (buffer-file-name))
               (progn (eval-buffer))
+            (message "current buffer: %s" (current-buffer))
             (sgml-parse-prolog)
             ;;(sgml-next-trouble-spot)
             (sgml-parse-until-end-of nil)))
@@ -44,19 +45,16 @@
            (case (caar expected)
              (error (debug)))
          (error "Unexpected %s" errcode))))
-    (when (null expected)
-        (set-buffer (get-buffer-create sgml-log-buffer-name))
-        (goto-char (point-min))
-        (when (re-search-forward "." nil t)
-          (error "Unexpected warnings")))
+    (when (and (null expected) sgml-warning-message-flag)
+      (error "Unexpected warnings"))
     (while (and expected (eq (caar expected) 'warning))
       (let ((warning-pattern (cadar expected)))
-        (set-buffer (get-buffer-create sgml-log-buffer-name))
-        (goto-char (point-min))
-        (cond ((re-search-forward warning-pattern nil t)
-               (setq expected (cdr expected)))
-              (t
-               (error "No %s warning" warning-pattern)))))
+        (with-current-buffer  "*Messages*"
+          (goto-char (point-min))
+          (cond ((re-search-forward warning-pattern nil t)
+                 (setq expected (cdr expected)))
+                (t
+                 (error "No %s warning" warning-pattern))))))
     (when expected
       (error "The expected result %s didn't" expected))))
 
