@@ -1,4 +1,4 @@
-This is the READ ME file for psgml.el version 1.2.       -*- text -*-
+This is the READ ME file for psgml.el version 1.2.1.       -*- text -*-
 
 This is a BETA releas of PSGML.  
 
@@ -13,7 +13,7 @@ defaults, and structure based editing.
 To install PSGML you first need to uncompress and unpack the source
 archive.  This is done with the `gunzip' and `tar' commands.
 
-     gunzip psgml-1.2.0.tar.gz; tar xf psgml-1.2.0.tar
+     gunzip psgml-1.2.1.tar.gz; tar xf psgml-1.2.1.tar
 
 This should create a subdirectory to the current directory with the
 source code. This directory contains a `configure' command (see the file
