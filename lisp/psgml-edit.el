@@ -1442,8 +1442,7 @@ elements with omitted end-tags."
 	(assert (or (zerop (sgml-element-stag-len element))
 		    (= (point) (sgml-element-start element))))
 	(delete-char (sgml-element-stag-len element))
-	(sgml-insert-start-tag name asl attlist
-			       (eq t (sgml-element-net-enabled element)))))))
+	(sgml-insert-start-tag name asl attlist nil)))))
 
 (defun sgml-normalize-end-tag (element)
   (unless (sgml-element-empty element)
