@@ -64,8 +64,10 @@
 
 ;;;; Code:
 
-(defconst psgml-version "0.3a5"
+(defconst psgml-version "0.3a6"
   "Version of psgml package.")
+
+(defconst psgml-maintainer-address "lenst@lysator.liu.se")
 
 (require 'cl)
 
@@ -349,6 +351,32 @@ running the sgml-validate-command.")
   (if (null sgml-indent-step)
       (insert-tab)
     (funcall indent-line-function)))
+
+;;;; Bug reporting
+
+(defun sgml-submit-bug-report ()
+  "Submit via mail a bug report on PSGML."
+  (interactive)
+  (require 'reporter)
+  (and (y-or-n-p "Do you really want to submit a report on PSGML? ")
+       (reporter-submit-bug-report
+	psgml-maintainer-address
+	(concat "psgml.el " psgml-version)
+	(list 
+	 'sgml-parent-document
+	 'sgml-tag-region-if-active
+	 'sgml-normalize-trims
+	 'sgml-omittag
+	 'sgml-minimize-attributes
+	 'sgml-always-quote-attributes
+	 'sgml-auto-insert-required-elements
+	 'sgml-balanced-tag-edit
+	 'sgml-omittag-transparent
+	 'sgml-leave-point-after-insert
+	 'sgml-indent-step
+	 'sgml-indent-data
+	 ))))
+
 
 ;;;; SGML mode: keys and menus
 
