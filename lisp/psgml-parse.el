@@ -54,8 +54,8 @@ Tested by sgml-close-element to see if the parse should be ended.")
 (defconst sgml-pcdata-token (intern "#PCDATA"))
 
 (defvar sgml-error-context nil)		; Vars used in *param* buffers
-(defvar sgml-previous-buffer)		; "
-(defvar sgml-parameter-name)		; "
+(defvar sgml-previous-buffer nil)	; "
+(defvar sgml-parameter-name nil)	; "
 
 
 ;; For loading DTD
@@ -1459,10 +1459,11 @@ or if nil, until end of buffer."
 
 (defun sgml-parse-to (sgml-goal)
   (when (null sgml-top-tree)		; first parse in this buffer
-    ;;(make-local-variable 'pre-command-hook)
-    ;;(setq pre-command-hook 'sgml-reset-log)
-    (sgml-set-doctype sgml-any)
-    )
+    (sgml-set-doctype sgml-any))
+  (unless (and (boundp 'pre-command-hook)
+	       (not (null pre-command-hook)))
+    (make-local-variable 'pre-command-hook)
+    (setq pre-command-hook 'sgml-reset-log))
   (when (and (null sgml-buffer-element-map)
 	     sgml-default-dtd-file
 	     (file-exists-p sgml-default-dtd-file))
@@ -1577,7 +1578,7 @@ or if nil, until end of buffer."
 	(progn
 	  (unless (sgml-final-p sgml-current-state)
 	    (sgml-log-warning
-	     "%s element can't end here, need on of %s; %s end tag out of context"
+	     "%s element can't end here, need one of %s; %s end tag out of context"
 	     (element-name (sgml-current-element))
 	     (sgml-required-tokens sgml-current-state)
 	     gi))
@@ -1933,8 +1934,13 @@ This uses the selective display feature."
 			     (sgml-skip-markup-declaration)
 			     (point))))
 	(t
-	 (let ((r (sgml-element-extent)))
-	   (sgml-fold-region (car r) (cdr r))))))
+	 (let ((el (sgml-find-element-of (point))))
+	   (save-excursion
+	     (goto-char (sgml-element-end el))
+	     (when (zerop (sgml-tree-etag-len el))
+	       (skip-chars-backward " \t\n"))
+	     (sgml-fold-region (sgml-tree-start el)
+			       (point)))))))
 
 (defun sgml-fold-subelement ()
   "Fold all elements current elements content, leaving the first lines visible.
@@ -2441,7 +2447,7 @@ To finsh edit use \\[sgml-edit-attrib-finish].
 		   . sgml-always-quote-attributes)
 		  ("Warn about undefined elements"
 		   . sgml-warn-about-undefined-elements)
-		  ("Debug" . sgml-debug)
+		  ;;("Debug" . sgml-debug)
 		  ))
        (indents '(("None" . nil) ("0" . 0) ("1" . 1) ("2" . 2) ("3" . 3)
 		  ("4" . 4) ("5" . 5) ("6" . 6) ("7" . 7) ("8" . 8)))
