@@ -655,6 +655,7 @@
   t)
 
 ;;;; Possible modification to allow setting face on content:
+
 (defun sgml-set-face-for (start end type)
   (let ((face (cdr (assq type sgml-markup-faces))))
     ;;++
@@ -663,10 +664,14 @@
     ;;--
     (cond
      (sgml-use-text-properties
-      (sgml-without-change-hooks
-       (put-text-property start end 'face face)
-       (when (< start end)
-         (put-text-property (1- end) end 'rear-nonsticky '(face)))))
+      (let ((inhibit-read-only t)
+            (after-change-functions nil)
+            (before-change-functions nil)
+            (buffer-undo-list t)
+            (deactivate-mark nil))
+	(put-text-property start end 'face face)
+        (when (< start end)
+          (put-text-property (1- end) end 'rear-nonsticky '(face)))))
      (t
       (let ((current (overlays-at start))
 	    (pos start)

@@ -30,6 +30,7 @@
 
 (require 'psgml)
 (require 'easymenu)
+(eval-when-compile (require 'cl))
 
 (defvar sgml-max-menu-size (/ (* (frame-height) 2) 3)
   "*Max number of entries in Tags and Entities menus before they are split
@@ -68,15 +69,15 @@ STRING."
     ((> (length entries) sgml-max-menu-size)
      (loop for i from 1 while entries
            collect
-           (let ((submenu
-                  (subseq entries 0 (min (length entries)
-                                         sgml-max-menu-size))))
+           (let ((submenu (copy-sequence entries)))
+             (setcdr (nthcdr (1- (min (length entries) sgml-max-menu-size))
+                             submenu)
+                     nil)
              (setq entries (nthcdr sgml-max-menu-size entries))
              (cons
-              (format "%s '%s'-'%s'"
+              (format "%s '%s'.."
                       title
-                      (sgml-range-indicator (caar submenu))
-                      (sgml-range-indicator (caar (last submenu))))
+                      (sgml-range-indicator (caar submenu)))
               submenu))))
     (t
      (list (cons title entries))))))
@@ -114,30 +115,15 @@ if the item is selected."
 
 (defvar sgml-use-text-properties nil)
 
-(defmacro sgml-without-change-hooks (&rest body)
-  `(let ((inhibit-read-only t)
-         ,@(if (or (not (boundp 'emacs-major-version))
-                   (and (< emacs-major-version 20)
-                        (< emacs-minor-version 23)))
-               `((after-change-function nil)
-                 (before-change-function nil)))
-         (after-change-functions nil)
-         (before-change-functions nil))
-     ,@body))
-
-(defmacro sgml-without-before-change-hooks (&rest body)
-  `(let (,@(if (or (not (boundp 'emacs-major-version))
-                   (and (< emacs-major-version 20)
-                        (< emacs-minor-version 23)))
-               `((before-change-function nil)))
-           (before-change-functions nil))
-     ,@body))
-
 (defun sgml-set-face-for (start end type)
   (let ((face (cdr (assq type sgml-markup-faces))))
     (cond
      (sgml-use-text-properties
-      (sgml-without-change-hooks
+      (let ((inhibit-read-only t)
+            (after-change-functions nil)
+            (before-change-functions nil)
+            (buffer-undo-list t)
+            (deactivate-mark nil))
 	(put-text-property start end 'face face)
         (when (< start end)
           (put-text-property (1- end) end 'rear-nonsticky '(face)))))

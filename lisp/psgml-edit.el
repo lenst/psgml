@@ -257,15 +257,17 @@ If called from a program first two arguments are start and end of
 region. And optional third argument true unhides."
   (interactive "r\nP")
   (setq selective-display t)
-  (let ((mp (buffer-modified-p)))
-    (sgml-without-change-hooks
-     (unwind-protect
-         (subst-char-in-region beg end
-                               (if unhide ?\r ?\n)
-                               (if unhide ?\n ?\r)
-                               'noundo)
-       (when sgml-buggy-subst-char-in-region
-         (set-buffer-modified-p mp))))))
+  (let ((mp (buffer-modified-p))
+	(inhibit-read-only t)
+        (before-change-functions nil)
+	(after-change-functions nil))
+    (unwind-protect
+        (subst-char-in-region beg end
+                              (if unhide ?\r ?\n)
+                              (if unhide ?\n ?\r)
+                              'noundo)
+      (when sgml-buggy-subst-char-in-region
+        (set-buffer-modified-p mp)))))
 
 (defun sgml-fold-element ()
   "Fold the lines comprising the current element, leaving the first line visible.
@@ -1541,7 +1543,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
   (let ((buffer-modified-p (buffer-modified-p))
 	(inhibit-read-only t)
 	(buffer-read-only nil)
-	(before-change-function nil)
+	(before-change-functions nil)
 	(markup-index			; match-data index in tag regexp
 	 (if attr-p 2 1))
 	(tagcount			; number tags to give them uniq
@@ -1593,7 +1595,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 ;;;; SGML mode: Normalize (and misc manipulations)
 
 (defun sgml-expand-shortref-to-text (name)
-  (let (before-change-function
+  (let (before-change-functions
 	(entity (sgml-lookup-entity name (sgml-dtd-entities sgml-dtd-info))))
     (cond
      ((null entity) (sgml-error "Undefined entity %s" name))
@@ -1610,7 +1612,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 (defun sgml-expand-shortref-to-entity (name)
   (let ((end (point))
 	(re-found nil)
-	before-change-function)
+	before-change-functions)
     (goto-char sgml-markup-start)
     (setq re-found (search-forward "\n" end t))
     (delete-region sgml-markup-start end)	   
@@ -1644,10 +1646,10 @@ references will be expanded."
     (setq element (or element (sgml-top-element)))
     (goto-char (sgml-element-end element)) 
     ;; FIXME: actually the sgml-note-change-at called by the
-    ;; before-change-function need to be delayed to after the normalize
+    ;; before-change-functions need to be delayed to after the normalize
     ;; to avoid destroying the tree wile traversing it.
-    (sgml-without-before-change-hooks
-     (sgml-normalize-content element only-one)))
+    (let ((before-change-functions nil))
+      (sgml-normalize-content element only-one)))
   (sgml-note-change-at (sgml-element-start element))
   (sgml-message "Done"))
 

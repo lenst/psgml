@@ -38,6 +38,8 @@
   (autoload 'sgml-write-dtd	     "psgml-dtd")
   (autoload 'sgml-check-dtd-subset   "psgml-dtd") )
 
+(eval-when-compile (require 'cl))
+
 
 ;;;; Advise to do-auto-fill
 
