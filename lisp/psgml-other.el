@@ -258,6 +258,7 @@ The entries are added last in keymap and a blank line precede it."
 (defun sgml-set-face-for (start end type)
   (let ((current (overlays-at start))
 	(face (cdr (assq type sgml-markup-faces)))
+	(pos start)
 	o)
     (while current
       (cond ((and (null o)
@@ -266,6 +267,13 @@ The entries are added last in keymap and a blank line precede it."
 	    ((overlay-get (car current) 'type)
 	     (delete-overlay (car current))))
       (setq current (cdr current)))
+    (while (< (setq pos (next-overlay-change pos))
+	      end)
+      (setq current (overlays-at pos))
+      (while current
+	(when (overlay-get (car current) 'type)
+	  (delete-overlay (car current)))
+	(setq current (cdr current))))
     (cond (o
 	   (move-overlay o start end))
 	  (face
@@ -274,13 +282,12 @@ The entries are added last in keymap and a blank line precede it."
 	   (overlay-put o 'face face)))))
 
 (defun sgml-set-face-after-change (start end &optional pre-len)
-  (when nil;; sgml-set-face
+  (when sgml-set-face
     (loop for o in (overlays-at start)
 	  do (cond
 	      ((not (overlay-get o 'type)))
 	      ((= start (overlay-start o))
-	       (move-overlay o end (overlay-end o)))
-	      (t (delete-overlay o))))))
+	       (move-overlay o end (overlay-end o)))))))
 
 (defalias 'next-overlay-at 'next-overlay-change) ; fix bug in cl.el
 
