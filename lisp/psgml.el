@@ -100,7 +100,7 @@ If nil, the point will be placed before the inserted tag(s).")
   "*If non-nil, print a warning when a tag for a undefined element is found.")
 
 (defvar sgml-indent-step 2
-  "*How much to increament indent for every element level.
+  "*How much to increment indent for every element level.
 If nil, no indentation.")
 
 (defvar sgml-indent-data t
@@ -108,7 +108,7 @@ If nil, no indentation.")
 
 (defvar sgml-system-path
   '("." "~/sgml")
-  "*List of directorys used to look for system identifiers.")
+  "*List of directors used to look for system identifiers.")
 
 (defvar sgml-public-map
   '("/usr/local/lib/sgml/%o/%c/%d")
@@ -141,10 +141,10 @@ Can be changed in the Local variables section of the file.")
   "*Menu entries to be added to the Markup menu.
 The value should be a list of lists of two strings.  The first is a
 string is the menu line and the second string is the text inserted
-when the menu item is choosen.  The second string can contain a \\r
+when the menu item is chosen.  The second string can contain a \\r
 where the cursor should be left.  Also if a selection is made
 according the same rules as for the Tags menu, the selection is
-relplaced with the second string and \\r is replaced with the
+replaced with the second string and \\r is replaced with the
 selection.
 
 Example:
@@ -154,7 +154,7 @@ Example:
 ")
 
 (defvar sgml-custom-dtd nil
-  "*Menu entires to be added to the DTD menu.
+  "*Menu entries to be added to the DTD menu.
 The value should be a list of lists of three strings.  The first
 string is the menu entry.  The second string is a doctype declaration
 (this can be nil if no doctype).  The third string is the file name of
