@@ -251,7 +251,7 @@ copy of @file{texinfo.tex}.
 @cindex major mode
 
 @findex sgml-mode
-PSGML defines a major modes called @code{sgml-mode} and @code{xml-mode}.
+PSGML defines major modes called @code{sgml-mode} and @code{xml-mode}.
 Files with extensions @file{.sgml}, @file{.sgm} or @file{.dtd} will
 automatically be edited in SGML mode.  To edit some other file in SGML
 mode, type @kbd{M-x sgml-mode @key{RET}} after finding the file.
@@ -393,7 +393,7 @@ transliterated according to the variable
 in order until an existing file is found.  The @code{sgml-public-map} is
 modeled after @file{sgmls} environment variable @code{SGML_PATH} and
 psgml understand the following substitution characters: %%, %N, %P, %S,
-%Y, %C, %L, %O, %T, and %V.  The the default value of
+%Y, %C, %L, %O, %T, and %V.  The default value of
 @code{sgml-public-map} is taken from the environment variable
 @code{SGML_PATH}.
 
@@ -634,7 +634,7 @@ with another value).
 
 @vindex sgml-ecat-files
 @vindex sgml-local-ecat-files
-To enable caching you have to create special catalog files, hear after
+To enable caching you have to create special catalog files, hereafter
 called ECAT files due to (temporary) lack of imagination.  These catalogs
 have similar syntax to the entity catalogs and there are two variables
 containing lists of catalogs to search: @code{sgml-ecat-files} and
@@ -1421,14 +1421,14 @@ Default: @code{t}.
 
 @c *** Need work..
 
-Set the variable @code{sgml-display-char-list-filename} to a file file that
+Set the variable @code{sgml-display-char-list-filename} to a file that
 contains mappings between all characters present in the presentation
 character set, and their "standard replacement text" names, e.g. "å"
 -> "[aring ]", e.t.c.
 
 The default value for this variable is `iso88591.map'. 
 
-The use the functions (also in the Modify menu)
+Then use the functions (also in the Modify menu)
 
 @table @code
 @findex sgml-charent-to-display-char
