@@ -1535,12 +1535,24 @@ in any of them."
 
 (defun sgml-do-processing-instruction ()
   (let ((start (point)))
+    (when (and (eq ?P (following-char))
+	       (looking-at "PSGML +\\(\\sw+\\) *"))
+      (let ((command (downcase (match-string 1))))
+	(goto-char (match-end 0))
+	(cond ((string-equal command "nofill")
+	       ;; ?? (unless sgml-parsing-dtd (sgml-need-dtd))
+	       (loop for name = (sgml-parse-name)
+		     while name
+		     for et = (sgml-lookup-eltype name)
+		     do (setf (sgml-eltype-appdata et 'nofill) t)
+		     (message "Defining element %s as a NOFILL" name)
+		     (sgml-skip-cs))))))
     (if sgml-xml-p
 	(sgml-skip-upto "XML-PIC")
       (sgml-skip-upto "PIC"))
     (when sgml-pi-function
-	  (funcall sgml-pi-function
-		   (buffer-substring-no-properties start (point)))))
+      (funcall sgml-pi-function
+	       (buffer-substring-no-properties start (point)))))
   (if sgml-xml-p
       (sgml-check-delim "XML-PIC")
     (sgml-check-delim "PIC"))
@@ -1941,48 +1953,50 @@ repreaentation of the catalog."
 
 (defun sgml-catalog-lookup (files pubid type name)
   "Look up the public identifier/entity name in catalogs.
-FILES is a list of catalogs to use. PUBID is the public identifier
-\(if any). TYPE is the entity type and NAME is the entity name."
+The result is a file name or nil. FILES is a list of catalogs to use.
+PUBID is the public identifier \(if any). TYPE is the entity type and
+NAME is the entity name."
   (cond ((eq type 'param)
 	 (setq name (format "%%%s" name)
 	       type 'entity))
 	((eq type 'dtd)
 	 (setq type 'doctype)))
   ;;(sgml-trace-lookup "  [pubid='%s' type=%s name='%s']" pubid type name)
-  (loop
-   for f in files thereis
-   (let ((cat (sgml-cache-catalog f 'sgml-catalog-assoc
-				  (function sgml-parse-catalog-buffer)
-				  (sgml-main-directory))))
-     (sgml-trace-lookup "  catalog: %s %s"
-			(expand-file-name f (sgml-main-directory))
-			(if (null cat) "empty/non existent" "exists"))
-     (or
-      ;; Giv PUBLIC entries priority over ENTITY and DOCTYPE
-      (if pubid
-	  (loop for (key cname file) in cat
-		thereis (if (and (eq 'public key)
-				 (string= pubid cname))
-			    (if (file-readable-p file)
-				(progn
-				  (sgml-trace-lookup "  >> %s [by pubid]" file)
-				  file)
-			      (progn
-				(sgml-trace-lookup "   !unreadable %s" file)
-				nil)))))
-      (loop for (key cname file) in cat
-	    ;;do (sgml-trace-lookup "    %s %s" key cname)
-	    thereis (if (and (eq type key)
-			     (or (null cname)
-				 (string= name cname)))
-			(if (file-readable-p file)
-			    (progn
-			      (sgml-trace-lookup "  >> %s [by %s %s]"
-						 file key cname) 
-			      file)
-			  (progn
-			    (sgml-trace-lookup "   !unreadable %s" file)
-			    nil))))))))
+  (let ((remaining files)
+	(file nil))
+    (while (and remaining (null file))
+      (let ((additional nil)		; Extra catalogs to search
+	    (cat (sgml-cache-catalog (car remaining) 'sgml-catalog-assoc
+				     (function sgml-parse-catalog-buffer)
+				     (sgml-main-directory))))
+	(sgml-trace-lookup "  catalog: %s %s"
+			   (expand-file-name (car remaining)
+					     (sgml-main-directory))
+			   (if (null cat) "empty/non existent" "exists"))
+	(when pubid
+	  ;; Giv PUBLIC entries priority over ENTITY and DOCTYPE
+	  (loop for (key cname cfile) in cat
+		while (not file) do
+		(when (and (eq 'public key)
+			   (string= pubid cname))
+		  (when (file-readable-p cfile) (setq file cfile))
+		  (sgml-trace-lookup "  >> %s [by pubid]%s"
+				     cfile (if file "" " !unreadable")))))
+	(loop for (key cname cfile) in cat
+	      while (not file) do
+	      (when (eq 'catalog key)
+		(push cfile additional))
+	      (when (and (eq type key)
+			 (or (null cname)
+			     (string= name cname)))
+		(when (file-readable-p cfile) (setq file cfile))
+		(sgml-trace-lookup "  >> %s [by %s %s]%s"
+				   cfile key cname
+				   (if file "" " !unreadable"))))
+	(setq remaining
+	      (append additional (cdr remaining)))))
+    file))
+
 
 (defun sgml-path-lookup (extid type name)
   (let* ((pubid (sgml-extid-pubid extid))
@@ -2072,7 +2086,8 @@ Returns nil if entity is not found."
    for class = (cdr (assoc type '(("public" . public) ("dtddecl" . public)
 				  ("entity" . name)   ("linktype" . name)
 				  ("doctype" . name)  ("sgmldecl" . noname)
-				  ("document" . noname))))
+				  ("document" . noname)
+				  ("catalog"  . noname))))
    when (not (null class))
    collect
    (let* ((name
