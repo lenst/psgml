@@ -1,5 +1,5 @@
 ;;;; psgml-info.el
-;;; Last edited: 1998-11-25 21:34:05 lenst
+;;; Last edited: 1999-11-08 22:09:49 lenst
 ;;; $Id$
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
@@ -102,9 +102,9 @@ Next page...
 	   (loop for dfa in (sgml-and-node-dfas (car agenda)) do
 		 (sgml-add-last-unique dfa states))))
 	 (setq agenda (cdr agenda)))
-       (setq res (sort (set-difference
-			(union res (sgml-eltype-includes eltype))
-			(sgml-eltype-excludes eltype))
+       (setq res (sort (copy-seq (set-difference
+                                  (union res (sgml-eltype-includes eltype))
+                                  (sgml-eltype-excludes eltype)))
 		       (function string-lessp)))
        (setf (sgml-eltype-appdata eltype 're-cache) res)
        res)))))
@@ -367,10 +367,19 @@ Next page...
       (cond ((symbolp (sgml-eltype-model et)) (princ (sgml-eltype-model et)))
 	    (t
 	     (princ (if (sgml-eltype-mixed et) "mixed\n\n"
-		       "element\n\n"))	     
+                      "element\n\n"))	     
 	     (sgml-princ-names
 	      (mapcar #'symbol-name (sgml-eltype-refrenced-elements et)))))
-
+      (let ((incl (sgml-eltype-includes et))
+            (excl (sgml-eltype-excludes et)))
+        (when (or incl excl)
+          (princ "\n\nEXCEPTIONS:"))
+        (when incl
+          (princ "\n + ")
+          (sgml-princ-names (mapcar #'symbol-name incl)))
+        (when excl
+          (princ "\n - ")
+          (sgml-princ-names (mapcar #'symbol-name excl))))
       ;; ----
       (princ "\n\nOCCURS IN:\n\n")
       (let ((occurs-in ()))
