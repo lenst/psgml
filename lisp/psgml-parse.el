@@ -203,6 +203,12 @@ Only valid after `sgml-parse-to'.")
   "This is the entity reference used to enter current entity.
 If this is nil, then current entity is main buffer.")
 
+(defvar sgml-scratch-buffer nil
+  "The global value of this variable is the first scratch buffer for 
+entities. The entity buffers can have a buffer local value for this variable
+to point to the next scratch buffer.")
+
+(defvar sgml-last-entity-buffer nil)
 
 ;;; For loading DTD
 
@@ -945,13 +951,10 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
      attlist
      appdata)))
 
-(defun sgml-read-dtd (buffer)
-  "Decode the saved DTD in BUFFER, set global variabels."
+(defun sgml-read-dtd ()
+  "Decode the saved DTD in current buffer, return the DTD."
   (let ((gc-cons-threshold (max gc-cons-threshold 500000))
-	(cb (current-buffer))
 	temp dtd)
-    (set-buffer buffer)
-    (goto-char (point-min))
     (setq temp (sgml-read-sexp))	; file-version
     (cond ((equal temp '(sgml-saved-dtd-version 4))
 	   (setq sgml-single-octet-threshold sgml-max-single-octet-number))
@@ -972,7 +975,6 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (setf (sgml-dtd-parameters dtd) (sgml-read-sexp))
     (setf (sgml-dtd-entities dtd) (sgml-read-sexp))
     (setf (sgml-dtd-shortmaps dtd) (sgml-read-sexp))
-    (set-buffer cb)
     dtd))
 
 (defun sgml-load-dtd (file)
@@ -1014,16 +1016,11 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	(setq dtd (sgml-pstate-dtd sgml-buffer-parse-state)))
        (t				; load DTD from file
 	(set-buffer cb)
-	(setq tem (generate-new-buffer " *saveddtd*"))
-	(unwind-protect
-	    (progn
-	      (message "Loading DTD from %s..." file)
-	      (set-buffer tem)
-	      (insert-file-contents real-file)
-	      (set-buffer cb)
-	      (setq dtd (sgml-read-dtd tem))
-	      (message "Loading DTD from %s...done" file))
-	  (kill-buffer tem))))
+	(sgml-push-to-entity file)
+	(message "Loading DTD from %s..." file)
+	(setq dtd (sgml-read-dtd))
+	(message "Loading DTD from %s...done" file)
+	(sgml-pop-entity)))
       (set-buffer cb)
       (sgml-set-initial-state dtd)
       (setq sgml-default-dtd-file file)
@@ -1447,6 +1444,10 @@ a RNI must be followed by NAME."
 	     (sgml-check-delim "LIT"))
 	   value))))
 
+(defun sgml-check-literal ()
+  (or (sgml-parse-literal)
+      (sgml-parse-error "A litteral expected")))
+
 (defun sgml-parse-minimum-literal ()
   "Parse a quoted SGML string and return it, if no string return nil."
   (cond
@@ -1694,57 +1695,55 @@ the entity name."
 
 (defun sgml-load-catalog (file)
   "Load a catalog file."
-  (let ((old-buffer (current-buffer))
-	(buf (generate-new-buffer " *SGML catalog*"))
-	map)
+  (let (map)
     (setq file (expand-file-name file))
-    (unwind-protect
-	(progn
-	  (message "Parsing SGML catalog file %s ..." file)
-	  (sgml-debug "Parsing SGML catalog file %s ..." file)
-	  (set-buffer buf)
-	  (insert-file-contents file)
-	  (setq default-directory (file-name-directory file))
-	  (setq map (sgml-parse-catalog-buffer))
-	  (message "Parsing SGML catalog file %s ... done." file))
-      (kill-buffer buf))
-    (set-buffer old-buffer)
+    (message "Parsing SGML catalog file %s ..." file)
+    (sgml-debug "Parsing SGML catalog file %s ..." file)
+    (sgml-push-to-entity file)
+    (setq default-directory (file-name-directory file))
+    (setq map (sgml-parse-catalog-buffer))
+    (sgml-pop-entity)
+    (message "Parsing SGML catalog file %s ... done." file)    
     map))
 
-; Parse a buffer full of catalogue entries.
+;; Parse a buffer full of catalogue entries.
 (defun sgml-parse-catalog-buffer ()
   "Parse all entries in a catalogue."
-  (goto-char (point-min))
-  (sgml-with-parser-syntax
-   (let (type name sysid map)
-     (while (progn (sgml-skip-cs)
-		   (setq type (sgml-parse-nametoken)))
-       (setq type (intern (downcase type)))
-       (sgml-skip-cs)
-       (cond
+  (let (type name sysid map)
+    (while (progn (sgml-skip-cs)
+		  (setq type (sgml-parse-nametoken)))
+      (setq type (intern (downcase type)))
+      (sgml-skip-cs)
+      (cond
 					; Public identifier.
-	((eq type 'public)
-	 (setq name (sgml-canonize-pubid (sgml-parse-minimum-literal))))
+       ((eq type 'public)
+	(setq name (sgml-canonize-pubid (sgml-check-minimum-literal))))
 					; Entity reference.
-	((eq type 'entity)
-	 (if (sgml-parse-char ?%)
-	     (setq type 'pentity))
-	 (setq name (sgml-parse-name t)))
+       ((eq type 'entity)
+	(if (sgml-parse-char ?%)
+	    (setq type 'pentity))
+	(setq name (sgml-check-name t)))
 					; Document type.
-	((eq type 'doctype)
-	 (setq name (sgml-parse-name)))
+       ((eq type 'doctype)
+	(setq name (sgml-check-name)))
 					; Oops!
-	(t
-	 (error "Error in catalog file: \"%s\" should be \"PUBLIC\", \"ENTITY\", or \"DOCTYPE\"." type)))
+       (t
+	(error "Error in catalog file: \"%s\" should be \"PUBLIC\", \"ENTITY\", or \"DOCTYPE\"." type)))
        
-       (sgml-skip-cs)
-       (setq sysid (or (sgml-parse-literal)
-		       (buffer-substring (point)
-					 (progn (skip-chars-forward "^ \r\n\t")
-						(point)))))
-       (setq sysid (expand-file-name sysid))
-       (setq map (nconc map (list (list type name sysid)))))
-     map)))
+      (sgml-skip-cs)
+      (setq sysid (expand-file-name (sgml-check-cat-literal)))
+      (setq map (nconc map (list (list type name sysid)))))
+    map))
+
+(defun sgml-check-cat-literal ()
+  (or (sgml-parse-literal)
+      (buffer-substring (point)
+			(progn (skip-chars-forward "^ \r\n\t")
+			       (point)))))
+
+(defun sgml-check-minimum-literal ()
+  (or (sgml-parse-minimum-literal)
+      (sgml-parse-error "A minimum literal expected")))
 
 (defconst sgml-formal-pubid-regexp
   (concat
@@ -1874,61 +1873,131 @@ the entity name."
 ;;extid-cdtd-name: extid -> file?
 ;;up-to-date-p: (file, dependencies) -> cond
 
+;; Emacs Catalogues:
+;; Syntax:
+;;  ecat ::= (cs | ecat-entry)*
+;;  cs ::= (s | comment)
+;;  ecat-entry ::= (pub-entry | file-entry)
+;;  pub-entry ::= ("PUBLIC.CDTD", minimal literal, ent-spec?, cat literal)
+;;  pub-entry ::= ("FILE.CDTD", literal, ent-spec?, cat literal)
+;;  ent-spec ::= ("[", (name, literal)*, "]")
 
-(defun sgml-extid-cdtd-name (extid)
-  "File name of file containing the compiled (DTD) version of EXTID."
-  nil
-  )
+(defvar sgml-ecat-files '("ECAT" "~/sgml/ECAT" "/usr/local/lib/sgml/ECAT"))
+(defvar sgml-local-ecat-files nil)
+(make-variable-buffer-local 'sgml-local-ecat-files)
 
-(defun sgml-file-cdtd-name (file)
-  "File name of file containing the compiled (DTD) version of FILE."
-  (concat (file-name-directory file)
-	  ".ced."
-	  (file-name-nondirectory file)))
+;; Parsed ecat = (eent*)
+;; eent = (type ...)
+;;      = ('public.cdtd pubid cfile . ents)
+;;      = ('file.cdtd file cfile . ents)
 
-(defvar sgml-file-cdtd-name-function 'sgml-file-cdtd-name)
+(defvar sgml-ecat-assoc nil
+  "Assoc list of files and parsed ecats.")
+
+(defun sgml-load-ecat (file)
+  "Return ecat for FILE."
+  (setq file (expand-file-name file))
+  (and
+   (file-readable-p file)
+   (let ((c (assoc file sgml-ecat-assoc))
+	 (modtime (elt (file-attributes file) 5)))
+     (if (and c (equal (second c) modtime))
+	 (cddr c)
+       (let (type from ents to name val new)
+	 (when c (setq sgml-ecat-assoc
+		       (delq c sgml-ecat-assoc)))
+	 (sgml-push-to-entity file)
+	 (setq default-directory (file-name-directory file))
+	 (while (progn (sgml-skip-cs)
+		       (setq type (sgml-parse-name)))
+	   (setq type (intern (downcase type)))
+	   (setq ents nil from nil)
+	   (sgml-skip-cs)
+	   (cond
+	    ((eq type 'public.cdtd)
+	     (setq from (sgml-canonize-pubid (sgml-check-minimum-literal))))
+	    ((eq type 'file.cdtd)
+	     (setq from (expand-file-name (sgml-check-cat-literal)))))
+	   (cond
+	    ((null from)
+	     (error "Syntax error in ECAT: %s" file))
+	    (t
+	     (sgml-skip-cs)
+	     (when (sgml-parse-char ?\[)
+	       (while (progn (sgml-skip-cs)
+			     (setq name (sgml-parse-name t)))
+		 (sgml-skip-cs)
+		 (setq val (sgml-check-literal))
+		 (push (cons name val) ents))
+	       (sgml-check-char ?\])
+	       (sgml-skip-cs))
+	     (setq to (expand-file-name (sgml-check-cat-literal)))
+	     (push (cons type (cons from (cons to ents)))
+		   new))))
+	 (setq new (nreverse new))
+	 (sgml-pop-entity)
+	 (push (cons file (cons modtime new)) sgml-ecat-assoc)
+	 new)))))
+
+(defun sgml-ecat-lookup (files pubid file)
+  "Return (file . ents) or nil."
+  (let ((params (sgml-dtd-parameters sgml-dtd-info)))
+    (loop
+     named ecat-lookup
+     for f in files do
+     (loop for (type name cfile . ents) in (sgml-load-ecat f) do
+	   (when (and (cond ((eq type 'public.cdtd)
+			     (equal name pubid))
+			    ((eq type 'file.cdtd)
+			     (equal name file)))
+		      (loop for (name . val) in ents
+			    for entity = (sgml-lookup-entity name params)
+			    always (and entity
+					(equal val (sgml-entity-text entity)))))
+	     (return-from ecat-lookup (cons cfile ents)))))))
+
+;;(let ((sgml-dtd-info (sgml-make-dtd nil)))
+;;  (sgml-ecat-lookup sgml-ecat-files
+;;		    "-//lenst//DTD My DTD//EN//"
+;;		    "/home/u5/lenst/src/psgml/bar.dtd"))
 
 (defun sgml-compiled-dtd (pubid file)
   "Return the complied DTD for extid or nil."
-  (let ((cfile (if file (sgml-file-cdtd-name file)))
-	cdtd
-	)
-    (when (and cfile (file-readable-p cfile))
-      (condition-case nil
-	  (let ((cb (current-buffer))
-		(tem (generate-new-buffer " *saveddtd*"))
-		dtd)
-	    (sgml-push-to-entity cfile)
-	    (message "Loading DTD from %s..." cfile)
-	    (setq dtd (sgml-read-dtd tem))
-	    (message "Loading DTD from %s...done" cfile)
-	    (setq cdtd (cons cfile dtd)))
-	(error nil)))
-    (when (and (not (and cdtd (sgml-up-to-date-p
-			       cfile
-			       (sgml-dtd-dependencies (cdr cdtd)))))
-	       (file-writable-p cfile))
-      (setq cdtd (sgml-compile-cdtd cfile file)))
-    cdtd))
+  (when pubid (setq pubid (sgml-canonize-pubid pubid)))
+  (when file (setq file (expand-file-name file)))
+  (let ((ce (or (sgml-ecat-lookup sgml-local-ecat-files pubid file)
+		(sgml-ecat-lookup sgml-ecat-files pubid file)))
+	cfile dtd)
+    (when ce
+      (setq cfile (car ce))  
+      (when (file-readable-p cfile)
+	(condition-case nil
+	    (progn
+	      (sgml-push-to-entity cfile)
+	      (message "Loading DTD from %s..." cfile)
+	      (setq dtd (sgml-read-dtd))
+	      (sgml-pop-entity)
+	      (message "Loading DTD from %s...done" cfile))
+	  (error nil)))
+      (when (and (not (and dtd (sgml-up-to-date-p
+				cfile
+				(sgml-dtd-dependencies dtd))))
+		 (file-writable-p cfile))
+	(setq dtd (sgml-compile-cdtd file cfile (cdr ce)))))
+    (if dtd (cons cfile dtd))))
 
-(defun sgml-compile-cdtd (dtd-file &optional to-file)
-  (interactive "fFile: ")
+(defun sgml-compile-cdtd (dtd-file to-file ents)
   ;; Do compile
-  (let ((sgml-dtd-info (sgml-make-dtd nil))
-	(sgml-parsing-dtd t)
-	(cb (current-buffer))
-	(tem (generate-new-buffer " *dtdcomp*")))
-    (set-buffer tem)
-    (unwind-protect
-	(progn
-	  (set-syntax-table sgml-parser-syntax)
-	  (insert-file-contents file)
-	  (sgml-check-dtd-subset))
-      (kill-buffer tem))
-    (set-buffer cb)
-    (setq to-file (or to-file (sgml-file-cdtd-name dtd-file)))
+  (let* ((sgml-dtd-info (sgml-make-dtd nil))
+	 (parameters (sgml-dtd-parameters sgml-dtd-info))
+	 (sgml-parsing-dtd t))
+    (loop for (name . val) in ents
+	  do (sgml-entity-declare name parameters 'text val))
+    (sgml-push-to-entity dtd-file)
+    (sgml-check-dtd-subset)
+    (sgml-pop-entity)
     (sgml-save-dtd to-file sgml-dtd-info)
-    (cons to-file sgml-dtd-info)))
+    sgml-dtd-info))
 
 
 (defun sgml-up-to-date-p (file dependencies)
@@ -1971,9 +2040,6 @@ If DEPENDENCIES contains the symbol `t', FILE is not considered newer."
 
 ;;;; Pushing and poping entities
 
-(defvar sgml-scratch-buffer nil)
-(defvar sgml-last-entity-buffer nil)
-
 (defun sgml-push-to-entity (entity &optional ref-start type)
   "Set current buffer to a buffer containing the entity ENTITY.
 ENTITY can also be a file name.  Optional argument REF-START should be
@@ -1985,7 +2051,9 @@ overrides the entity type in entity look up."
   (let ((cb (current-buffer))
 	(dd default-directory)
 	;;*** should eref be argument ?
-	(eref (sgml-make-eref entity
+	(eref (sgml-make-eref (if (stringp entity)
+				  (sgml-make-entity entity nil nil)
+				entity)
 			      (sgml-epos (or ref-start (point)))
 			      (sgml-epos (point)))))
     (set-buffer sgml-scratch-buffer)
@@ -2009,11 +2077,12 @@ overrides the entity type in entity look up."
      ((stringp entity)			; a file name
       (save-excursion (insert-file-contents entity)))
      ((and sgml-parsing-dtd
-	   (consp (sgml-entity-text entity)))	; external id?
-      (let ((file (sgml-entity-file entity)))
+	   (consp (sgml-entity-text entity))) ; external id?
+      (let ((file (sgml-entity-file entity type)))
 	(cond
-	 ((sgml-try-merge-compiled-dtd (car (sgml-entity-text entity))
-				       file)
+	 ((and file
+	       (sgml-try-merge-compiled-dtd (car (sgml-entity-text entity))
+					    file))
 	  (goto-char (point-max)))
 	 (file
 	  (insert-file-contents file)
