@@ -1,5 +1,5 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
-<!ENTITY last.ed  'Time-stamp: "2005-03-05 18:02:33 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "2005-03-08 15:50:46 lenst"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
@@ -211,6 +211,14 @@ HR.divider { width: 50%; align: center; }
       <tr>
        <th>http</th>
        <th>ftp</th>
+      </tr>
+      <tr>
+       <!-- one of (TD TH) -->
+       <td>1.3.2</td>
+       <td>alpha</td>
+       <td>fixes and some ui changes</td>
+       <td><a href="&base.url;/&psgml1.3.2;">http</a></td>
+       <td><a href="&alpha.dir;&psgml1.3.2;">ftp</a></td>
       </tr>
       <tr>
        <td>1.3.1</td>
