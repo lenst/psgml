@@ -31,7 +31,6 @@
 
 ;;;; Code:
 
-(provide 'psgml-lucid)
 (require 'psgml)
 
 
@@ -96,6 +95,7 @@
     ["Insert start-tag" (sgml-start-tag-menu last-command-event) t]
     ["Insert end-tag" (sgml-end-tag-menu last-command-event) t]
     ["Tag region" (sgml-tag-region-menu last-command-event) t]
+    ["Insert attribute" (sgml-attrib-menu last-command-event) t]
     ["Insert entity" (sgml-entities-menu last-command-event) t]
     "----------"
     ["Marked section" (sgml-insert-markup "<![ [\r]]>\n") t]
@@ -131,28 +131,9 @@
     ["Expand" sgml-expand-element t]
     ))
 
-(if (not (boundp 'emacs-major-version))
-    (defvar sgml-sgml-menu
-      '("SGML"
-      ["Next data field"  sgml-next-data-field t]
-      ["End element" sgml-insert-end-tag t]
-      ["Show context" sgml-show-context t]
-      ["What element" sgml-what-element t]
-      ["Next trouble spot" sgml-next-trouble-spot t]
-      ["Edit attributes" sgml-edit-attributes t]
-      ["Change element name" sgml-change-element-name t]
-      ["Show valid tags" sgml-list-valid-tags t]
-      ["Show/hide warning log" sgml-show-or-clear-log t]
-      ["Validate" sgml-validate t]
-      ["Normalize" sgml-normalize t]
-      ["Fill element" sgml-fill-element t]
-      ["Options" sgml-options-menu t]
-      ["Save options" sgml-save-options t]
-      ["Submit bug report" sgml-submit-bug-report t]
-      ))
-  (defvar sgml-sgml-menu
-    (list
-     "SGML"
+(defvar sgml-sgml-menu
+  (append
+   '("SGML"
      ["Next data field"  sgml-next-data-field t]
      ["End element" sgml-insert-end-tag t]
      ["Show context" sgml-show-context t]
@@ -164,47 +145,41 @@
      ["Show/hide warning log" sgml-show-or-clear-log t]
      ["Validate" sgml-validate t]
      ["Normalize" sgml-normalize t]
-     ["Fill element" sgml-fill-element t]
-     (cons "Options"
-         (mapcar
-          (function
-           (lambda (var)
-             (vector (capitalize
-                      (mapconcat (function (lambda (x)
-                                             (if (= x ?-) " "
-                                               (char-to-string x))))
-                                 (substring (symbol-name var) 5 nil)
-                                 ""))
-                     (list 'setq var (list 'not var))
-                     :style toggle :selected var)))
-          '(sgml-balanced-tag-edit
-            sgml-auto-insert-required-elements
-            sgml-omittag-transparent
-            sgml-leave-point-after-insert
-            sgml-indent-data
-            sgml-always-quote-attributes
-            sgml-warn-about-undefined-elements
-            sgml-normalize-trims
-            sgml-omittag
-            sgml-shorttag
-            sgml-debug)))
-     (cons "Indent Step"
-         (mapcar
-          (function
-           (lambda (entry)
-             (vector (car entry)
-                     (list 'setq 'sgml-indent-step (cdr entry))
-                     ':style 'radio ':active t
-                     ':selected
-                     (list 'eq 'sgml-indent-step (cdr entry)))))
-          '(("None" . nil)
-            ("0" . 0) ("1" . 1) ("2" . 2) ("3" . 3)
-            ("4" . 4) ("5" . 5) ("6" . 6) ("7" . 7) ("8" . 8))))
-     ["Save options" sgml-save-options t]
+     ["Fill element" sgml-fill-element t])
+   (if (not (boundp 'emacs-major-version))
+       '(["Options" sgml-options-menu t])
+     (list
+      (cons "Options"
+	    (mapcar
+	     (function
+	      (lambda (var)
+		(vector (capitalize
+			 (mapconcat (function (lambda (x)
+						(if (= x ?-) " "
+						  (char-to-string x))))
+				    (substring (symbol-name var) 5 nil)
+				    ""))
+			(list 'setq var (list 'not var))
+			':style 'toggle ':selected var)))
+	     (loop for v in sgml-user-options
+		   if (eq 'toggle (sgml-variable-type v))
+		   collect v)))
+      (cons "Indent Step"
+	    (mapcar
+	     (function
+	      (lambda (entry)
+		(vector (car entry)
+			(list 'setq 'sgml-indent-step (cdr entry))
+			':style 'radio ':active t
+			':selected
+			(list 'eq 'sgml-indent-step (cdr entry)))))
+	     '(("None" . nil)
+	       ("0" . 0) ("1" . 1) ("2" . 2) ("3" . 3)
+	       ("4" . 4) ("5" . 5) ("6" . 6) ("7" . 7) ("8" . 8))))))
+   '(["Save options" sgml-save-options t]
      ["Submit bug report" sgml-submit-bug-report t]
-     )
-    )
-  )
+     )))
+
 
 (defun sgml-build-custom-menus ()
   (and sgml-custom-markup (add-menu-item '("Markup") "------------" nil t))
@@ -227,21 +202,32 @@
 
 ;;;; Insert with properties
 
+(facep 'underline)
+
+
+
 (defun sgml-insert (props format &rest args)
-  (let ((start (point)))
+  (let ((start (point))
+	tem face)
     (insert (apply (function format)
 		   format
 		   args))
-    (when sgml-running-lucid		
-      (remf props 'rear-nonsticky))	; not useful in Lucid
+    (remf props 'rear-nonsticky)	; not useful in Lucid
+
+    ;; Copy face prop from category
+    (when (setq tem (getf props 'category))
+      (when (setq tem (get tem 'face))
+	  (set-face-underline-p (make-face 'underline) t)
+	  (setf (getf props 'face) tem)))
+
     (add-text-properties start (point) props)
+
     ;; A read-only value of 1 is used for the text after values
     ;; and this should in Lucid be open at the front.
-    (if (and sgml-running-lucid
-	     (eq 1 (getf props 'read-only)))
-      (set-extent-property
-       (extent-at start nil 'read-only)
-       'start-open t))))
+    (if (eq 1 (getf props 'read-only))
+	(set-extent-property
+	 (extent-at start nil 'read-only)
+	 'start-open t))))
 
 
 ;;;; Set face of markup
@@ -291,7 +277,7 @@
 
 ;;;; Provide
 
-
+(provide 'psgml-lucid)
 
 
 ;;; psgml-lucid.el ends here
