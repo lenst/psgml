@@ -95,6 +95,8 @@ into several panes.")
   '("End Element" . sgml-insert-end-tag))
 (define-key sgml-mode-map [menu-bar sgml next-data]
   '("Next Data Field" . sgml-next-data-field))
+(define-key sgml-mode-map [menu-bar sgml reset]
+  '("Reset" . normal-mode))
 
 
 ;;;; DTD menu
