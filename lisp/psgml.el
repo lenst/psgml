@@ -80,6 +80,10 @@
 
 ;;; User settable options:
 
+(defvar sgml-insert-defaulted-attributes nil
+  "*Controls whether defaulted attributes (not #FIXED) are inserted explicitly
+or not. nil means don't insert, t means insert.")
+
 (defvar sgml-insert-missing-element-comment t
   "*If true, and sgml-auto-insert-required-elements also true,
 `sgml-insert-element' will insert a comment if there is an element required
