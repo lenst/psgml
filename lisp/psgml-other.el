@@ -250,15 +250,14 @@ The entries are added last in keymap and a blank line precede it."
 
 (defun sgml-set-face-for (start end type)
   (let ((current (overlays-at start))
-	(face (cdr (assq type sgml-markup-faces
-			 )))
+	(face (cdr (assq type sgml-markup-faces)))
 	o)
-
     (while current
       (cond ((and (null o)
 		  (eq type (overlay-get (car current) 'type)))
 	     (setq o (car current)))
-	    (t (delete-overlay (car current))))
+	    ((overlay-get (car current) 'type)
+	     (delete-overlay (car current))))
       (setq current (cdr current)))
     (cond (o
 	   (move-overlay o start end))
@@ -271,6 +270,7 @@ The entries are added last in keymap and a blank line precede it."
   (when sgml-set-face
     (loop for o in (overlays-at start)
 	  do (cond
+	      ((not (overlay-get o 'type)))
 	      ((= start (overlay-start o))
 	       (move-overlay o end (overlay-end o)))
 	      (t (delete-overlay o))))))
