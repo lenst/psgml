@@ -1082,33 +1082,14 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-read-dtd ()
   "Decode the saved DTD in current buffer, return the DTD."
   (let ((gc-cons-threshold (max gc-cons-threshold 500000))
-	temp dtd)
-    (setq temp (sgml-read-sexp))	; file-version
+        (file-version (sgml-read-sexp))
+        dtd)
     (cond
-     ((equal temp '(sgml-saved-dtd-version 5))
-      ;; Doctype -- create dtd structure
-      (setq dtd (sgml-make-dtd (sgml-read-sexp)))
-      ;; Element type names -- read and create token vector
-      (setq temp (sgml-read-number))	; # eltypes
-      (setq sgml-read-token-vector (make-vector (1+ temp) nil))
-      (aset sgml-read-token-vector 0 sgml-pcdata-token)
-      (loop for i from 1 to temp do
-	    (aset sgml-read-token-vector i
-		  (sgml-lookup-eltype (sgml-read-sexp) dtd)))
-      ;; Element type descriptions
-      (loop for i from 1 to (sgml-read-number) do
-	    (sgml-read-element (aref sgml-read-token-vector i)))
-      (setf (sgml-dtd-parameters dtd) (sgml-read-sexp))
-      (setf (sgml-dtd-entities dtd) (sgml-read-sexp))
-      (setf (sgml-dtd-shortmaps dtd) (sgml-read-sexp))
-      (setf (sgml-dtd-notations dtd) (sgml-read-sexp))
-      (setf (sgml-dtd-dependencies dtd) (sgml-read-sexp)))
-     ;; New version
-     ((equal temp '(sgml-saved-dtd-version 6))
+     ((equal file-version '(sgml-saved-dtd-version 7))
       (setq dtd (sgml-bdtd-read-dtd)))
      ;; Something else
      (t
-      (error "Unknown file format for saved DTD: %s" temp)))
+      (error "Unknown file format for saved DTD: %s" file-version)))
     dtd))
 
 (defun sgml-load-dtd (file)
@@ -1182,7 +1163,7 @@ settings in ENTS."
 	     ;; fifth arg to insert-file-contents is not available in early
 	     ;; v19.
 	     (insert-file-contents cfile nil nil nil))
-	   (equal '(sgml-saved-dtd-version 6) (sgml-read-sexp))
+	   (equal '(sgml-saved-dtd-version 7) (sgml-read-sexp))
 	   (or (sgml-up-to-date-p cfile (sgml-read-sexp))
 	       (if (eq 'ask sgml-recompile-out-of-date-cdtd)
 		   (not (y-or-n-p
@@ -4133,9 +4114,7 @@ pointing to start of short ref and point pointing to the end."
 	  (setq u (sgml-tree-content u)))
 	 (t
 	  (sgml-set-parse-state u 'start)
-	  nil)))
-    )
-  )
+	  nil)))))
 
 
 (defun sgml-check-tag-close ()
