@@ -1,5 +1,5 @@
 ;;;; psgml-charent.el
-;;; Last edited: 1999-10-06 00:23:08 lenst
+;;; Last edited: 1999-10-06 07:53:23 lenst
 ;;; $Id$
 
 ;; Copyright (C) 1994 Lennart Staflin
@@ -37,7 +37,7 @@
 ;;;; Variable declarations
 
 (defvar sgml-display-char-list-filename
-  (expand-file-name "iso8859.map"
+  (expand-file-name "iso88591.map"
                     (file-name-directory (locate-library "psgml")))
   "*Name of file holding relations between character codes and character
 names of displayable characters")

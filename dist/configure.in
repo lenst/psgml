@@ -16,6 +16,6 @@ AM_PATH_LISPDIR
 AC_PATH_PROG(MAKEINFO, makeinfo, no)
 AC_SUBST(PACKAGE)
 AC_SUBST(VERSION)
-AC_OUTPUT(Makefile lisp/Makefile texi/Makefile)
+AC_OUTPUT(Makefile)
 
 dnl configure.in ends here

@@ -4,7 +4,7 @@ VERSION=1.1.7
 
 PSGML_SRC="ChangeLog psgml.el psgml-parse.el psgml-edit.el psgml-dtd.el \
 	psgml-info.el psgml-charent.el psgml-api.el \
-	psgml-other.el psgml-lucid.el psgml-maint.el" 
+	psgml-other.el psgml-lucid.el psgml-maint.el psgml-debug.el" 
 
 PSGML_DOC="psgml-api.texi psgml.texi"
 
@@ -13,7 +13,7 @@ DISTNAME=psgml-$VERSION
 do_tree=1
 do_tar=1
 
-while `getopts "dt" opt`; do
+while getopts "dt" opt ; do
     case $opt in
         d)
             do_tree=1; do_tar=0;
@@ -31,7 +31,7 @@ disttree() {
         echo "Creating distribution"
 	mkdir $DISTNAME
 	cp iso88591.map \
-            INSTALL README.psgml configure \
+            INSTALL README.psgml configure Makefile.in\
             install-sh mkinstalldirs \
                 $DISTNAME
         cp Makefile.def $DISTNAME/Makefile 

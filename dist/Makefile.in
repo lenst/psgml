@@ -31,7 +31,7 @@ install: compile installdirs
 	  echo " $(INSTALL_DATA) $$p $(lispdir)/$$p"; \
 	  $(INSTALL_DATA) $$p $(lispdir)/$$p; \
 	done
-	$(INSTALL_DATA) iso8859.map $(lispdir)
+	$(INSTALL_DATA) iso88591.map $(lispdir)
 
 installdirs:
 	$(srcdir)/mkinstalldirs $(psgmldir)
