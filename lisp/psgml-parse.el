@@ -1051,15 +1051,12 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 			   (file-name-nondirectory tem)))))
   (setq sgml-loaded-dtd nil)		; Allow reloading of DTD
   ;; Search for 'file' on the sgml-system-path [ndw]
-  (let (real-file)
-    (let ((l (cons "." sgml-system-path)))
-      (while (and l (not real-file))
-	(unless (file-exists-p
-		 (setq real-file
-		       (expand-file-name file (car l))))
-	  (setq real-file nil))
-	(setq l (cdr l)))
-      real-file)
+  (let ((real-file (car (mapcan (function
+				 (lambda (dir)
+				   (let ((f (expand-file-name file dir)))
+				     (if (file-exists-p f)
+					 (list f)))))
+				(cons "." sgml-system-path)))))
     (or real-file
 	(error "Saved DTD file %s not found" file))
     (let ((cb (current-buffer))
@@ -1079,10 +1076,10 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	(setq dtd (sgml-pstate-dtd sgml-buffer-parse-state)))
        (t				; load DTD from file
 	(set-buffer cb)
-	(sgml-push-to-entity file)
-	(message "Loading DTD from %s..." file)
+	(sgml-push-to-entity real-file)
+	(message "Loading DTD from %s..." real-file)
 	(setq dtd (sgml-read-dtd))
-	(message "Loading DTD from %s...done" file)
+	(message "Loading DTD from %s...done" real-file)
 	(sgml-pop-entity)))
       (set-buffer cb)
       (sgml-set-initial-state dtd)
@@ -1108,16 +1105,16 @@ settings in ENTS."
   (sgml-debug "Trying to load compiled DTD from %s..." cfile)
   (or (and (file-readable-p cfile)
 	   (let ((find-file-type	; Allways binary
-		     (function (lambda (fname) 1))))
+		  (function (lambda (fname) 1))))
 	     ;; fifth arg to insert-file-contents is not available in early
 	     ;; v19.
 	     (insert-file-contents cfile nil nil nil))
 	   (equal '(sgml-saved-dtd-version 6) (sgml-read-sexp))
 	   (or (sgml-up-to-date-p cfile (sgml-read-sexp))
-	       (if (eq 'ask sgml-ignore-out-of-date-cdtd)
+	       (if (eq 'ask sgml-recompile-out-of-date-cdtd)
 		   (not (y-or-n-p
 			 "Compiled DTD is out of date, recompile? "))
-		 sgml-ignore-out-of-date-cdtd)))
+		 (not sgml-recompile-out-of-date-cdtd))))
       (sgml-compile-dtd dtdfile cfile ents)))
 
 (defun sgml-up-to-date-p (file dependencies)
@@ -2590,6 +2587,13 @@ entity hierarchy as possible."
     epos))
 
 (defun sgml-open-element (eltype conref before-tag after-tag &optional asl)
+  (unless (sgml-eltype-defined eltype)
+    (setf (sgml-eltype-mixed eltype) t)
+    (setf (sgml-eltype-etag-optional eltype) t)
+    (when sgml-warn-about-undefined-elements
+      (sgml-log-warning
+       "Start-tag of undefined element %s; assume O O ANY"
+       (sgml-eltype-name eltype))))
   (let* ((emap (sgml-eltype-shortmap eltype))
 	 (newmap (if emap
 		     (if (eq 'empty emap)
@@ -2758,30 +2762,25 @@ Where the latter represents end-tags."
 
 
 (defun sgml-eltypes-in-state (tree state)
-  "Return list of symbols valid in STATE and TREE.
-The symbols are the tokens used in the DFAs."
-  (let* ((req (if (sgml-model-group-p state)
-		  (sgml-required-tokens state)))
-	 (elems
+  "Return list of element types (eltype) valid in STATE and TREE."
+  (let* ((req				; Required tokens
+	  (if (sgml-model-group-p state)
+	      (sgml-required-tokens state)))
+	 (elems				; Normally valid tokens
 	  (if (sgml-model-group-p state)
 	      (nconc req
-		     (delq sgml-pcdata-token (sgml-optional-tokens state)))))
-	 (in (sgml-tree-includes tree))
-	 (ex (sgml-tree-excludes tree)))
+		     (delq sgml-pcdata-token (sgml-optional-tokens state))))))
     ;; Modify for exceptions
-    (while in
-      (unless (memq (car in) elems)
-	(setq elems (nconc elems (list (car in)))))
-      (setq in (cdr in)))
-    (while ex
-      (setq elems (delq (car ex) elems))
-      (setq ex (cdr ex)))
+    (loop for et in (sgml-tree-includes tree) ;*** Tokens or eltypes?
+	  unless (memq et elems) do (push et elems))
+    (loop for et in (sgml-tree-excludes tree)
+	  do (setq elems (delq et elems)))
     ;; Check for omitable start-tags
     (when (and sgml-omittag-transparent
 	       (not (sgml-final-p state))
 	       req
 	       (null (cdr req)))
-      (let ((et (sgml-lookup-eltype (car req))))
+      (let ((et (sgml-token-eltype (car req))))
 	(when (sgml-eltype-stag-optional et)
 	  (setq elems
 		(nconc elems		; *** possibility of duplicates
@@ -3457,12 +3456,16 @@ pointing to start of short ref and point pointing to the end."
   (let ((sgml-shortref-handler shortref-fun))
     (sgml-parse-until-end-of nil)))
 
+(defun sgml-move-current-state (token)
+  (setq sgml-current-state
+	(or (sgml-get-move sgml-current-state token)
+	    sgml-current-state)))
+
 (defun sgml-execute-implied (imps type)
   (loop for token in imps do
 	(if (eq t token)
 	    (sgml-implied-end-tag type sgml-markup-start sgml-markup-start)
-	  (setq sgml-current-state
-		(sgml-get-move sgml-current-state token))
+	  (sgml-move-current-state token)
 	  (when sgml-throw-on-element-change
 	    (throw sgml-throw-on-element-change 'start))
 	  (sgml-open-element (sgml-token-eltype token)
@@ -3475,12 +3478,9 @@ pointing to start of short ref and point pointing to the end."
 	     type)))))
 
 (defun sgml-do-move (token type)
-  (sgml-execute-implied (sgml-list-implications token type)
-			type)
+  (sgml-execute-implied (sgml-list-implications token type) type)
   (unless (eq sgml-any sgml-current-state)
-    (setq sgml-current-state
-	  (or (sgml-get-move sgml-current-state token)
-	      sgml-current-state))))
+    (sgml-move-current-state token)))
 
 (defun sgml-pcdata-move ()
   "Moify parser state to reflect parsed data."
@@ -3572,8 +3572,6 @@ pointing to start of short ref and point pointing to the end."
 		 (sgml-log-warning
 		  "NET enabling start-tag is not allowed with SHORTTAG NO"))))
        (sgml-check-tag-close)))
-    (sgml-do-move (sgml-eltype-token et)
-		  (format "%s start-tag" (sgml-eltype-name et)))
     (sgml-set-markup-type 'start-tag)
     (cond ((and sgml-ignore-undefined-elements
 		(not (sgml-eltype-defined et)))
@@ -3582,17 +3580,13 @@ pointing to start of short ref and point pointing to the end."
 	      "Start-tag of undefined element %s; ignored"
 	      (sgml-eltype-name et))))
 	  (t
-	   (unless (sgml-eltype-defined et)
-	     (setf (sgml-eltype-mixed et) t)
-	     (setf (sgml-eltype-etag-optional et) t)
-	     (when sgml-warn-about-undefined-elements
-	       (sgml-log-warning
-		"Start-tag of undefined element %s; assume O O ANY"
-		(sgml-eltype-name et))))
+	   (sgml-do-move (sgml-eltype-token et)
+			 (format "%s start-tag" (sgml-eltype-name et)))
 	   (sgml-open-element et sgml-conref-flag
 			      sgml-markup-start (point) asl)
 	   (when net-enabled
 	     (setf (sgml-tree-net-enabled sgml-current-tree) t))))))
+
 
 (defun sgml-do-empty-start-tag ()
   "Return eltype to use if empty start tag"
