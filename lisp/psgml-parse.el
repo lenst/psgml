@@ -2708,6 +2708,43 @@ entity hierarchy as possible."
 		 (t
 		  (setf (sgml-tree-content u) nil))))))))))))
 
+(defun sgml-list-implications (token type)
+  "Return a list of the tags implied by a token TOKEN.
+TOKEN is a token, and the list elements are either tokens or `t'.
+Where the latter represents end-tags."
+  (let ((state sgml-current-state)
+	(tree sgml-current-tree)
+	(temp nil)
+	(imps nil))
+    (while				; Until token accepted
+	(cond
+	 ;; Test if accepted in state
+	 ((or (eq state sgml-any)
+	      (and (not (memq token (sgml-excludes)))
+		   (or (memq token (sgml-includes))
+		       (sgml-get-move state token))))
+	  nil)
+	 ;; Test if end tag implied
+	 ((and (sgml-final-p state)
+	       (not (eq tree sgml-top-tree)))
+	  (setq state (sgml-tree-pstate tree)
+		tree (sgml-fake-close-element tree))
+	  (push t imps)
+	  t)
+	 ;; Test if start-tag can be implied
+	 ((and (setq temp (sgml-required-tokens state))
+	       (null (cdr temp)))
+	  (setq temp (car temp)
+		tree (sgml-fake-open-element tree temp)
+		state (sgml-element-model tree))
+	  (push temp imps)
+	  t)
+	 ;; No implictions and not accepted
+	 (t
+	  (sgml-log-warning "Out of context %s" type)
+	  (setq imps nil))))
+    ;; Return the implications in correct order
+    (nreverse imps)))
 
 
 (defun sgml-eltypes-in-state (tree state)
@@ -3410,17 +3447,34 @@ pointing to start of short ref and point pointing to the end."
   (let ((sgml-shortref-handler shortref-fun))
     (sgml-parse-until-end-of nil)))
 
+(defun sgml-execute-implied (imps type)
+  (loop for token in imps do
+	(if (eq t token)
+	    (sgml-implied-end-tag type sgml-markup-start sgml-markup-start)
+	  (setq sgml-current-state
+		(sgml-get-move sgml-current-state token))
+	  (when sgml-throw-on-element-change
+	    (throw sgml-throw-on-element-change 'start))
+	  (sgml-open-element (sgml-token-eltype token)
+			     nil sgml-markup-start sgml-markup-start)
+	  (unless (and sgml-current-omittag
+		       (sgml-element-stag-optional sgml-current-tree))
+	    (sgml-log-warning
+	     "%s start-tag implied by %s; not minimizable"
+	     (sgml-eltype-name (sgml-token-eltype token))
+	     type)))))
+
+(defun sgml-do-move (token type)
+  (sgml-execute-implied (sgml-list-implications token type)
+			type)
+  (unless (eq sgml-any sgml-current-state)
+    (setq sgml-current-state
+	  (or (sgml-get-move sgml-current-state token)
+	      sgml-current-state))))
+
 (defun sgml-pcdata-move ()
   "Moify parser state to reflect parsed data."
-  (let (new-state)
-    (while				; Until token accepted
-	(cond
-	 ((eq sgml-current-state sgml-any) nil)
-	 ((setq new-state
-		(sgml-get-move sgml-current-state sgml-pcdata-token))
-	  (setq sgml-current-state new-state)
-	  nil)
-	 ((sgml-do-implied "data character"))))))
+  (sgml-do-move sgml-pcdata-token "data character"))
 
 (defsubst sgml-parse-pcdata ()
   (/= 0
@@ -3508,12 +3562,8 @@ pointing to start of short ref and point pointing to the end."
 		 (sgml-log-warning
 		  "NET enabling start-tag is not allowed with SHORTTAG NO"))))
        (sgml-check-tag-close)))
-    (sgml-execute-implied (sgml-list-implications et)
-			  (format "%s start-tag" (sgml-eltype-name et)))
-    (unless (eq sgml-any sgml-current-state)
-      (setq sgml-current-state
-	    (or (sgml-get-move sgml-current-state et)
-		sgml-current-state)))
+    (sgml-do-move (sgml-eltype-token et)
+		  (format "%s start-tag" (sgml-eltype-name et)))
     (sgml-set-markup-type 'start-tag)
     (cond ((and sgml-ignore-undefined-elements
 		(not (sgml-eltype-defined et)))
@@ -3533,66 +3583,6 @@ pointing to start of short ref and point pointing to the end."
 			      sgml-markup-start (point) asl)
 	   (when net-enabled
 	     (setf (sgml-tree-net-enabled sgml-current-tree) t))))))
-
-(defun sgml-list-implications (et)
-  "Return a list of the tags implied by a start-tag with type ET.
-ET is an eltype, and the list elemennts are either eltype or `t'.
-Where the latter represents end-tags."
-  (let ((state sgml-current-state)
-	(tree sgml-current-tree)
-	(temp nil)
-	(imps nil))
-    (while				; Until token accepted
-	(cond
-	 ;; Test if accepted in state
-	 ((or (not (sgml-eltype-defined et));***??
-	      (eq state sgml-any)
-	      (and (not (memq et (sgml-excludes)))
-		   (or (memq et (sgml-includes))
-		       (sgml-get-move state et))))
-	  nil)
-	 ;; Test if end tag implied
-	 ((and (sgml-final-p state)
-	       (not (eq tree sgml-top-tree)))
-	  (setq state (sgml-tree-pstate tree)
-		tree (sgml-fake-close-element tree))
-	  (push t imps)
-	  t)
-	 ;; Test if start-tag can be implied
-	 ((and (setq temp (sgml-required-tokens state))
-	       (null (cdr temp)))
-	  (setq temp (car temp)
-		tree (sgml-fake-open-element tree temp)
-		state (sgml-element-model tree))
-	  (push temp imps)
-	  t)
-	 ;; No implictions and not accepted
-	 (t
-	  (sgml-log-warning
-	   "Out of context start-tag %s"
-	   (sgml-eltype-name et))
-	  (setq imps nil))))
-    ;; Return the implications in correct order
-    (nreverse imps)))
-
-(defun sgml-execute-implied (imps type)
-  (loop for et in imps do
-	(if (eq t et)
-	    (sgml-implied-end-tag type sgml-markup-start sgml-markup-start;***
-				  )
-	  (setq sgml-current-state
-		(sgml-get-move sgml-current-state et))
-	  (when sgml-throw-on-element-change
-	    (throw sgml-throw-on-element-change 'start))
-	  (sgml-open-element (sgml-token-eltype et)
-			     nil sgml-markup-start sgml-markup-start)
-	  (unless (and sgml-current-omittag
-		       (sgml-element-stag-optional sgml-current-tree))
-	    (sgml-log-warning
-	     "%s start-tag implied by %s; not minimizable"
-	     (sgml-eltype-name et)
-	     type)))))
-
 
 (defun sgml-do-empty-start-tag ()
   "Return eltype to use if empty start tag"
@@ -3669,9 +3659,7 @@ Where the latter represents end-tags."
 	(unless found
 	  (sgml-implied-end-tag (format "%s end-tag" gi)
 				sgml-markup-start sgml-markup-start)))
-      (sgml-close-element sgml-markup-start (point))))
-)
-
+      (sgml-close-element sgml-markup-start (point)))))
 
 (defun sgml-is-goal-after-start (goal tree)
   (and tree
@@ -3708,29 +3696,6 @@ Where the latter represents end-tags."
 	   t))
    (sgml-error "Invalid character in markup %c"
 	       (following-char))))
-  
-(defun sgml-do-implied (type &optional temp)
-  ;; *** can this be obsoleted?
-  (cond
-   ((sgml-final-p sgml-current-state)
-    (sgml-implied-end-tag type sgml-markup-start sgml-markup-start)
-    t)
-   ((and (setq temp (sgml-required-tokens sgml-current-state))
-	 (null (cdr temp)))
-    (setq sgml-current-state
-	  (sgml-get-move sgml-current-state (car temp)))
-    (when sgml-throw-on-element-change
-      (throw sgml-throw-on-element-change 'start))
-    (sgml-open-element (sgml-token-eltype (car temp))
-		       nil sgml-markup-start sgml-markup-start)
-    (unless (and sgml-current-omittag
-		 (sgml-element-stag-optional sgml-current-tree))
-      (sgml-log-warning
-       "%s start-tag implied by %s; not minimizable"
-       (car temp) type))
-    t)
-   (t (sgml-log-warning "%s out of context" type)
-      nil)))
 
 (defun sgml-implied-end-tag (type start end)
   (cond ((eq sgml-current-tree sgml-top-tree)
