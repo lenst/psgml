@@ -1374,10 +1374,10 @@ Editing is done in a separate window."
 	      (def-value (sgml-attdecl-default-value attr))
 	      (cur-value (sgml-lookup-attspec aname asl)))
 	 (sgml-insert			; atribute name
-	  '(read-only t sgml-category sgml-form) " %s =" aname)
+	  '(read-only t category sgml-form) " %s =" aname)
 	 (cond				; attribute value
 	  ((sgml-default-value-type-p 'FIXED def-value)
-	   (sgml-insert '(read-only t sgml-category sgml-fixed)
+	   (sgml-insert '(read-only t category sgml-fixed)
 			" #FIXED %s"
 			(sgml-default-value-attval def-value)))
 	  ((and (null cur-value)
@@ -1389,8 +1389,8 @@ Editing is done in a separate window."
 	   (sgml-insert '(category sgml-default rear-nonsticky (category))
 			"#DEFAULT"))
 	  (t
-           (sgml-insert '(read-only t sgml-category sgml-form
-                                    rear-nonsticky (read-only sgml-category))
+           (sgml-insert '(read-only t category sgml-form
+                                    rear-nonsticky (read-only category))
                         " ")
            (when (not (null cur-value))
              (sgml-insert nil "%s" (sgml-attspec-attval cur-value)))))
@@ -1475,7 +1475,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
        (sgml-parse-s)
        (sgml-check-nametoken)		; attribute name, should match head of al
        (forward-char 3)
-       (unless (memq (get-text-property (point) 'sgml-category)
+       (unless (memq (get-text-property (point) 'category)
 		     '(sgml-default sgml-fixed))
 	 (push
 	  (sgml-make-attspec (sgml-attdecl-name (car al))
@@ -1530,7 +1530,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
       (put-text-property (point) end 'read-only nil)
       (let ((inhibit-read-only t))
         (put-text-property (1- (point)) (point)
-                           'rear-nonsticky '(read-only sgml-category)))
+                           'rear-nonsticky '(read-only category)))
       (kill-region (point) end))))
 
 
@@ -1548,8 +1548,8 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
     (beginning-of-line 1)
     (while (not (eq t (get-text-property (point) 'read-only)))
       (beginning-of-line 0))
-    (while (eq 'sgml-form (get-text-property (point) 'sgml-category))
-      (setq start (next-single-property-change (point) 'sgml-category))
+    (while (eq 'sgml-form (get-text-property (point) 'category))
+      (setq start (next-single-property-change (point) 'category))
       (unless start (error "No attribute value here"))
       (assert (number-or-marker-p start))
       (goto-char start))))
