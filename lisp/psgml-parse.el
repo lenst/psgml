@@ -58,6 +58,9 @@ value the auto-fill is inhibited.")
 
 ;;;; Variables
 
+(defvar sgml-psgml-pi-enable-outside-dtd nil)
+
+
 ;;; Hooks
 
 (defvar sgml-open-element-hook nil
@@ -1595,18 +1598,7 @@ in any of them."
   (let ((start (point)))
     (when (and (eq ?P (following-char))
 	       (looking-at "PSGML +\\(\\sw+\\) *"))
-      (let* ((command (downcase (match-string 1)))
-             (flag-command (assoc command
-                                  '(("nofill"      . nofill)
-                                    ("breakafter"  . break-after-stag)
-                                    ("breakbefore" . break-before-stag)
-                                    ("structure"   . structure)))))
-	(goto-char (match-end 0))
-	(cond (flag-command
-               (sgml-parse-set-appflag (cdr flag-command)))
-              (t
-               (sgml-log-warning "Unknown processing instruction for PSGML: %s"
-                                 command)))))
+      (sgml--pi-psgml-handler in-declaration))
     (if sgml-xml-p
 	(sgml-skip-upto "XML-PIC")
       (sgml-skip-upto "PIC"))
@@ -1619,6 +1611,46 @@ in any of them."
   (unless in-declaration
     (sgml-set-markup-type 'pi))
   t)
+
+
+(defun sgml--pi-psgml-handler (in-declaration)
+  (when (or in-declaration
+            sgml-psgml-pi-enable-outside-dtd)
+    (let* ((command (downcase (match-string 1)))
+           (flag-command (assoc command
+                                '(("nofill"      . nofill)
+                                  ("breakafter"  . break-after-stag)
+                                  ("breakbefore" . break-before-stag)
+                                  ("structure"   . structure)))))
+      (goto-char (match-end 0))
+      (cond (flag-command
+             (sgml-parse-set-appflag (cdr flag-command)))
+            ((equal command "element")
+               (sgml--pi-element-handler))
+            (t
+             (sgml-log-warning "Unknown processing instruction for PSGML: %s"
+                               command))))))
+
+
+(defun sgml--pi-element-handler ()
+  (sgml-skip-ps)
+  (let ((eltype (sgml-lookup-eltype (sgml-parse-name)))
+        name value)
+    (sgml-skip-ps)
+    (while (setq name (sgml-parse-name))
+      ;; FIXME: check name not reserved
+      (sgml-skip-ps)
+      (cond ((sgml-parse-delim "VI")
+             (sgml-skip-ps)
+             (setq value
+                   (if (looking-at "['\"]")
+                       (sgml-parse-literal)
+                     (read (current-buffer)))))
+            (t
+             (setq value t)))
+      (message "%s = %S" name value)
+      (setf (sgml-eltype-appdata eltype (intern (downcase name))) value)
+      (sgml-skip-ps))))
 
 
 ;;[lenst/1998-03-09 19:52:08]  Perhaps not the right place
