@@ -605,7 +605,9 @@ after the first tag inserted."
 	      (sgml-indent-line nil element))
 	    (if newpos (setq stag-end newpos))))
 	(sgml-insert-tag (sgml-end-tag-of name) 'silent)
-	(unless after (goto-char stag-end))
+	(unless after
+	  (goto-char stag-end)
+	  (sgml-end-of-element))
 	(unless silent (sgml-show-context)))
       stag-end)))
 
