@@ -469,7 +469,7 @@ to point to the next scratch buffer.")
   ;; state is a and-state
   (let ((m (sgml-get-move (sgml-and-state-substate state) token)))
     (cond (m (cons m (cdr state)))
-	  ((sgml-state-final-p (sgml-and-state-substate state))
+	  ((sgml-final (sgml-and-state-substate state))
 	   (sgml-next-sub-and (sgml-and-state-dfas state)
 			      token
 			      (sgml-and-state-next state))))))
