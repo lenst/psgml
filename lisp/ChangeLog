@@ -5,3 +5,27 @@ Sat Mar 14 21:31:09 1998  Lennart Staflin  <lenst@lysator.liu.se>
 	(sgml-parse-catalog-buffer): add catalog as a noname entry
 	(sgml-catalog-lookup): handle catalog entries
 
+Thu Mar 12 00:04:52 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-current-element-name): make buffer local
+
+Wed Mar 11 22:11:01 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-insert-start-tag): extended meaning of NET
+	paramenter to insert XML-TAGCE if XML.
+	(sgml-change-start-tag): keep XML-TAGCE
+
+	* psgml-parse.el (sgml-read-element-name): use completing read on
+	all defined element types if in an ANY context.
+	(sgml-check-tag-close): removed check for XML-TAGCE
+	(sgml-do-start-tag): added check for XML-TAGCE
+	(sgml-element-empty): In XML no special handling of elements with
+	declared content of EMPTY, but use conref to signal empty element tag.
+
+	* psgml-dtd.el (sgml-merge-attlists): reverse the list
+
+Tue Mar 10 20:13:11 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el: Merged David Megginson's latest xml modifications.
+	
+
