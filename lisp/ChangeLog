@@ -1,4 +1,28 @@
+2000-09-06  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-api.el (sgml-map-content): Use sgml-with-parser-syntax-ro
+
+	* psgml-parse.el (sgml-find-start-point): renamed to
+	sgml-goto-start-point, to indicate that this actually changes the
+	point and buffer. And should always be called inside
+	sgml-with-parser-syntax.
+	(sgml-with-parser-syntax-ro): As sgml-with-parser-syntax also
+	handle restoring buffer modification state.
+	(sgml-last-buffer): New state variable
+	(sgml-with-parser-syntax): set sgml-last-buffer
+	(sgml-mainbuf-point): new function
+	(sgml-max-pos-in-tree): new function
+	(sgml-update-display): don't call sgml-find-start-point, use
+	sgml-max-pos-in-tree to figure out if there is much to parse.
+	(sgml-parse-to): calls sgml-parser-loop directly no
+	sgml-parse-continue.
+	(sgml-parse-continue): use sgml-with-parser-syntax-ro and
+	set-buffer to sgml-last-buffer.
+
 2000-08-24  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml.el (sgml-insert-defaulted-attributes): new option
+	* psgml-edit.el (sgml-insert-attributes): check new option
 
 	* psgml-fs.el (style-format): set ps-left-header to include a
 	style-sheet specified title and the filename. (for ps-print-buffer)
