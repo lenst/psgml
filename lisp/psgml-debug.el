@@ -500,27 +500,7 @@
           (sgml-princ-names (mapcar #'symbol-name excl))))
       ;; ----
       (princ "\n\nATTRIBUTES:\n")
-      (loop for attdecl in (sgml-eltype-attlist et) do
-	    (let ((name (sgml-attdecl-name attdecl))
-		  (dval (sgml-attdecl-declared-value attdecl))
-		  (defl (sgml-attdecl-default-value attdecl)))
-	      (when (listp dval)
-		(setq dval (concat (if (eq (first dval)
-					   'NOTATION)
-				       "#NOTATION (" "(")
-				   (mapconcat (function identity)
-					      (second dval)
-					      "|")
-				   ")")))
-	      (cond ((sgml-default-value-type-p 'FIXED defl)
-		     (setq defl (format "#FIXED '%s'"
-					(sgml-default-value-attval defl))))
-		    ((symbolp defl)
-		     (setq defl (upcase (format "#%s" defl))))
-		    (t
-		     (setq defl (format "'%s'"
-					(sgml-default-value-attval defl)))))
-	      (princ (format " %-9s %-30s %s\n" name dval defl))))
+      (sgml-print-attlist et)
       ;; ----
       (let ((s (sgml-eltype-shortmap et)))
 	(when s
@@ -535,6 +515,40 @@
 	 (sgml-pstate-dtd sgml-buffer-parse-state))
         (sgml-princ-names (mapcar 'sgml-eltype-name
                                   (sort occurs-in (function string-lessp))))))))
+
+(defun sgml-print-attlist (et)
+  (let ((ob (current-buffer)))
+    (set-buffer standard-output)
+    (unwind-protect
+        (loop
+         for attdecl in (sgml-eltype-attlist et) do
+         (princ " ")
+         (princ (sgml-attdecl-name attdecl))
+         (let ((dval (sgml-attdecl-declared-value attdecl))
+               (defl (sgml-attdecl-default-value attdecl)))
+           (when (listp dval)
+             (setq dval (concat (if (eq (first dval)
+                                        'NOTATION)
+                                    "#NOTATION (" "(")
+                                (mapconcat (function identity)
+                                           (second dval)
+                                           "|")
+                                ")")))
+           (indent-to 15 1)
+           (princ dval)
+           (cond ((sgml-default-value-type-p 'FIXED defl)
+                  (setq defl (format "#FIXED '%s'"
+                                     (sgml-default-value-attval defl))))
+                 ((symbolp defl)
+                  (setq defl (upcase (format "#%s" defl))))
+                 (t
+                  (setq defl (format "'%s'"
+                                     (sgml-default-value-attval defl)))))
+
+           (indent-to 48 1)          
+           (princ defl)
+           (terpri)))
+      (set-buffer ob))))
 
 
 (defun sgml-print-position-in-model (element element-type buffer-pos parse-state)
