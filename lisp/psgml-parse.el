@@ -787,7 +787,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	 0 0 nil 0 nil nil nil nil)))
 
 
-(autoload 'sgml-make-primitive-content-token "psgml-dtd")
+(eval-and-compile
+  (autoload 'sgml-make-primitive-content-token "psgml-dtd"))
 
 (defun sgml-set-doctype-element (element-name)
   (sgml-set-doctype
@@ -1535,7 +1536,8 @@ Where name is a symbol and val is a string."
 	      "%s is not in any name group for element %s."
 	      val
 	      (sgml-element-name element))))
-      (push (list (sgml-gname-symbol name) val) asl))
+      (when (not (null name))
+	(push (list (sgml-gname-symbol name) val) asl)))
     asl))
 
 (defun sgml-parse-attribute-value-specification ()
