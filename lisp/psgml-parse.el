@@ -30,13 +30,6 @@
 (require 'psgml)
 
 ;;;; Variables
-
-(defvar sgml-parent-document nil
-  "*File name (a string) of a file containing a DOCTYPE declaration to use,
-or a list (FILENAME DOCTYPENAME), where FILENAME is a file name of a file '
-containing a DOCTYPE declaration to use with the modification that the
-document type name is DOCTYPENAME.")
-
 ;;; Internal variables
 ;;; See also parser state
 
@@ -1765,6 +1758,7 @@ or if nil, until end of buffer."
 		    (sgml-parse-char ?/)) ; net
 		(sgml-element-name sgml-current-tree)
 	      (prog1 (sgml-check-name)
+		(sgml-skip-s)
 		(or (eq ?< (following-char))	;unclosed end tag
 		    (sgml-check-char ?>))))))
     (while
@@ -1842,7 +1836,7 @@ or if nil, until end of buffer."
 	    (setf (sgml-tree-next u) nil) ; Forget next element
 	    (cond 
 	     ;; If change after this element and it is ended by an end
-	     ;; tag pruning is done.  If the end of the element is
+	     ;; tag no pruning is done.  If the end of the element is
 	     ;; implied changing the tag that implied it may change
 	     ;; the extent of the element.
 	     ((and (sgml-tree-end u)	
@@ -1989,39 +1983,6 @@ Returns parse tree; error if no element after POS."
 				   (and (null (cdr tab)) (caar tab)))))))
 	(t
 	 (read-from-minibuffer prompt))))
-
-(defun sgml-map-content (element element-fun &optional data-fun pi-fun)
-  "Map content of ELEMENT, calling ELEMENT-FUN for every element.
-Also calling DATA-FUN, if non-nil, with data in content."
-  (let ((c (sgml-element-content element))
-	(last-pos (sgml-element-stag-end element)))
-    (save-excursion
-      (goto-char last-pos)
-      (when (eolp)
-	(setq last-pos (1+ last-pos))))
-    (while c
-      ;; Any data before first element in content
-      (when (and data-fun
-		 (sgml-element-mixed element))
-	(sgml-map-data (buffer-substring last-pos (sgml-element-start c))
-		       data-fun pi-fun))
-      ;; Do the element
-      (when element-fun
-	(funcall element-fun c))
-      (setq last-pos (sgml-element-end c))
-      ;; Next element
-      (setq c (sgml-element-next c)))
-    ;; Any data after last element
-    (when (and data-fun
-	       (sgml-element-data-p element))
-      (sgml-map-data (buffer-substring last-pos
-				       (sgml-element-etag-start element))
-		     data-fun
-		     pi-fun))))
-
-(defun sgml-map-data (data data-fun pi-fun)
-  (when (not (equal data ""))
-    (funcall data-fun data)))
 
 ;;;; SGML mode: structure editing
 
@@ -2492,6 +2453,9 @@ after the first tag inserted."
 ;;;; SGML mode: Fill 
 
 (defun sgml-fill-element (element)
+  "Fill bigest enclosing element with mixed content.
+If current element has pure element content, recursively fill the
+subelements."
   (interactive (list (sgml-find-element-of (point))))
   ;;
   (message "Filling...")
@@ -2504,30 +2468,45 @@ after the first tag inserted."
   (sgml-message "Done"))
 
 (defun sgml-do-fill (element)
-  (cond
-   ((sgml-element-mixed element)
-    (let ((last-pos (sgml-element-stag-end element))
-	  (c (sgml-element-content element))
-	  (agenda nil))			; regions to fill later
-      (while c
-	(cond
-	 ((sgml-element-mixed c))
-	 (t
-	  ;; Put region before element on agenda.  Can't fill it now
-	  ;; that would mangel the parse tree that is beeing traversed.
-	  (push (cons last-pos (sgml-element-start c))
-		agenda)
-	  (setq last-pos (sgml-element-end c))
-	  (sgml-fill-element c)))
-	(setq c (sgml-element-next c)))
-      (sgml-fill-region last-pos (sgml-element-etag-start element))
-      (while agenda
-	(sgml-fill-region (caar agenda) (cdar agenda))
-	(setq agenda (cdr agenda)))))
-   (t
-    ;; If element is not mixed, fill subelements recursively
-    (sgml-map-content element
-		      (function sgml-fill-element)))))
+  (when sgml-debug
+    (goto-char (sgml-element-start element))
+    (sit-for 0))
+  (save-excursion
+    (cond
+     ((sgml-element-mixed element)
+      (let ((last-pos (sgml-element-stag-end element))
+	    (c (sgml-element-content element))
+	    (agenda nil))		; regions to fill later
+	(while c
+	  (cond
+	   ((sgml-element-mixed c))
+	   (t
+	    ;; Put region before element on agenda.  Can't fill it now
+	    ;; that would mangel the parse tree that is beeing traversed.
+	    (push (cons last-pos (sgml-element-start c))
+		  agenda)
+	    (goto-char (sgml-element-start c))
+	    (sgml-do-fill c)
+	    ;; Fill may change parse tree, get a fresh
+	    (setq c (sgml-find-element-of (point)))
+	    (setq last-pos (sgml-element-end c))))
+	  (setq c (sgml-element-next c)))
+	;; Fill the last region in content of element,
+	;; but get a fresh parse tree, if it has change due to other fills.
+	(sgml-fill-region last-pos
+			  (sgml-element-etag-start
+			   (sgml-find-element-of
+			    (sgml-element-start element))))
+	(while agenda
+	  (sgml-fill-region (caar agenda) (cdar agenda))
+	  (setq agenda (cdr agenda)))))
+     (t
+      ;; If element is not mixed, fill subelements recursively
+      (let ((c (sgml-element-content element)))
+	(while c
+	  (goto-char (sgml-element-start c))
+	  (sgml-do-fill c)
+	  (setq c (sgml-element-next (sgml-find-element-of (point))))))))))
 
 (defun sgml-fill-region (start end)
   (sgml-message "Filling...")
@@ -2870,9 +2849,10 @@ elements with omitted end tags."
 	       (/ (* 100.0 (point)) (point-max)))
       ;; Fix the end tag
       (unless (sgml-element-empty element)
-	(when (or (sgml-tree-net-enabled element)
-		  (zerop (sgml-tree-etag-len element))
-		  (= 3 (sgml-tree-etag-len element)))
+	(cond
+	 ((or (sgml-tree-net-enabled element)
+	      (zerop (sgml-tree-etag-len element))
+	      (= 3 (sgml-tree-etag-len element)))
 	  (goto-char (min (point) (sgml-element-etag-start element)))
 	  (if (zerop (sgml-element-etag-len element))
 	      (if sgml-normalize-trims
@@ -2886,7 +2866,13 @@ elements with omitted end tags."
 	    (insert (sgml-end-tag-of (sgml-element-name element))))
 	  (when (not (sgml-element-data-p element))
 	    (sgml-indent-line nil element)
-	    (beginning-of-line 1))))
+	    (beginning-of-line 1)))
+	 (t
+	  ;; End tag full, but check for unclosed end tag
+	  (goto-char (1- (sgml-tree-end element)))
+	  (unless (looking-at ">")
+	    (skip-chars-backward " \t\n") ;*** Is this allways safe?
+	    (insert ">")))))
       ;; Fix tags of content
       (sgml-normalize-content (sgml-tree-content element) nil)
       ;; Fix the start tag
