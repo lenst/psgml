@@ -1,4 +1,4 @@
-TODO      [Time-stamp: "2001-02-20 23:55:00 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2001-12-16 07:13:49 lenst"]           -*- outline -*- 
 
 * before-change-functions
 
@@ -60,10 +60,6 @@ skiljer sig i case.
 
 * Byt sgml-throw-on-warning till en handler
 
-* ofta fel av typen listp, ANY
-
-måste vara i ANY context...
-
 * Kanske sgml--add-before-p borde användas allmänt
 
 T.ex. av sgml-insert-element
@@ -115,13 +111,3 @@ attributes. The check against the DTD will fill in attribute names for
 attributes specified with a value only. This is also the time to check
 for CONREF and check that all required attributes are given.
 
-* For 1.2
-
-** Syntax
-
-;; Request by:  Michael Hucka <mhucka@bbb.caltech.edu>
-(defvar sgml-mode-syntax-table
-  (let ((s (copy-syntax-table text-mode-syntax-table)))
-    (modify-syntax-entry ?< "(<"  s)
-    (modify-syntax-entry ?> ")>"  s)
-    s))

@@ -6,6 +6,7 @@
 	(sgml-bdtd-merge): dito.
 	(sgml-push-to-entity): dito.
 	(sgml-update-display): bugfix, wrong variable
+	(sgml-do-entity-ref): fix sgml-warn-about-undefined-entities behviour.
 
 2001-12-06  Lennart Staflin  <lenst@lysator.liu.se>
 
