@@ -92,7 +92,7 @@ translation approved by the Free Software Foundation.
 @top PSGML
 
 PSGML is a major mode for editing SGML documents.  This is the DRAFT
-documentation for PSGML version 1.2.
+documentation for PSGML version 1.4.
 @end ifinfo
 
 @menu
@@ -815,8 +815,8 @@ The following commands can be used via @kbd{M-x} and
 can also be found in the DTD menu.
 
 @table @code
-@findex sgml-general-dtd-info
-@item sgml-general-dtd-info
+@findex sgml-describe-dtd
+@item sgml-describe-dtd
 Display information about the current DTD.
 
 @findex sgml-describe-element-type
@@ -906,6 +906,15 @@ listed attributes will be on the top. E.g.,
 @code{attnames=("ID" "CLASS" "ONCLICK" *)}.
 Note: that the attribute names need to be written with the correct
 case and in string quotes.
+
+@item structure
+Control if element is included in @code{sgml-show-structure} (@kbd{C-c
+C-s}). If set to @code{t}, the element is included and if set to
+@code{ignore} it will not be included. @xref{Information, Showing information}.
+
+@item help-text
+Should be a string. The string will be displayed by
+@code{sgml-show-current-element-type} (@kbd{C-c C-t}).
 
 @end table
 
@@ -1224,7 +1233,9 @@ Commands for showing information obtained by parsing the buffer.
 @findex sgml-show-context
 @item C-c C-c
 Shows in the message area: context at point, if in a tag or in mixed
-content and the open elements (@code{sgml-show-context}).
+content and the open elements (@code{sgml-show-context}). The form of
+the string is controled by the user option
+@code{sgml-show-context-function}.
 
 @kindex C-c C-w
 @findex sgml-what-element
@@ -1233,13 +1244,46 @@ Shows what element the character after point (under the cursor) belongs
 to; also shows context of element (@code{sgml-what-element}).
 
 @kindex C-c C-t
-@findex sgml-list-valid-tags
+@findex sgml-show-current-element-type
 @item C-c C-t
+Show information about the current element type and the valid element
+following the point.
+
+@kindex C-c C-s
+@findex sgml-show-structure
+@item C-c C-s
+Show the major element structure in a separate buffer (@samp{*Document
+structure*}). That buffer can be used to navigate the document, like
+an Occur buffer (@pxref{Other Repeating Search, , Other
+Search-and-Loop Commands, emacs, The Emacs Editor}). The structure
+shows container elements and the text of the first child element (if
+it is not a container). This works best for document types which uses
+containers and title structure (e.g. @samp{<div> <title>Heder</title>
+..</div>}). PSGML uses a heuristic rule to identify container
+elements: it should have element content and be non empty. You can
+configure exceptions from this rule using a process instruction in the
+DTD (@pxref{Customizing DTD}).
+
+To include an element type @var{el1} that would otherwise be excluded:
+@example
+<?PSGML element @var{el1} structure=t?>
+@end example
+
+To exclude an element type @var{el2} that would otherwise be included:
+@example
+<?PSGML element @var{el2} structure=ignore?>
+@end example
+
+@end table
+
+@findex sgml-list-valid-tags
 List contextually valid tags (@code{sgml-list-valid-tags}).  Displays
 information about current element, all valid end-tags, valid start-tags
 in current element, and start-tags valid at this point but in other
 elements together with the tags omitted.
-@end table
+
+@ignore
+*** This is no longer working
 
 You can make the mode-line display the name of the current open element
 by setting the @code{sgml-live-element-indicator} variable.  Setting
@@ -1252,6 +1296,16 @@ If non-nil, indicate current element in mode line.
 NOTE: Setting this implies that every command can cause a parse.  
 @end defopt
 
+@end ignore
+
+@defopt sgml-show-context-function
+The value shold be a function that generates a string from an element
+and the current markup type (if any). There are two ready made
+functions for this. The function @code{sgml-show-context-standard},
+the default, generates a string like @samp{#PCDATA in para in chapter
+in book}. The function @code{sgml-show-context-backslash} generates a
+string like @samp{book\chapter\para}.
+@end defopt
 
 
 @c --------------------------------------------------------------------------

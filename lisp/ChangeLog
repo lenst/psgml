@@ -1,16 +1,26 @@
+2005-03-02  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-mode-map): bind C-c C-s to new comman
+	sgml-show-structure.
+	Update autoloads.
+
+	* psgml-edit.el (sgml-show-structure): new command
+	(sgml-show-structure-insert, sgml-show-struct-element-p)
+	(sgml-structure-elements): new functions
+
 2005-02-27  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el (sgml-content-indent-function): moved
 	(sgml-attribute-indent-function): moved
 
 	* psgml-edit.el (sgml-show-context): use new option
-	sgml-show-context-function. 
+	sgml-show-context-function.
 	(sgml-show-context-standard, sgml-show-context-backslash): new
-	functions for sgml-show-context-function 
+	functions for sgml-show-context-function
 	(sgml-right-menu): new command for use on a mouse button
 
 	* psgml.el (sgml-mode-map): bind C-c C-t to
-	sgml-show-current-element-type 
+	sgml-show-current-element-type
 	(sgml-show-context-function): new option
 
 	* psgml-edit.el (sgml-show-current-element-type): new command
@@ -47,7 +57,7 @@
 	remove log related keybinding/menu entry
 
 	* psgml-parse.el (sgml-compile-dtd, sgml-check-entities)
-	(sgml-log-warning, sgml-error): remove sgml-log-message 
+	(sgml-log-warning, sgml-error): remove sgml-log-message
 	(sgml-entity-stack): new func
 
 	* psgml-ids.el: New file (From: Jean-Daniel.Fekete)
@@ -81,7 +91,7 @@
 
 2003-03-25  Lennart Staflin  <lenst@lysator.liu.se>
 
-	* psgml-dtd.el (sgml-parse-parameter-literal): 
+	* psgml-dtd.el (sgml-parse-parameter-literal):
 	Modified to use unibyte-char-to-multibyte if
 	enable-multibyte-characters. I hope this is correct.
 
@@ -117,7 +127,7 @@
 	parameter.
 	(sgml-do-start-tag): use new parameter on sgml-open-element.
 	Fixes bug with NET (tc17).
-	
+
 	* psgml-edit.el (sgml-edit-attrib-field-start,
 	sgml-edit-attrib-clear, sgml-attribute-buffer,
 	sgml-edit-attrib-specification-list): change sgml-category to
@@ -128,7 +138,7 @@
 2002-05-08  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.3.0 released
-	
+
 	* psgml.el (sgml-default-nonsticky): moved from psgml-other.el
 
 2002-05-07  Lennart Staflin  <lenst@lysator.liu.se>
@@ -141,14 +151,14 @@
 	* psgml.el (sgml-mode): make adding to
 	text-property-default-nonsticky conditional on
 	sgml-default-nonsticky to work with Emacs < 21.
-	
+
 2002-04-25  Lennart Staflin  <lenst@lysator.liu.se>
 
 	fixing merge of Dave Love's patch.
-	
+
 2002-02-08  Dave Love  <fx@gnu.org>
 	[Merging from 1.2.4 branch /lenst]
-	
+
 	Changes for various things: Useful DTD-less XML editing; avoiding
 	CL at runtime; some Emacs portability; Mule-related fixes,
 	particularly for non-ASCII names in DTD.
@@ -184,7 +194,7 @@
 
 	* psgml-lucid.el (sgml-insert): Use property name `sgml-category',
 	not `category'. [backed out //lenst]
-	
+
 	* psgml.el: Require cl only when compiling.  Doc fixes.
 	(sgml-mode): Set text-property-default-nonsticky.  In Emacs, use
 	which-fun-mode hook instead of trying to modify mode-line-format.
@@ -228,7 +238,7 @@
 	sgml-entity-case use.
 	(sgml-update-display): Call force-mode-line-update.
 	(sgml-parse-attribute-specification-list): Use sgml-dtd-less.
-	
+
 	* psgml-other.el (sgml-insert): Use plist-get rather than CL
 	runtime's getf.
 	(sgml-use-text-properties): Default to t.
@@ -249,7 +259,7 @@
 
 	* psgml-debug.el: Require cl, elp and edebug when compiling.
 
-	
+
 2002-04-19  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.2.5 released
@@ -276,7 +286,7 @@
 2002-02-08  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-set-buffer-multibyte): support setting to
-	default 
+	default
 	(sgml-compile-dtd): removed sgml-set-buffer-multibyte, this is
 	done by sgml-write-dtd
 	(sgml-push-to-entity): reset buffer to default multibyte support
