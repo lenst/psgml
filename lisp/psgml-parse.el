@@ -476,14 +476,17 @@ element the value."
     (forward-char 1)))
 
 (defsubst sgml-read-number ()
-  (let ((n (sgml-read-octet)))
-    (if (> n sgml-single-octet-threshold)
-	(+ (* (- n (eval-when-compile
-		     (1+ sgml-max-single-octet-number)))
-	      256)
-	   (sgml-read-octet)
-	   sgml-max-single-octet-number)
-      n)))
+  "Read a number.
+A number is 1: an octet [0--sgml-singel-octet-threshold]
+or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
+  (if (> (following-char) sgml-single-octet-threshold)
+      (+ (* (- (following-char) (eval-when-compile
+				 (1+ sgml-max-single-octet-number)))
+	    256)
+	 (prog1 (char-after (1+ (point)))
+	   (forward-char 2))
+	 sgml-max-single-octet-number)
+    (sgml-read-octet)))
 
 (defsubst sgml-read-peek ()
   (following-char))
