@@ -15,7 +15,8 @@
     ("tc07.sgml")
     ("tc08.xml")
     ("tc13.el")
-    ("tc15.el")))
+    ("tc15.el")
+    ("tc16.el")))
 
 (defun testsuit-run-test-case (case-description)
   (let* ((file (first case-description))

@@ -1,0 +1,10 @@
+(let ()
+  (switch-to-buffer (generate-new-buffer "tc16 temp"))
+  (insert-file-contents "tc16.html")
+  (sgml-mode)
+  (sgml-normalize nil)
+  (goto-char (point-min))
+  (while (re-search-forward "<\\(dt\\|li\\)>" nil t)
+    (let ((gi (match-string 1)))
+      (assert (looking-at (format ".*</%s>" gi))))))
+
