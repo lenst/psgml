@@ -61,6 +61,8 @@
 
 ;;; Sgml menu
 
+(define-key sgml-mode-map [menu-bar sgml report-buf]
+  '("Submit bug report" . sgml-submit-bug-report))
 (define-key sgml-mode-map [menu-bar sgml save-options]
   '("Save options" . sgml-save-options))
 (define-key sgml-mode-map [menu-bar sgml options]
