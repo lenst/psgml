@@ -1042,8 +1042,7 @@ remove it if it is showing."
 
 (defun sgml-push-to-param (param)
   (let ((cb (current-buffer))
-	(val (or (cdr-safe (assq param sgml-param-entities))
-		 ""))
+	(val (cdr-safe (assq param sgml-param-entities)))
 	(buf (generate-new-buffer " *param*")))
     (sgml-debug "Enter param %s" param)
     (set-buffer buf)
@@ -1053,9 +1052,14 @@ remove it if it is showing."
     (make-local-variable 'sgml-parameter-name)
     (setq sgml-parameter-name param)
     (cond ((consp val)			; external entity
-	   (insert-file-contents (sgml-external-file val)))
-	  (t
-	   (insert val)))
+	   (let ((file (sgml-external-file val)))
+	     (make-local-variable 'sgml-error-context)
+	     (setq sgml-error-context file)
+	     (insert-file-contents file)))
+	  ((stringp val)
+	   (insert val))
+	  (t				; sgml-warn-undefined-entity ***
+	   (sgml-log-warning "Entity %s undefined" param)))
     (goto-char (point-min))))
 
 (defun sgml-push-to-file (file)
