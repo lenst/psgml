@@ -612,7 +612,12 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
    (let ((tem (expand-file-name
 	       (or sgml-default-dtd-file
 		   (sgml-default-dtd-file)))))
-     (list (read-file-name "Load DTD from: " nil tem t tem))))
+     (list (read-file-name "Load DTD from: "
+			   (file-name-directory tem)
+			   tem
+			   t
+			   (file-name-nondirectory tem)))))
+  (setq file (expand-file-name file))
   (let ((cb (current-buffer))
 	(tem nil)
 	(doctype nil)
@@ -636,12 +641,13 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
       (sgml-set-doctype doctype))
      
      (t					; load DTD from file
+      (set-buffer cb)
       (setq tem (generate-new-buffer " *saveddtd*"))
       (unwind-protect
 	  (progn
 	    (message "Loading DTD from %s..." file)
 	    (set-buffer tem)
-	    (insert-file-contents (expand-file-name file))
+	    (insert-file-contents file)
 	    (set-buffer cb)
 	    (sgml-read-dtd tem)
 	    (message "Loading DTD from %s...done" file))
@@ -1875,11 +1881,7 @@ Also sets sgml-current-tree, sgml-current-state and point."
 	  (cond
 	   ((null c)			; If c = Nil: no previous element.
 	    ;; But maybe the containing element ends at pos too.
-	    (sgml-parse-to (1+ pos))	; If it ends at pos, this will
-					; now be noted in the parse
-					; tree.
-	    (cond ((and (sgml-tree-end u)
-			(= pos (sgml-tree-end u)))
+	    (cond ((= pos (sgml-element-end u))
 		   (setq c u)))		; Previos is parent!
 	    nil)
 	   ((<= pos (sgml-tree-start c))	; Pos before first content el
