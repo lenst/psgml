@@ -19,6 +19,12 @@ Thu Nov  4 19:07:09 1999  Lennart Staflin  <lenst@lysator.liu.se>
 	* psgml-edit.el (sgml-last-element): don't use sgml-last-element
 	for XML (there is not omitted tags to account for).
 
+1999-10-21  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-parse.el (sgml-push-to-entity): restore the (erase-buffer)
+	that had been commented out. This is needed for the case when 
+	sgml-try-merge-compiled-dtd fails and leaves junk in the buffer.
+	
 1999-10-19  Lennart Staflin  <lennarts@infotek.no>
 	
 	* Version 1.2.1 released

@@ -1,6 +1,6 @@
 #! /bin/bash
 
-VERSION=1.2.1
+VERSION=1.2.2
 
 PSGML_SRC="ChangeLog psgml.el psgml-parse.el psgml-edit.el psgml-dtd.el \
 	psgml-info.el psgml-charent.el psgml-api.el \
@@ -32,7 +32,7 @@ disttree() {
         echo "Creating distribution"
 	mkdir $DISTNAME
 	cp iso88591.map \
-            INSTALL README.psgml configure Makefile.in\
+            INSTALL README.psgml configure configure.in Makefile.in\
             install-sh mkinstalldirs \
                 $DISTNAME
         cp Makefile.def $DISTNAME/Makefile 

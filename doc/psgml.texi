@@ -216,11 +216,8 @@ variable, you can add a directory to this variable in your
 
 If you use the @code{configure} approach, compile psgml with @code{make}
 and the you can run @code{make install} to install it in the system
-library @file{site-lisp}.  The files are installed in a subdirectory
-named @file{psgml}.  The location of @file{site-lisp} is figured out by
-@code{configure}, but you can change it in the @file{Makefile}.  You
-need to make sure that this subdirectory is in Emacs @code{load-path}.
-
+library @file{site-lisp}.  The location of @file{site-lisp} is figured
+out by @code{configure}, but you can change it in the @file{Makefile}.
 
 Put the following line in your .emacs:
 

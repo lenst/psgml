@@ -1,4 +1,4 @@
-This is the READ ME file for psgml.el version 1.2.1.       -*- text -*-
+This is the READ ME file for psgml.el version 1.2.2.       -*- text -*-
 
 This is a BETA releas of PSGML.  
 
@@ -27,10 +27,8 @@ can add a directory to this variable in your `.emacs'.)
 
 If you use the `configure' approach, compile psgml with `make' and the
 you can run `make install' to install it in the system library
-`site-lisp'.  The files are installed in a subdirectory named `psgml'.
-The location of `site-lisp' is figured out by `configure', but you can
-change it in the `Makefile'.  You need to make sure that this
-subdirectory is in Emacs `load-path'.
+`site-lisp'. The location of `site-lisp' is figured out by
+`configure', but you can change it in the `Makefile'.
 
 Put the following line in your .emacs:
 
