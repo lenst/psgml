@@ -1,3 +1,13 @@
+2002-02-08  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-set-buffer-multibyte): support setting to
+	default 
+	(sgml-compile-dtd): removed sgml-set-buffer-multibyte, this is
+	done by sgml-write-dtd
+	(sgml-push-to-entity): reset buffer to default multibyte support
+
+	* psgml-dtd.el (sgml-write-dtd): fixes for multibyte handling
+
 2001-12-20  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el (sgml-xml-validate-command): new option. Default for
