@@ -2125,11 +2125,11 @@ is the entity type and NAME is the entity name, used to find the entity."
 	cfile dtd ents)
     (and ce
 	 (let ((cfile (car ce))
-	       (entd  (cdr ce)))
+	       (ents  (cdr ce)))
 	   (sgml-debug "Found %s" cfile)
 	   (if (sgml-use-special-case)
 	       (sgml-try-merge-special-case pubid file cfile ents)
-	     (and (sgml-bdtd-load cfile file (cdr ce))
+	     (and (sgml-bdtd-load cfile file ents)
 		  (sgml-bdtd-merge)))))))
 
 (defun sgml-use-special-case ()
@@ -2224,6 +2224,7 @@ overrides the entity type in entity look up."
 	  (goto-char (point-max)))
 	 (file
 	  ;; fifth arg not available in early v19
+	  (erase-buffer)
 	  (insert-file-contents file nil nil nil)
 	  (goto-char (point-min))
 	  (push file (sgml-dtd-dependencies sgml-dtd-info)))
