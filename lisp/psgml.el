@@ -1,4 +1,4 @@
-;;;; psgml.el --- SGML-editing mode with parsing support
+;;; psgml.el --- SGML-editing mode with parsing support
 ;; $Id$
 
 ;; Copyright (C) 1993, 1994, 1995 Lennart Staflin
@@ -23,20 +23,11 @@
 ;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-;;;; Commentary:
+;;; Commentary:
 
 ;; Major mode for editing the SGML document-markup language.
 
 ;; Send bugs to lenst@lysator.liu.se
-
-;; LIMITATIONS
-
-;; - only accepts the referece concrete syntax, though it does allow
-;;   unlimited lengths on names
-;; - no interpretation of character- and general entity references
-;;   (implicitly assumes entities only contain data),
-;; - Features not supported: subdoc, concur, datatag, rank, shortref,
-;;   and shorttag (most of shortag is supported)
 
 ;; WHAT IT CAN DO
 
@@ -51,17 +42,15 @@
 ;; - Structure editing: move and kill by element
 ;; - Find next data context
 
-;; TODO
-;; - Better error recovery in the parser
+;; LIMITATIONS
 
-;; BUGS
-;; - "*SGML LOG*" buffer handling is confusing
-
+;; - only accepts the referece concrete syntax, though it does allow
+;;   unlimited lengths on names
 
 
-;;;; Code:
+;;; Code:
 
-(defconst psgml-version "1.0a8"
+(defconst psgml-version "1.0a9"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -84,6 +73,16 @@
 
 ;;; User settable options:
 
+(defvar sgml-insert-missing-element-comment t
+  "*If true, and sgml-auto-insert-required-elements also true,
+`sgml-insert-element' will insert a comment if there is an element required
+but there is more than one to choose from." )
+
+(defvar sgml-insert-end-tag-on-new-line nil
+  "*If true, `sgml-insert-element' will put the end-tag on a new line
+after the start-tag. Useful on slow terminals if you find the end-tag after
+the cursor irritating." )
+
 (defvar sgml-doctype nil
   "*If set, this should be the name of a file that contains the doctype
 declaration to use.
@@ -92,12 +91,12 @@ Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-doctype)
 
 (defvar sgml-system-identifiers-are-preferred nil
-  "*If nil PSGML will look up external entities by searching the catalogs
-in `sgml-local-catalogs' and `sgml-catalog-files'  and only if the entity
-is not found in will a given system identifer be used.  If the variable
-is non-nil and a system identifer is given, the system identifier will
-be used for the entity. If no system identifier is given the catalogs
-will searched.")
+  "*If nil, PSGML will look up external entities by searching the catalogs
+in `sgml-local-catalogs' and `sgml-catalog-files' and only if the
+entity is not found in the catalogs will a given system identifer be
+used. If the variable is non-nil and a system identifer is given, the
+system identifier will be used for the entity. If no system identifier
+is given the catalogs will searched.")
 
 (defvar sgml-range-indicator-max-length 9
   "*Maximum number of characters used from the first and last entry
@@ -115,8 +114,8 @@ of a submenu to indicate the range of that menu.")
 			    (doctype 	. bold)
 			    (entity 	. bold-italic)
 			    (shortref   . bold))
-  "*Alist of markup to face mappings.
-Each element looks like (MARKUP-TYPE . FACE).
+  "*List of markup to face mappings.
+Element are of the form (MARKUP-TYPE . FACE).
 Possible values for MARKUP-TYPE is:
 comment	- comment declaration
 doctype	- doctype declaration
@@ -158,25 +157,26 @@ will be shown in the mode line.")
 (defvar sgml-parent-document nil
   "* Used when the current file is part of a bigger document.
 
-The variable describes how the current files content fits into the element
+The variable describes how the current file's content fit into the element
 hierarchy. The variable should have the form
 
-  (parent-file context-element* top-element (has-seen-element*)?)
+  (PARENT-FILE CONTEXT-ELEMENT* TOP-ELEMENT (HAS-SEEN-ELEMENT*)?)
 
-* parent-file (string) is the name of the file contatining the
-document entity.
-
-* context-element (string) is used to set up exceptions and short
-reference map. Good candidates for these elements are the elements
-open when the entity pointing to the current file is used.
-
-* top-element (string) is the top level element in the current file.
-The file should contain one instance of this element, unless the last
-\(lisp) element of sgml-parent-document is a list. If it is a list, the
-top level of the file should follow the content model of top-element.
-
-* has-seen-element (string) element satisfied in the content model
-of top-element.
+PARENT-FILE	is a string, the name of the file contatining the
+		document entity.
+CONTEXT-ELEMENT is a string, that is the name of an element type.
+		It can occur 0 or more times and is used to set up
+		exceptions and short reference map. Good candidates
+		for these elements are the elements open when the
+		entity pointing to the current file is used. 
+TOP-ELEMENT	is a string that is the name of the element type
+		of the top level element in the current file. The file
+		should contain one instance of this element, unless
+		the last \(lisp) element of sgml-parent-document is a
+		list. If it is a list, the top level of the file
+		should follow the content model of top-element. 
+HAS-SEEN-ELEMENT is a string that is the name of an element type. This
+	        element is satisfied in the content model of top-element.
 
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-parent-document)
@@ -439,7 +439,8 @@ These file names will serve as the arguments to the `sgml-validate-command'
 format control string instead of the defaults.")
 
 (defvar sgml-validate-error-regexps
-  '(("\\(error\\|warning\\) at \\([^,]+\\), line \\([0-9]+\\)" 2 3))
+  '(("\\(error\\|warning\\) at \\([^,]+\\), line \\([0-9]+\\)" 2 3)
+    ("^\\(.+\\):\\([0-9]+\\):\\([0-9]+\\):E: " 1 2 3))
   "Alist of regexps to recognize error messages from `sgml-validate'.
 See `compilation-error-regexp-alist'.")
 
@@ -624,7 +625,9 @@ as that may change."
       (setq old-text (buffer-substring (point) end))
       (delete-region (point) end))
     (setq before (point))
-    (insert text)
+    (if (stringp text)
+	(insert text)
+      (eval text))
     (setq after (point))
     (goto-char before)
     (when (search-forward "\r" after t)
@@ -676,27 +679,30 @@ as that may change."
 	psgml-maintainer-address
 	(concat "psgml.el " psgml-version)
 	(list 
-	 'sgml-parent-document
-	 'sgml-doctype
-	 'sgml-declaration
-	 'sgml-tag-region-if-active
-	 'sgml-normalize-trims
-	 'sgml-omittag
-	 'sgml-shorttag
-	 'sgml-minimize-attributes
 	 'sgml-always-quote-attributes
+	 'sgml-auto-activate-dtd
 	 'sgml-auto-insert-required-elements
 	 'sgml-balanced-tag-edit
-	 'sgml-omittag-transparent
-	 'sgml-leave-point-after-insert
-	 'sgml-indent-step
+	 'sgml-catalog-files 
+	 'sgml-declaration
+	 'sgml-doctype
+	 'sgml-ecat-files
 	 'sgml-indent-data
+	 'sgml-indent-step
+	 'sgml-leave-point-after-insert
 	 'sgml-live-element-indicator
-	 'sgml-set-face
+	 'sgml-local-catalogs 
+	 'sgml-local-ecat-files
 	 'sgml-markup-faces
+	 'sgml-minimize-attributes
+	 'sgml-normalize-trims
+	 'sgml-omittag
+	 'sgml-omittag-transparent
+	 'sgml-parent-document
 	 'sgml-public-map
-	 'sgml-catalog-files 'sgml-ecat-files
-	 'sgml-local-catalogs 'sgml-local-ecat-files
+	 'sgml-set-face
+	 'sgml-shorttag
+	 'sgml-tag-region-if-active
 	 ))))
 
 
@@ -733,6 +739,7 @@ as that may change."
 (define-key sgml-mode-map "\C-c\C-t" 'sgml-list-valid-tags)
 (define-key sgml-mode-map "\C-c\C-v" 'sgml-validate)
 (define-key sgml-mode-map "\C-c\C-w" 'sgml-what-element)
+(define-key sgml-mode-map "\C-c\C-z" 'sgml-trim-and-leave-element)
 (define-key sgml-mode-map "\C-c\C-f\C-e" 'sgml-fold-element)
 (define-key sgml-mode-map "\C-c\C-f\C-r" 'sgml-fold-region)
 (define-key sgml-mode-map "\C-c\C-f\C-s" 'sgml-fold-subelement)
@@ -1086,6 +1093,7 @@ start tag, and the second / is the corresponding null end tag."
 	    (cons ?b (and (buffer-file-name)
 			  (file-name-nondirectory (buffer-file-name))))
 	    (cons ?s (sgml-declaration))
+	    (cons ?v sgml-declaration)
 	    (cons ?d sgml-doctype))))
       (loop for template in sgml-validate-command
 	    thereis
@@ -1261,4 +1269,4 @@ If it is something else complete with ispell-complete-word." t)
  (t
   (require 'psgml-other)))
 
-;;; psgml.el ends here
+;;; psgml.el ends HERE
