@@ -62,7 +62,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "0.4a4"
+(defconst psgml-version "0.4b"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -279,7 +279,7 @@ Example:
 (defvar sgml-validate-command
   "sgmls -s"
   "*The command to validate an SGML document.
-The file name of current buffer file name will be appended to this,
+The file name of current buffer's file will be appended to this,
 separated by a space.")
 
 (defvar sgml-validate-error-regexps
@@ -484,6 +484,9 @@ running the sgml-validate-command.")
 	 'sgml-leave-point-after-insert
 	 'sgml-indent-step
 	 'sgml-indent-data
+	 'sgml-live-element-indicator
+	 'sgml-set-face
+	 'sgml-markup-faces
 	 ))))
 
 
