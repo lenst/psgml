@@ -263,7 +263,8 @@ if the item is selected."
 	   (lambda (x)
 	     (add-menu-item '("DTD") (nth 0 x)
 			    (list 'apply ''sgml-doctype-insert
-				  (list 'quote (cdr x)))
+				  (cadr x)
+				  (list 'quote (cddr x)))
 			    t)))
 	  sgml-custom-dtd))
 

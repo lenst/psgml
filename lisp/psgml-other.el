@@ -221,7 +221,8 @@ if the item is selected."
 	   (list "----")
 	   (loop for e in sgml-custom-dtd collect
 		 (vector (first e)
-			 (` (sgml-doctype-insert '(,@(cdr e))))
+			 (` (sgml-doctype-insert (, (cadr e))
+						 '(, (cddr e))))
 			 t)))))
 
 
