@@ -24,13 +24,23 @@
     ("tc20.sgml" (warning "Start-tag of undefined element FOO"))
     ("tc21.sgml")
     ("tc22.el")
+    ("tc23.sgml")
     ))
 
+
+(defun testsuit-pi-handler (string)
+  (when (string-match "ASSERT\\>" string )
+    (let ((form (car (read-from-string (substring string (match-end 0))))))
+      (assert (eval form) nil
+              "Assertion fail: %S" form))))
+
+  
 (defun testsuit-run-test-case (case-description)
   (let* ((file (first case-description))
          (expected (rest case-description))
          (sgml-show-warnings t)
-         (warning-expected nil))
+         (warning-expected nil)
+         (sgml-pi-function 'testsuit-pi-handler))
     (setq sgml-catalog-assoc nil)       ; To allow testing catalog parsing
     (setq sgml-ecat-assoc nil)
     (message "--Testing %s" file)
