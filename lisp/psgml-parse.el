@@ -30,6 +30,13 @@
 (require 'psgml)
 
 ;;;; Variables
+
+(defvar sgml-close-element-hook nil
+  "The hook run by `sgml-close-element'.
+These functions are invoked with `sgml-current-tree' bound to the
+element just parsed.")
+
+
 ;;; Internal variables
 ;;; See also parser state
 
@@ -1109,6 +1116,7 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
     (setq sgml-goal (point)))
   (setf (sgml-tree-end sgml-current-tree) after-tag)
   (setf (sgml-tree-etag-len sgml-current-tree) (- after-tag before-tag))
+  (run-hooks 'sgml-close-element-hook)
   (setq sgml-markup-tree sgml-current-tree)
   (cond ((eq sgml-current-tree sgml-top-tree)
 	 (unless (eobp)
@@ -1300,7 +1308,7 @@ remove it if it is showing."
 	       (sgml-log-warning "System id %s not found" sysid))
 	     file))
 	  (pubid
-	   (setq file (sgml-map-public pubid))
+	   (setq file (sgml-map-public pubid name))
 	   (unless file
 	     (sgml-log-warning "Public id %s; can't find file"
 			       pubid))
@@ -1312,10 +1320,13 @@ remove it if it is showing."
 	    (or name ""))
 	   nil))))
 
-(defun sgml-map-public (pubid)
+(defun sgml-map-public (pubid &optional name)
   (let ((pubid-parts (sgml-pubid-parts pubid))
 	(l sgml-public-map)
 	res)
+    (if name
+	(setq pubid-parts
+	      (cons (cons ?n (symbol-name name)) pubid-parts)))
     (sgml-debug "Pub id parts = %S" pubid-parts)
     (while (and l (not res))
       (cond
@@ -1325,6 +1336,7 @@ remove it if it is showing."
        ((stringp (car l))
 	(setq res (sgml-pub-expand (car l) pubid-parts))))
       (when res
+	(sgml-debug "file-exists-p? %S" res)
 	(unless (file-exists-p
 		 (setq res (substitute-in-file-name res)))
 	  (setq res nil)))
@@ -1333,33 +1345,38 @@ remove it if it is showing."
 
 (defconst sgml-formal-pubid-regexp
   (concat
-   "^\\(+//\\|-//\\)?"			; Registered indicator
-   "\\(\\([^/]\\|/[^/]\\)+\\)"		; Owner
+   "^\\(+//\\|-//\\)?"			; Registered indicator  [1]
+   "\\(\\([^/]\\|/[^/]\\)+\\)"		; Owner                 [2]
    "//"
-   "\\([^ ]+\\)"			; Text class
+   "\\([^ ]+\\)"			; Text class            [4]
    " "
-   "\\(\\([^/]\\|/[^/]\\)*\\)"		; Text description
-   ".*"))
+   "\\(\\([^/]\\|/[^/]\\)*\\)"		; Text description      [5]
+   "//"
+   "\\(\\([^/]\\|/[^/]\\)*\\)"		; Language              [7]
+   "\\(//"				;   		        [9] 
+   "\\(\\([^/]\\|/[^/]\\)*\\)"		; Version	        [10]
+   "\\)?"))
 
 (defun sgml-pubid-parts (pubid)
-  (append
+  (nconc
    (if (string-match sgml-formal-pubid-regexp pubid)
-       (list
-	(cons ?o (sgml-transliterate-file (sgml-matched-string pubid 2)))
-	(cons ?c (downcase (sgml-matched-string pubid 4)))
-	(cons ?d (sgml-transliterate-file (sgml-matched-string pubid 5)))
-	;; t alias for d  (%T used by sgmls)
-	(cons ?t (sgml-transliterate-file (sgml-matched-string pubid 5)))
-	))
+       (nconc
+	(list
+	 (cons ?o (sgml-transliterate-file (sgml-matched-string pubid 2)))
+	 (cons ?c (downcase (sgml-matched-string pubid 4)))
+	 (cons ?d (sgml-transliterate-file (sgml-matched-string pubid 5)))
+	 ;; t alias for d  (%T used by sgmls)
+	 (cons ?t (sgml-transliterate-file (sgml-matched-string pubid 5)))
+	 (cons ?l (downcase (sgml-matched-string pubid 7))))
+	(if (match-beginning 9)
+	    (list (cons ?v (sgml-transliterate-file
+			    (sgml-matched-string pubid 10)))))))
    (list
-    '(?% ?%)			; %% translate to %
+    '(?% ?%)				; %% translate to %
     (cons ?p (sgml-transliterate-file pubid)))))
 
 (defun sgml-pub-expand-char (c parts)
-  (cond ((memq (downcase c) '(?c ?o ?d))
-	 (cdr-safe (assq (downcase c) parts)))
-	(t
-	 (char-to-string c))))
+  (cdr-safe (assq (downcase c) parts)))
 
 (defun sgml-transliterate-file (string)
   (mapconcat (function (lambda (c)
@@ -1397,7 +1414,7 @@ remove it if it is showing."
 	   (sgml-debug "Ignoring redefinition of %%%s" param)
 	   )
 	  (t
-	   (sgml-debug "Defining entity %s as %s" param value)
+	   (sgml-debug "Defining entity %s as %S" param value)
 	   (setq sgml-param-entities
 		 (cons (cons param value)
 		       sgml-param-entities))))))
@@ -1407,6 +1424,8 @@ remove it if it is showing."
 	(val (cdr-safe (assq param sgml-param-entities)))
 	(buf (generate-new-buffer " *param*"))
 	file)
+    (if (consp val)
+	(setq file (sgml-external-file val 'param param)))
     (sgml-debug "Enter param %s" param)
     (set-buffer buf)
     (set-syntax-table sgml-parser-syntax)
@@ -1414,8 +1433,7 @@ remove it if it is showing."
     (setq sgml-previous-buffer cb)
     (make-local-variable 'sgml-parameter-name)
     (setq sgml-parameter-name param)
-    (if (consp val)
-	(setq file (sgml-external-file val 'param param)))
+
     (cond (file
 	   (make-local-variable 'sgml-error-context)
 	   (setq sgml-error-context file)
@@ -1480,6 +1498,7 @@ remove it if it is showing."
 		 (eq (, char3) (char-after (1+ (1+ (point))))))
 	    (forward-char 3)
 	    t)))))
+
 
 (defsubst sgml-check-char (char)
   (cond ((not (sgml-parse-char char))
