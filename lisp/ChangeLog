@@ -1,6 +1,8 @@
 Fri Jul  3 18:14:21 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
-	* Makefile.in: Change to call install with only one source file.
+	* Version 1.1.3
+
+	* Makefile.in: Call install with only one source file.
 	
 Fri Jul  3 17:54:06 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
