@@ -270,7 +270,6 @@ Syntax: var dfa-expr &body forms"
 
 
 (defun sgml-parse-parameter-literal ()
-  (sgml-skip-ps)
   (let ((qchar (following-char))
 	qregexp
 	value)
@@ -319,8 +318,15 @@ Syntax: var dfa-expr &body forms"
 (defun sgml-parse-dtgo ()
   (sgml-parse-char ?\[))
 
+(defun sgml-parse-name-string ()
+  "Parses a name and returns a string or nil if no name."
+  (and (sgml-startnm-char-next)
+       (let ((start (point)))
+	 (skip-syntax-forward "w_")
+	 (buffer-substring start (point)))))
+
 (defun sgml-parse-name-group ()
-  (sgml-skip-ps)
+  "Parse a singel name or a name group"
   (let (names)
     (cond
      ((sgml-parse-grpo)
@@ -331,10 +337,14 @@ Syntax: var dfa-expr &body forms"
 	(push (sgml-check-name) names))
       (sgml-check-grpc)
       names)
-     (t
-      (list (sgml-check-name))))))
+     ((setq names (sgml-parse-name-string))
+      (list (sgml-gname-symbol names))))))
 
-(defun sgml-parse-nametoken-group ()
+(defun sgml-check-name-group ()
+  (or (sgml-parse-name-group)
+      (sgml-parse-error "Expecting a name or a name group")))
+
+(defun sgml-check-nametoken-group ()
   (sgml-skip-ps)
   (let ((names nil))
     (cond
@@ -370,8 +380,12 @@ Syntax: var dfa-expr &body forms"
 			 (sgml-parse-nametoken-string)))
 	      name))))))
 
-
-(defun sgml-parse-notation-dcl ()
+(defun sgml-check-external ()
+  (or (sgml-parse-external)
+      (sgml-parse-error "Expecting a PUBLIC or SYSTEM")))
+
+;;;; Parse doctype: notation
+(defun sgml-declare-notation ()
   ;;148  notation declaration = MDO, "NOTATION",
   ;;                        65 ps+, 41 notation name,
   ;;                        65 ps+, 149 notation identifier,
@@ -381,9 +395,7 @@ Syntax: var dfa-expr &body forms"
   (sgml-skip-ps)
   (sgml-check-name)
   (sgml-skip-ps)
-  (sgml-parse-external)
-  (sgml-skip-ps)
-  (sgml-check-mdc))
+  (sgml-check-external))
 
 
 ;;;; Parse doctype: Element
@@ -472,10 +484,9 @@ Syntax: var dfa-expr &body forms"
 (defun sgml-parse-exeption (type)
   (sgml-skip-ps)
   (if (sgml-parse-char type)
-      (sgml-parse-name-group)))
+      (sgml-check-name-group)))
 
-(defun sgml-parse-element-dcl ()
-  (sgml-skip-ps)
+(defun sgml-declare-element ()
   (let* ((names (sgml-check-element-type))
 	 (stag-opt (sgml-parse-opt))
 	 (etag-opt (sgml-parse-opt))
@@ -483,8 +494,6 @@ Syntax: var dfa-expr &body forms"
 	 (model (sgml-check-content))
 	 (exclusions (sgml-parse-exeption ?-))
 	 (inclusions (sgml-parse-exeption ?+)))
-    (sgml-skip-ps)
-    (sgml-check-mdc)
     (while names
       (sgml-debug "Defining element %s" (car names))
       (sgml-define-element (car names) stag-opt etag-opt model
@@ -492,26 +501,22 @@ Syntax: var dfa-expr &body forms"
 			 sgml-used-pcdata)
       (setq names (cdr names)))))
 
-
 
 ;;;; Parse doctype: Entity
 
-(defun sgml-parse-entity-dcl ()
+(defun sgml-declare-entity ()
   (sgml-skip-ps)
   (cond
    ((sgml-parse-char ?%)		; parameter entity declaration
-    (sgml-set-param-entity (sgml-check-ename) (sgml-parse-entity-text)))
+    (sgml-set-param-entity (sgml-check-ename) (sgml-check-entity-text)))
    (t					; normal entity declaration
     (cond ((sgml-parse-rni 'default))
 	  (t				; general entity
 	   (push (symbol-name (sgml-check-ename))
 		 sgml-entities)))
-    (sgml-parse-entity-text)))
-  (sgml-skip-ps)
-  (sgml-check-char ?>))
+    (sgml-check-entity-text))))
 
-
-(defun sgml-parse-entity-text ()
+(defun sgml-check-entity-text ()
   ;;105  entity text  = 66 parameter literal
   ;;                 | 106 data text
   ;;                 | 107 bracketed text
@@ -539,7 +544,7 @@ Syntax: var dfa-expr &body forms"
 	  (concat "<![" (sgml-check-parameter-literal) "]]>"))
 	 ((eq token 'md)		; Markup declaration
 	  (concat "<!" (sgml-check-parameter-literal) ">")))))
-     ((sgml-parse-parameter-literal)))))
+     ((sgml-check-parameter-literal)))))
 
 (defun sgml-parse-entity-type ()
   ;;109+ entity type      = "SUBDOC"
@@ -567,16 +572,15 @@ Syntax: var dfa-expr &body forms"
 
 ;;;; Parse doctype: Attlist
 
-(defun sgml-parse-attlist ()
-  (sgml-skip-ps)
-  (let ((assnot (sgml-parse-rni 'notation))
-	(assel (sgml-parse-name-group))
-	(attlist nil)			; the list
-	(attdef nil)
-	)	
+(defun sgml-declare-attlist ()
+  (let* ((assnot (cond ((sgml-parse-rni 'notation)
+			(sgml-skip-ps)
+			t)))
+	 (assel (sgml-check-name-group))
+	 (attlist nil)			; the list
+	 (attdef nil))
     (while (setq attdef (sgml-parse-attribute-definition))
       (push attdef attlist))
-    (sgml-check-char ?>)
     (setq attlist (nreverse attlist))
     (unless assnot
       (while assel
@@ -588,10 +592,10 @@ Syntax: var dfa-expr &body forms"
   (if (eq (following-char) ?>)		; End of attlist?
       nil
     (sgml-make-attdecl (sgml-check-name)
-		       (sgml-parse-declared-value)
-		       (sgml-parse-default-value))))
+		       (sgml-check-declared-value)
+		       (sgml-check-default-value))))
 
-(defun sgml-parse-declared-value ()
+(defun sgml-check-declared-value ()
   (sgml-skip-ps)
   (let ((type 'name-token-group)
 	(names nil))
@@ -599,69 +603,97 @@ Syntax: var dfa-expr &body forms"
       (setq type (sgml-check-name))
       (sgml-skip-ps))
     (when (memq type '(name-token-group notation))
-      (setq names (sgml-parse-nametoken-group)))
+      (setq names (sgml-check-nametoken-group)))
     (sgml-make-declared-value type names)))
 
-(defun sgml-parse-default-value ()
+(defun sgml-check-default-value ()
   (sgml-skip-ps)
   (let* ((rni (sgml-parse-rni))
 	 (key (if rni (sgml-check-name))))
     (sgml-make-default-value
      key
      (if (or (not rni) (eq key 'fixed))
-	 (sgml-parse-attribute-value-specification)))))
+	 (sgml-check-attribute-value-specification)))))
+
+
+;;;; Parse doctype: shortref
+
+;;;150  short reference mapping declaration = MDO, "SHORTREF",
+;;;                        [[65 ps]]+, [[151 map name]],
+;;;                        ([[65 ps]]+, [[66 parameter literal]],
+;;;                        [[65 ps]]+, [[55 name]])+,
+;;;                        [[65 ps]]*, MDC
+
+(defun sgml-declare-shortref ()
+  (sgml-check-name)			; map name
+  (while (progn
+	   (sgml-skip-ps)
+	   (sgml-parse-parameter-literal))
+    (sgml-skip-ps)
+    (sgml-check-name)))
+
+;;;152  short reference use declaration = MDO, "USEMAP",
+;;;                        [[65 ps]]+, [[153 map specification]],
+;;;                        ([[65 ps]]+, [[72 associated element type]])?,
+;;;                        [[65 ps]]*, MDC
+
+(defun sgml-declare-usemap ()
+  (or (sgml-parse-rni 'empty)
+      (sgml-check-name))		; map specification
+  (sgml-skip-ps)
+  (sgml-parse-name-group)) 		; associated element type
 
 
 ;;;; Parse doctype
 
-(defun sgml-parse-dtd-subset ()
+(defun sgml-check-dtd-subset ()
   (let ((elcnt ""))
     (message "Parsing doctype%s" elcnt)
     (while 
 	(cond
 	 ((sgml-parse-ds))
 	 ((sgml-parse-marked-section-start) ; marked section start
-	  (sgml-parse-marked-section)
+	  (sgml-check-marked-section)
 	  t)
 	 ((sgml-parse-mdo)
 	  (let ((token (sgml-check-name)))
+	    (sgml-skip-ps)
 	    (cond
-	     ((eq token 'entity)
-	      (sgml-parse-entity-dcl)
-	      t)
-	     ((eq token 'element)
-	      (sgml-parse-element-dcl)
+	     ((eq token 'element) 	(sgml-declare-element)
 	      (setq elcnt (concat elcnt "."))
 	      (when (> (length elcnt) 60) (setq elcnt ""))
-	      (message "Parsing doctype%s" elcnt)
-	      t)
-	     ((eq token 'attlist)
-	      (sgml-parse-attlist)
-	      t)
-	     ((eq token 'notation)
-	      (sgml-parse-notation-dcl)
-	      t)
+	      (message "Parsing doctype%s" elcnt))
+	     ((eq token 'entity)	(sgml-declare-entity))
+	     ((eq token 'attlist) 	(sgml-declare-attlist))
+	     ((eq token 'notation) 	(sgml-declare-notation))
+	     ((eq token 'shortref)	(sgml-declare-shortref))
+	     ((eq token 'usemap)	(sgml-declare-usemap))
 	     (t
-	      (sgml-log-warning "Ignoring markup declaration %s" token)
-	      (sgml-skip-markup-declaration)
-	      t))))
+	      (sgml-log-warning "Ignoring markup declaration %s" token)))
+	    (sgml-skip-ps)
+	    (condition-case err
+		(sgml-check-mdc)
+	      (error
+	       (sgml-log-message "Skipping and restarting parse.")
+	       (sgml-skip-markup-declaration)))
+	    t))
 	 ((sgml-parse-marked-section-end)) ; end of marked section
 	 ))
     (when (sgml-any-open-param/file)
       (sgml-error "DTD subset ended"))))
 
-(defun sgml-parse-doctype ()
+(defun sgml-check-doctype ()
   (sgml-skip-ps)
   (let ((docname (sgml-check-name))
 	(external (sgml-parse-external)))
     (sgml-skip-ps)
     (cond
      ((sgml-parse-char ?\[)
-      (sgml-parse-dtd-subset)
+      (sgml-check-dtd-subset)
       (sgml-check-char ?\])))
     (cond (external
 	   (sgml-push-to-file (sgml-external-file external))
-	   (sgml-parse-dtd-subset)))
+	   (sgml-check-dtd-subset)))
     (sgml-skip-ps)
     (sgml-check-char ?>)
     (sgml-make-primitive-content-token docname)))
@@ -682,8 +714,8 @@ Syntax: var dfa-expr &body forms"
    (sgml-skip-sgml-dcl)
    (sgml-skip-ds)
    (cond ((sgml-parse-mdo)
-	  (cond ((eq 'doctype (sgml-parse-nametoken))
-		 (sgml-set-doctype (sgml-parse-doctype))
+	  (cond ((eq 'doctype (sgml-check-nametoken))
+		 (sgml-set-doctype (sgml-check-doctype))
 		 (setq sgml-buffer-element-map sgml-element-map
 		       sgml-buffer-param-entities sgml-param-entities
 		       sgml-buffer-entities (sort sgml-entities
