@@ -32,7 +32,7 @@
 
 2001-12-18  Lennart Staflin  <lenst@lysator.liu.se>
 
-	* psgml-edit.el (sgml-attribute-buffer): Don't write protect the
+	* psgml-edit.el (sgml-attribute-buffer): Don't write-protect the
 	"#DEFAULT" marker.
 	(sgml-extract-attribute-value): strip any remains of "#DEFAULT".
 	(sgml-edit-attrib-next): if point is before the attribute value,
