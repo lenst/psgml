@@ -1,3 +1,34 @@
+Sat Oct 31 20:00:22 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-cache-catalog): Use file-truename for
+	file-attributes, to get modification time from real file and not
+	from symlink.
+
+	* psgml.el (xml-mode): Do not build a syntax table
+	(sgml-dtd-menu): moved Custom DTD's to submenu
+	(sgml-markup-menu): moved Custom Markup to submenu
+	(sgml-build-custom-menus): Make submenus for Custom DTD and Markup
+
+	* psgml-parse.el (xml-parser-syntax): build special syntax table
+	for XML.
+	(sgml-with-parser-syntax): Use sgml-parser-syntax or
+	xml-parser-syntax depending on sgml-xml-p
+
+Wed Oct 28 23:15:38 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-read-element-type): use
+	let (completion-ignore-case sgml-namecase-general)
+
+Sat Oct 24 13:13:48 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-build-custom-menus): Construct sub-menus for
+	custom DTD and custom Markup insert, only if
+	easy-menu-filter-return is not defined otherwise use the :filter
+	facility to build menu when needed.
+
+	* psgml-edit.el (sgml-what-element): Guard call to
+	sgml-deref-shortmap
+
 1998-10-20  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-edit-external-entity): fix from Matthias Clasen

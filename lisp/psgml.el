@@ -823,7 +823,7 @@ as that may change."
  sgml-dtd-menu sgml-mode-map "DTD menu"
  '("DTD"
     ["Parse DTD"  sgml-parse-prolog t]
-    ("Insert DTD" :filter sgml-compute-insert-dtd-menu)
+    ("Insert DTD")
     ("Info"
      ["General DTD info"	sgml-general-dtd-info           t]
      ["Describe element type"	sgml-describe-element-type	t]
@@ -865,7 +865,7 @@ as that may change."
    ["Insert Attribute" sgml-attrib-menu	t]
    ["Insert Entity"	sgml-entities-menu	t]
    ["Add Element to element"	sgml-add-element-menu	t]
-   ("Custom markup" :filter sgml-compute-custom-markup-menu)
+   ("Custom markup")
    ))
 
 (easy-menu-define
@@ -917,34 +917,31 @@ as that may change."
    ["User Options >"	sgml-user-options-menu t]
    ["Save File Options"  sgml-save-options t]
    ["Submit Bug Report"  sgml-submit-bug-report t]
-   )
- )
+   ))
 
-(defun sgml-compute-insert-dtd-menu (menu)
-  (easy-menu-filter-return
-   (easy-menu-create-menu
-    "DTDs"
-    (loop for e in sgml-custom-dtd collect
-	  (vector (first e)
-		  (` (sgml-doctype-insert (, (cadr e))
-					  '(, (cddr e))))
-		  t)))))
 
-(defun sgml-compute-custom-markup-menu (menu)
-  (easy-menu-filter-return
-   (easy-menu-create-menu
-    "Markups"
-    (loop for e in sgml-custom-markup collect
-	  (vector (first e)
-		  (` (sgml-insert-markup  (, (cadr e))))
-		  t)))))
+(defun sgml-compute-insert-dtd-items ()
+  (loop for e in sgml-custom-dtd collect
+        (vector (first e)
+                (` (sgml-doctype-insert (, (cadr e)) '(, (cddr e))))
+                t)))
+
+(defun sgml-compute-custom-markup-items ()
+  (loop for e in sgml-custom-markup collect
+        (vector (first e)
+                (` (sgml-insert-markup  (, (cadr e))))
+                t)))
 
 (defun sgml-build-custom-menus ()
   "Build custom parts of Markup and DTD menus."
   (let ((button3 (lookup-key (current-local-map) [button3])))
     (unless (or (null button3)
 		(numberp button3))
-      (local-set-key [button3] button3))))
+      (local-set-key [button3] button3))
+    (easy-menu-change '("DTD") "Insert DTD"
+                      (sgml-compute-insert-dtd-items))
+    (easy-menu-change '("Markup") "Custom markup"
+                      (sgml-compute-custom-markup-items))))
 
 
 ;;;; Post command hook 

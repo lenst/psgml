@@ -293,9 +293,7 @@ to point to the next scratch buffer.")
 (mapconcat (function (lambda (c)
 		       (modify-syntax-entry c "_" sgml-parser-syntax)))
 	   "-.0123456789" "")
-(mapconcat (function (lambda (c)
-		       (modify-syntax-entry c "." sgml-parser-syntax)))
-	   "</>&%#[]" ".")
+
 
 ;;(progn (set-syntax-table sgml-parser-syntax) (describe-syntax))
 
@@ -307,10 +305,10 @@ to point to the next scratch buffer.")
 	(setq i (1+ i))))
     (mapconcat (function (lambda (c)
 			   (modify-syntax-entry c "w" tab)))
-	       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrtsuvwxyz" "")
+	       "_:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrtsuvwxyz" "")
     (mapconcat (function (lambda (c)
-			   (modify-syntax-entry c "w" tab)))
-	       "-_:.0123456789" "")
+			   (modify-syntax-entry c "_" tab)))
+	       "-.0123456789·" "")
     tab))
 
 ;;(progn (set-syntax-table xml-parser-syntax) (describe-syntax))
@@ -988,12 +986,13 @@ PROMPT is displayed as a prompt and DTD should be the dtd to get the
 element types from. Optional argument DEFAULT (string) will be used as
 a default for the element type name."
   (let ((name
-	 (completing-read prompt
-			  (sgml-dtd-eltypes dtd)
-			  (function fboundp)
-			  t
-			  nil
-			  nil)))
+	 (let ((completion-ignore-case sgml-namecase-general))
+           (completing-read prompt
+                            (sgml-dtd-eltypes dtd)
+                            (function fboundp)
+                            t
+                            nil
+                            nil))))
     (when (equal name "")
       (setq name (or default (error "Aborted"))))
     (sgml-lookup-eltype name dtd)))
@@ -1946,7 +1945,7 @@ repreaentation of the catalog."
   (and
    (file-readable-p file)
    (let ((c (assoc file (symbol-value cache-var)))
-	 (modtime (elt (file-attributes file) 5)))
+	 (modtime (elt (file-attributes (file-truename file)) 5)))
      (if (and c (equal (second c) modtime))
 	 (cddr c)
        (when c (set cache-var (delq c (symbol-value cache-var))))

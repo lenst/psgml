@@ -554,7 +554,8 @@ is determined."
   (interactive)
   (let* ((pos (point))
 	 (nobol (eq (point) sgml-rs-ignore-pos))
-	 (sref (sgml-deref-shortmap sgml-current-shortmap nobol))
+	 (sref (and sgml-current-shortmap
+                    (sgml-deref-shortmap sgml-current-shortmap nobol)))
 	 (el nil))
     (goto-char pos)
     (setq el (sgml-find-element-of pos))

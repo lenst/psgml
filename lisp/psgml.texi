@@ -20,7 +20,7 @@ END-INFO-DIR-ENTRY
 @ifinfo
 Documentation for PSGML, a major mode for SGML.
 
-Copyright 1994, 1996 Lennart Staflin
+Copyright 1994, 1996, 1998 Lennart Staflin
      
 Permission is granted to make and distribute verbatim
 copies of this manual provided the copyright notice and
@@ -57,7 +57,7 @@ translation approved by the Free Software Foundation.
 @c  start the copyright page.
 @page
 @vskip 0pt plus 1filll
-Copyright @copyright{} 1994, 1996 Lennart Staflin
+Copyright @copyright{} 1994, 1996, 1998 Lennart Staflin
 
 @c Published by ...
 
@@ -92,7 +92,7 @@ translation approved by the Free Software Foundation.
 @top PSGML
 
 PSGML is a major mode for editing SGML documents.  This is the DRAFT
-documentation for PSGML version 1.0.
+documentation for PSGML version 1.2.
 @end ifinfo
 
 @menu
@@ -125,8 +125,8 @@ documentation for PSGML version 1.0.
 @cindex RANK
 @cindex SGML Declaration
 
-PSGML is a major mode for editing SGML documents.  It works with GNU
-Emacs 19.19 and later or with Lucid Emacs 19.9 and later.  PSGML
+PSGML is a major mode for editing SGML and XML documents.  It works with
+GNU Emacs 19.34, 20.3 and later or with XEmacs 19.9 and later.  PSGML
 contains a simple SGML parser and can work with any DTD.  Functions
 provided includes menus and commands for inserting tags with only the
 contextually valid tags, identification of structural errors, editing of
@@ -199,7 +199,7 @@ To install PSGML you first need to uncompress and unpack the source
 archive.  This is done with the @code{gunzip} and @code{tar} commands.
 
 @example
-gunzip psgml-1.0.1.tar.gz; tar xf psgml-1.0.1.tar
+gunzip psgml-1.2.0.tar.gz; tar xf psgml-1.2.0.tar
 @end example
 
 This should create a subdirectory to the current directory with the
@@ -225,7 +225,8 @@ need to make sure that this subdirectory is in Emacs @code{load-path}.
 Put the following line in your .emacs:
 
 @lisp
-(autoload 'sgml-mode "psgml" "Major mode to edit SGML files." t )
+(autoload 'sgml-mode "psgml" "Major mode to edit SGML files." t)
+(autoload 'xml-mode "psgml" "Major mode to edit XML files." t)
 @end lisp
 
 You may also want to set up search paths for external entities,
@@ -253,11 +254,11 @@ copy of @file{texinfo.tex}.
 @cindex major mode
 
 @findex sgml-mode
-PSGML defines a major mode called @code{sgml-mode}.  Files with
-extensions @file{.sgml}, @file{.sgm} or @file{.dtd} will
-automatically be edited in SGML mode.  To edit some other file in
-sgml mode, type @kbd{M-x sgml-mode @key{RET}} after finding the
-file.
+PSGML defines a major modes called @code{sgml-mode} and @code{xml-mode}.
+Files with extensions @file{.sgml}, @file{.sgm} or @file{.dtd} will
+automatically be edited in SGML mode.  To edit some other file in SGML
+mode, type @kbd{M-x sgml-mode @key{RET}} after finding the file.
+To edit XML files, type @kbd{M-x xml-mode @key{RET}}.
 
 If you can modify the file you can add a @dfn{Local Variables} list
 (@pxref{file variables, , Local Variables in Files, emacs, The Emacs
@@ -280,8 +281,9 @@ mode:
 <!-- -*- sgml -*- -->
 @end example
 
+For XML replace @samp{sgml} with @samp{xml} in the above examples.
 But remember that you can't have a comment before the @emph{SGML
-declaration}.
+declaration} or the @emph{XML declaration}.
 
 
 @c -------------------------------------------------------------------------
