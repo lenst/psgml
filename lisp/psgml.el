@@ -325,6 +325,15 @@ running the sgml-validate-command.")
     end))
 
 
+;;;; SGML mode: indentation 
+
+(defun sgml-indent-or-tab ()
+  "Indent line in proper way for current major mode."
+  (interactive)
+  (if (null sgml-indent-step)
+      (insert-tab)
+    (funcall indent-line-function)))
+
 ;;;; SGML mode: keys and menus
 
 (if sgml-mode-map

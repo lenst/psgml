@@ -2171,13 +2171,6 @@ This uses the selective display feature."
 
 ;;;; SGML mode: indentation and movement
 
-(defun sgml-indent-or-tab ()
-  "Indent line in proper way for current major mode."
-  (interactive)
-  (if (null sgml-indent-step)
-      (insert-tab)
-    (funcall indent-line-function)))
-
 (defun sgml-indent-line (&optional col element)
   "Indent line, calling parser to determine level unless COL or ELEMENT
 is given.  If COL is given it should be the column to indent to.  If
