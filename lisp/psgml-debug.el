@@ -1,5 +1,5 @@
-;;;;\filename dump.el
-;;;\Last edited: 1999-12-16 22:57:33 lenst
+;;;;\filename psgml-debug.el
+;;;\Last edited: 2000-04-16 17:52:20 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -451,5 +451,118 @@
           (move-to-column fill-column)
           (delete-region (point) end)
           (throw 'show-data-stop nil))))))
+
+;;;; Show current element type
+
+(defun sgml-show-current-element-type ()
+  (interactive)
+  (let* ((el (sgml-find-context-of (point)))
+         (et (sgml-element-eltype el)))
+    (with-output-to-temp-buffer "*Help*"
+      (princ (format "ELEMENT: %s\n" (sgml-eltype-name et)))
+      (when sgml-omittag
+        (princ (format "\n Start-tag is %s.\n End-tag is %s.\n"
+                       (if (sgml-eltype-stag-optional et)
+                           "optional" "required")
+                       (if (sgml-eltype-etag-optional et)
+                           "optional" "required"))))
+      ;; ----
+      (princ "\nCONTENT: ")
+      (cond ((symbolp (sgml-eltype-model et)) (princ (sgml-eltype-model et)))
+	    (t
+	     (princ (if (sgml-eltype-mixed et)
+                        "mixed\n"
+                      "element\n"))	     
+             (sgml-print-position-in-model el et (point) sgml-current-state)
+             (princ "\n\n")
+	     (sgml-princ-names
+	      (mapcar #'symbol-name (sgml-eltype-refrenced-elements et))
+              "All: ")))
+      (let ((incl (sgml-eltype-includes et))
+            (excl (sgml-eltype-excludes et)))
+        (when (or incl excl)
+          (princ "\n\nEXCEPTIONS:"))
+        (when incl
+          (princ "\n + ")
+          (sgml-princ-names (mapcar #'symbol-name incl)))
+        (when excl
+          (princ "\n - ")
+          (sgml-princ-names (mapcar #'symbol-name excl))))
+      ;; ----
+      (princ "\n\nATTRIBUTES:\n")
+      (loop for attdecl in (sgml-eltype-attlist et) do
+	    (let ((name (sgml-attdecl-name attdecl))
+		  (dval (sgml-attdecl-declared-value attdecl))
+		  (defl (sgml-attdecl-default-value attdecl)))
+	      (when (listp dval)
+		(setq dval (concat (if (eq (first dval)
+					   'NOTATION)
+				       "#NOTATION (" "(")
+				   (mapconcat (function identity)
+					      (second dval)
+					      "|")
+				   ")")))
+	      (cond ((sgml-default-value-type-p 'FIXED defl)
+		     (setq defl (format "#FIXED '%s'"
+					(sgml-default-value-attval defl))))
+		    ((symbolp defl)
+		     (setq defl (upcase (format "#%s" defl))))
+		    (t
+		     (setq defl (format "'%s'"
+					(sgml-default-value-attval defl)))))
+	      (princ (format " %-9s %-30s %s\n" name dval defl))))
+      ;; ----
+      (let ((s (sgml-eltype-shortmap et)))
+	(when s
+	  (princ (format "\nUSEMAP: %s\n" s))))
+      ;; ----
+      (princ "\nOCCURS IN:\n")
+      (let ((occurs-in ()))
+	(sgml-map-eltypes
+	 (function (lambda (cand)
+		     (when (memq et (sgml-eltype-refrenced-elements cand))
+		       (push cand occurs-in))))
+	 (sgml-pstate-dtd sgml-buffer-parse-state))
+        (sgml-princ-names (mapcar 'sgml-eltype-name
+                                  (sort occurs-in (function string-lessp))))))))
+
+
+(defun sgml-print-position-in-model (element element-type buffer-pos parse-state)
+  (let ((u (sgml-element-content element))
+        (names nil))
+    (while (and u (>= buffer-pos (sgml-element-end u)))
+      (push (sgml-element-gi u) names)
+      (setq u (sgml-element-next u)))
+    (when names
+      (sgml-princ-names (nreverse names) " " ", ")
+      (princ "\n")))
+  (princ " ->")
+  (let* ((state parse-state)
+         (required-seq                  ; the seq of req el following point
+          (loop for required = (sgml-required-tokens state)
+                while (and required (null (cdr required)))
+                collect (sgml-eltype-name (car required))
+                do (setq state (sgml-get-move state (car required)))))
+         (last-alt
+          (mapcar 'sgml-eltype-name
+                  (append (sgml-optional-tokens state)
+                          (sgml-required-tokens state)))))
+    (cond
+     (required-seq
+      (when last-alt
+        (nconc required-seq
+               (list (concat "("
+                             (mapconcat (lambda (x) x)
+                                        last-alt " | ")
+                             (if (sgml-final state)
+                                 ")?" ")")))))
+      (sgml-princ-names required-seq " " ", "))
+
+     (last-alt
+      (sgml-princ-names last-alt " (" " | ")
+      (princ ")")
+      (when (sgml-final state)
+        (princ "?"))))))
+
 
 ;¤¤\end{codeseg}
