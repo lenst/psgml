@@ -2,7 +2,9 @@
 
 	* psgml.el, psgml-edit.el: Fix from David Megginson to some
 	regexps for _: in names.
-	
+	(sgml-build-custom-menus): Do not call easy-menu-change with empty
+	menu.
+
 	* psgml-edit.el (sgml-do-set-option): Don't modify the *Help*
 	buffer directly, call sgml-append-to-help-buffer. Fixes problem
 	with read-only buffer.

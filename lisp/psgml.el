@@ -867,7 +867,7 @@ as that may change."
    ["Insert Attribute"  sgml-attrib-menu	t]
    ["Insert Entity"	sgml-entities-menu	t]
    ["Add Element to Element"	sgml-add-element-menu	t]
-   ("Custom markup")
+   ("Custom markup"   "---")
    ))
 
 (easy-menu-define
@@ -914,8 +914,8 @@ as that may change."
    ["List Valid Tags"	sgml-list-valid-tags t]
    ["Show/Hide Warning Log"  sgml-show-or-clear-log t]
    ["Validate"		sgml-validate t]
-   ("File Options")
-   ("User Options")
+   ("File Options"   "---")
+   ("User Options"   "---")
    ["Submit Bug Report"  sgml-submit-bug-report t]
    ))
 
@@ -959,10 +959,12 @@ as that may change."
     (unless (or (null button3)
 		(numberp button3))
       (local-set-key [button3] button3))
-    (easy-menu-change '("DTD") "Insert DTD"
-                      (sgml-compute-insert-dtd-items))
-    (easy-menu-change '("Markup") "Custom markup"
-                      (sgml-compute-custom-markup-items))))
+    (when sgml-custom-dtd
+      (easy-menu-change '("DTD") "Insert DTD"
+			(sgml-compute-insert-dtd-items)))
+    (when sgml-custom-markup
+      (easy-menu-change '("Markup") "Custom markup"
+			(sgml-compute-custom-markup-items)))))
 
 
 ;;;; Post command hook 
