@@ -1,6 +1,10 @@
-2002-05-07  Lennart Staflin  <lenst@lysator.liu.se>
+2002-05-08  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.3.0 released
+	
+	* psgml.el (sgml-default-nonsticky): moved from psgml-other.el
+
+2002-05-07  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-maint.el (psgml-common-files): add psgml-sysdep
 	(psgml-find-source-dir): fix version

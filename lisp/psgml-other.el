@@ -139,10 +139,6 @@ Overlays are significantly less efficient in large buffers.")
 	 (when (not modified)
 	   (sgml-restore-buffer-modified-p nil))))))
 
-(defconst sgml-default-nonsticky (boundp 'text-property-default-nonsticky)
-  "Non-nil means use `text-property-default-nonsticky'. locally.
-Otherwise put explicit properties.")
-
 (defun sgml-set-face-for (start end type)
   (let ((face (cdr (assq type sgml-markup-faces))))
     (cond

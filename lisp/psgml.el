@@ -78,6 +78,11 @@
     "Non-nil if this Emacs supports regexp character classes.
 E.g. `[-.[:alnum:]]'."))
 
+(defconst sgml-default-nonsticky (boundp 'text-property-default-nonsticky)
+  "Non-nil means use `text-property-default-nonsticky'. locally.
+Otherwise put explicit properties.")
+
+
 (defvar sgml-xml-p nil
   "Is this an XML document?")
 (make-variable-buffer-local 'sgml-xml-p)
