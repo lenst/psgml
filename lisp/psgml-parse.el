@@ -2286,23 +2286,98 @@ With implied tags this is ambigous."
   (sgml-message ""))
 
 (defun sgml-change-element-name (gi)
-  "Replace the name (generic identifyer) of the current element with a new name."
+  "Replace the name of the current element with a new name.
+Eventual attributes of the current element will be translated if 
+possible."
   (interactive
-   (list
-    (let ((el (sgml-find-element-of (point))))
-      (goto-char (sgml-element-start el))
-      (sgml-read-element-name
-       (format "Change %s to: " (sgml-element-name el))))))
-  (when (or (null gi)
-	    (equal gi ""))
+   (list (let ((el (sgml-find-element-of (point))))
+	   (goto-char (sgml-element-start el))
+	   (sgml-read-element-name
+	    (format "Change %s to: " (sgml-element-name el))))))
+  (when (or (null gi) (equal gi ""))
     (error "Illegal name"))
-  (let ((element (sgml-find-element-of (point))))
-    (goto-char (sgml-element-end element))
-    (delete-char (- (sgml-element-etag-len element)))
-    (insert (sgml-end-tag-of gi))
+  (let* ((element (sgml-find-element-of (point)))
+	 (attspec (sgml-element-attribute-specification-list element))
+	 (oldattlist (sgml-element-attlist element)))
+    (unless (sgml-element-empty element)
+      (goto-char (sgml-element-end element))
+      (delete-char (- (sgml-element-etag-len element)))
+      (insert (sgml-end-tag-of gi)))
     (goto-char (sgml-element-start element))
     (delete-char (sgml-element-stag-len element))
-    (insert (sgml-start-tag-of gi))))
+    (insert (sgml-start-tag-of gi))
+    (forward-char -1)
+    (let* ((newel (sgml-find-element-of (point)))
+	   (newattlist (sgml-element-attlist newel))
+	   (newasl (sgml-translate-attribute-specification-list
+		    attspec oldattlist newattlist)))
+      (sgml-insert-attributes newasl newattlist))))
+
+(defun sgml-translate-attribute-specification-list (values from to)
+  "Translate attribute specification from one element type to another.
+Input attribute values in VALUES using attlist FROM is translated into
+a list using attlist TO."
+  (let ((new-values nil)
+	tem)
+    (loop for attspec in values 
+	  as from-decl = (sgml-lookup-attdecl (sgml-attspec-name attspec) from)
+	  as to-decl   = (sgml-lookup-attdecl (sgml-attspec-name attspec) to)
+	  do
+	  (cond
+	   ;; Special case ID attribute
+	   ((and (eq 'id (sgml-attdecl-declared-value from-decl))
+		 (setq tem (sgml-attribute-with-declared-value to 'id)))
+	    (push
+	     (sgml-make-attspec (sgml-attdecl-name tem)
+				(sgml-attspec-attval attspec))
+	     new-values))
+	   ;; Use attribute with same name if compatible type
+	   ((equal (sgml-attdecl-declared-value from-decl)
+		   (sgml-attdecl-declared-value to-decl))
+	    (push attspec new-values))
+	   (to-decl
+	    (sgml-log-warning
+	     "Attribute %s has new declared-value"
+	     (sgml-attspec-name attspec))
+	    (push attspec new-values))
+	   (t
+	    (sgml-log-warning "Can't translate attribute %s = %s"
+			      (sgml-attspec-name attspec)
+			      (sgml-attspec-attval attspec)))))
+    new-values))
+
+(defun sgml-attribute-with-declared-value (attlist declared-value)
+  "Find the first attribute in ATTLIST that has DECLARED-VALUE."
+  (let ((found nil))
+    (while (and attlist (not found))
+      (when (equal declared-value
+		   (sgml-attdecl-declared-value (car attlist)))
+	(setq found (car attlist)))
+      (setq attlist (cdr attlist)))
+    found))
+
+(defun sgml-untag-element ()
+  "Remove tags from current element."
+  (interactive "*")
+  (let ((el (sgml-find-element-of (point))))
+    (goto-char (sgml-element-etag-start el))
+    (delete-char (sgml-element-etag-len el))
+    (goto-char (sgml-element-start el))
+    (delete-char (sgml-element-stag-len el))))
+
+(defun sgml-kill-markup ()
+  "Kill next tag, markup declaration or process instruction."
+  (interactive "*")
+  (let ((start (point)))
+    (sgml-with-parser-syntax
+     (sgml-skip-s)
+     (setq sgml-markup-start (point))
+     (cond ((sgml-is-start-tag) (sgml-down-element))
+	   ((sgml-is-end-tag)   (sgml-up-element))
+	   ((sgml-skip-doctype))
+	   ((sgml-parse-mdo)    (sgml-skip-markup-declaration))
+	   ((sgml-skip-processing-instruction)))
+     (kill-region start (point)))))
 
 
 ;;;; SGML mode: folding
