@@ -169,19 +169,23 @@ possible."
   (let* ((element (sgml-find-element-of (point)))
 	 (attspec (sgml-element-attribute-specification-list element))
 	 (oldattlist (sgml-element-attlist element)))
-    (unless (sgml-element-empty element)
+    (unless  (sgml-element-empty element)
       (goto-char (sgml-element-end element))
       (delete-char (- (sgml-element-etag-len element)))
       (insert (sgml-end-tag-of gi)))
     (goto-char (sgml-element-start element))
     (delete-char (sgml-element-stag-len element))
-    (insert (sgml-start-tag-of gi))
-    (forward-char -1)
+    (insert (sgml-delim "STAGO")
+            (sgml-general-insert-case gi))
     (let* ((newel (sgml-find-element-of (point)))
 	   (newattlist (sgml-element-attlist newel))
 	   (newasl (sgml-translate-attribute-specification-list
 		    attspec oldattlist newattlist)))
-      (sgml-insert-attributes newasl newattlist))))
+      (sgml-insert-attributes newasl newattlist))
+    (insert (if (and sgml-xml-p (sgml-element-empty element))
+                (sgml-delim "XML-TAGCE")
+              (sgml-delim "TAGC")))))
+
 
 (defun sgml-translate-attribute-specification-list (values from to)
   "Translate attribute specification from one element type to another.
@@ -1251,7 +1255,7 @@ Editing is done in a separate window."
 			"#FIXED %s"
 			(sgml-default-value-attval def-value)))
 	  ((and (null cur-value)
-		(or (memq def-value '(implied conref current))
+		(or (memq def-value '(IMPLIED CONREF CURRENT))
 		    (sgml-default-value-attval def-value)))
 	   (sgml-insert '(category sgml-default rear-nonsticky (category))
 			"#DEFAULT"))
@@ -1710,6 +1714,8 @@ If it is something else complete with ispell-complete-word."
   (interactive "*")
   (let ((tab				; The completion table
 	 nil)
+        (ignore-case                    ; If ignore case in matching completion
+         sgml-namecase-general)
 	(pattern nil)
 	(c nil)
 	(here (point)))
@@ -1739,12 +1745,14 @@ If it is something else complete with ispell-complete-word."
 		   (sgml-current-list-of-endable-eltypes)))))
      ;; markup declaration
      ((eq c ?!)
-      (setq tab sgml-markup-declaration-table))
+      (setq tab sgml-markup-declaration-table
+            ignore-case t))
      (t
       (goto-char here)
       (ispell-complete-word)))
     (when tab
-      (let ((completion (try-completion pattern tab)))
+      (let* ((completion-ignore-case ignore-case)
+             (completion (try-completion pattern tab)))
 	(cond ((null completion)
 	       (goto-char here)
 	       (message "Can't find completion for \"%s\"" pattern)
@@ -1854,12 +1862,10 @@ If it is something else complete with ispell-complete-word."
 (defun sgml-position ()
   (interactive)
   (let ((el (sgml-find-context-of (point)))
-        (gis nil)
-        (pstr ""))
+        (gis nil))
     (while (not (sgml-off-top-p el))
       (push (sgml-element-gi el) gis)
       (setq el (sgml-element-parent el)))
-    
     (message "%s" (mapconcat #'sgml-general-insert-case
                              gis "\\"))))
 
@@ -1897,7 +1903,10 @@ If it is something else complete with ispell-complete-word."
     (mapcar #'sgml-token-eltype found)))
 
 
-(defun sgml-add-element-to-element (gi)
+(defun sgml-add-element-to-element (gi first)
+  "Add an element of type GI to the current element.
+The element will be added at the last legal position if FIRST is `nil',
+otherwise it will be added at the first legal position."
   (interactive
    (let ((tab
           (mapcar (lambda (et) (cons (sgml-eltype-name et) nil))
@@ -1908,31 +1917,28 @@ If it is something else complete with ispell-complete-word."
            (t
             (let ((completion-ignore-case sgml-namecase-general))
               (list (completing-read "Element: " tab nil t
-                                     (and (null (cdr tab)) (caar tab)))))))))
-  ;;
-  ;; Find point in current element to insert an element with GI
-  ;;
+                                     (and (null (cdr tab)) (caar tab)))
+                    current-prefix-arg))))))
   (let ((el (sgml-find-context-of (point)))
         (et (sgml-lookup-eltype (sgml-general-case gi))))
     (let ((c (sgml-element-content el))
           (s (sgml-element-model el))
-          (tok (sgml-eltype-token et)))
-      (while (cond
-              ((sgml--add-before-p tok s c)
-               (goto-char (if c (sgml-element-start c)
-			    (sgml-element-etag-start el)))
-               (sgml-insert-element gi)
-               nil)
-              (c
-               (setq s (sgml-element-pstate c))
-               (setq c (sgml-element-next c))
-               t)
-              (t
-               (error "A %s element is not valid in current element" gi)))))))
-
-
-(define-key sgml-mode-map "\C-c\C-i" 'sgml-add-element-to-element)
-
-
+          (tok (sgml-eltype-token et))
+          (last nil))
+      ;; Find legal position for new element
+      (while (and (not (cond
+                        ((sgml--add-before-p tok s c)
+                         (setq last (if c (sgml-element-start c)
+                                      (sgml-element-etag-start el)))
+                         first)))
+                  (cond
+                   (c (setq s (sgml-element-pstate c))
+                      (setq c (sgml-element-next c))
+                      t))))
+      (cond (last
+             (goto-char last)
+             (sgml-insert-element gi))
+            (t
+             (error "A %s element is not valid in current element" gi))))))
 
 ;;; psgml-edit.el ends here

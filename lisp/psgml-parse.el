@@ -612,8 +612,8 @@ or (notation  (NOT1 ... NOTn))"
 
 (defun sgml-attdecl-default-value (attdecl)
   "The default value of ATTDECL.
-The default value is either a symbol (required | implied | current |
-conref) or a list with first element nil or symbol 'fixed' and second
+The default value is either a symbol (REQUIRED | IMPLIED | CURRENT |
+CONREF) or a list with first element nil or symbol `FIXED' and second
 element the value."
   (caddr attdecl))
 
@@ -679,7 +679,7 @@ The actual value is a string. Return nil if no actual value."
 
 (defun sgml-default-value-type-p (type default-value)
   "Return true if DEFAULT-VALUE is of TYPE.
-Where TYPE is a symbol, one of required, implied, conref, or fixed."
+Where TYPE is a symbol, one of REQUIRED, IMPLIED, CONREF, or FIXED."
   (or (eq type default-value)
       (and (consp default-value)
 	   (eq type (car default-value)))))
@@ -1693,8 +1693,8 @@ in any of them."
 
 (defun sgml-do-parameter-entity-ref ()
   (let* ((name (sgml-parse-name t))
-	     (ent (sgml-lookup-entity name
-				      (sgml-dtd-parameters sgml-dtd-info))))
+         (ent (sgml-lookup-entity name
+                                  (sgml-dtd-parameters sgml-dtd-info))))
 	(or (sgml-parse-delim "REFC")
 	    (sgml-parse-char ?\n))
 	;;(sgml-set-markup-type 'param)
@@ -1866,6 +1866,7 @@ is not already in upper case."
   type					; Type of entity CDATA NDATA PI SDATA
   text					; string or external
   notation                              ; Notation of external entity or nil  
+  ;; Last cdr is undefined flag
   )
 
 (defun sgml-entity-data-p (entity)
@@ -1873,7 +1874,11 @@ is not already in upper case."
   (not (eq (sgml-entity-type entity) 'text)))
 
 (defun sgml-entity-marked-undefined-p (entity)
-  (cdddr entity))
+  (cddddr entity))
+
+(defsetf sgml-entity-marked-undefined-p (entity) (val)
+  `(setf (cddddr ,entity) ,val))
+
 
 
 ;;; Entity tables
@@ -2522,7 +2527,7 @@ overrides the entity type in entity look up."
 			    thereis (funcall fn sysid)))
 		  (progn
 		    ;; Mark entity as not found
-		    (setcdr (cddr entity) t) ;***
+                    (setf (sgml-entity-marked-undefined-p entity) t)
 		    (sgml-log-warning "External entity %s not found"
 				      (sgml-entity-name entity))
 		    (when pubid

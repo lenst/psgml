@@ -1,3 +1,23 @@
+Fri Jul  3 17:54:06 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-complete): ignore case
+
+	* psgml-parse.el (sgml-push-to-entity): use setf to set 
+	sgml-entity-marked-undefined-p.
+	(setf sgml-entity-marked-undefined-p): define setf method
+
+Tue Jun 30 21:48:39 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-mode-map): C-c C-i calls sgml-add-element-to-element
+
+	* psgml-edit.el (sgml-add-element-to-element): New command.
+
+Wed Jun 24 23:23:38 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-attribute-buffer): Fixed another victim of
+	the case change.
+	(sgml-change-element-name): fix bug with empty XML element
+
 Mon Jun 22 19:58:43 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el (psgml-version): Version 1.1.2
