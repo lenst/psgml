@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: 1998-10-24 07:37:50 lenst
+;;;\Last edited: 1998-11-15 22:02:29 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -253,7 +253,7 @@
     (with-output-to-temp-buffer "*Testing psgml*"
       (while
 	  (progn
-	    (setq file (format "/usr/local/src/sgmls-1.1/test/test%03d.sgm"
+	    (setq file (format "/ni/src/sgmls-1.1/test/test%03d.sgm"
 			       start))
 	    (file-exists-p file))
 	(princ (format "*** File test%03d ***\n" start))

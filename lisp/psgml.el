@@ -601,7 +601,9 @@ See `compilation-error-regexp-alist'.")
 	     (insert
 	      "<!-- Keep this comment at the end of the file\n"
 	      "Local variables:\n"
-	      "mode: sgml\n"
+	      (if sgml-xml-p
+		  "mode: xml\n"
+		"mode: sgml\n")
 	      "End:\n"
 	      "-->\n")
 	     (forward-line -3)))

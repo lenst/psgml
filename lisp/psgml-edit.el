@@ -116,7 +116,6 @@ With implied tags this is ambigous."
 			       (sgml-element-parent to)
 			     to))))
 
-
 (defun sgml-kill-element ()
   "Kill the element following the cursor."
   (interactive "*")
@@ -1984,6 +1983,14 @@ otherwise it will be added at the first legal position."
                     current-prefix-arg))))))
   (let ((el (sgml-find-context-of (point)))
         (et (sgml-lookup-eltype (sgml-general-case gi))))
+    ;; First expand empty tag
+    (when (and sgml-xml-p (sgml-element-empty el))
+      (save-excursion
+	(goto-char (sgml-element-stag-end el))
+	(delete-char -2)
+	(insert ">\n" (sgml-end-tag-of sgml-current-tree))
+	(sgml-indent-line))
+      (setq el (sgml-find-context-of (point))))
     (let ((c (sgml-element-content el))
           (s (sgml-element-model el))
           (tok (sgml-eltype-token et))

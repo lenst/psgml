@@ -1,5 +1,5 @@
 ;;;; psgml-info.el
-;;; Last edited: 1998-06-19 18:59:43 lenst
+;;; Last edited: 1998-11-16 09:55:24 XBOT
 ;;; $Id$
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
@@ -20,6 +20,7 @@
 ;; along with this program; if not, write to the Free Software
 ;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
+Next page...
 
 ;;;; Commentary:
 
@@ -222,7 +223,7 @@
       (setq table (sort table (function (lambda (a b)
 					  (string< (car a) (car b)))))))
     (loop for e in table do
-	  (insert (format "%s" (car e)))
+	  (insert (format "%s " (car e)))
 	  (loop for name in (if nosort
 				(cdr e)
 			      (sort (cdr e) (function string-lessp)))
@@ -292,6 +293,17 @@
 
 ;;;; Describe element type
 
+(defun sgml-princ-names (names)
+  (loop with col = 0
+	for name in names
+	do
+	(when (and (> col 0) (> (+ col (length name) 1) fill-column))
+	  (princ "\n")
+	  (setq col 0))
+	(princ " ") (princ name)
+	(incf col (length name))
+	(incf col 1)))
+
 (defun sgml-describe-element-type (et-name)
   "Describe the properties of an element type as declared in the current DTD."
   (interactive
@@ -351,7 +363,16 @@
 	(when s
 	  (princ (format "\nUSEMAP: %s\n" s))))
       ;; ----
-      (princ "\nOCCURS IN:\n\n")
+      (princ "\nCONTENT: ")
+      (cond ((symbolp (sgml-eltype-model et)) (princ (sgml-eltype-model et)))
+	    (t
+	     (princ (if (sgml-eltype-mixed et) "mixed\n\n"
+		       "element\n\n"))	     
+	     (sgml-princ-names
+	      (mapcar #'symbol-name (sgml-eltype-refrenced-elements et)))))
+
+      ;; ----
+      (princ "\n\nOCCURS IN:\n\n")
       (let ((occurs-in ()))
 	(sgml-map-eltypes
 	 (function (lambda (cand)

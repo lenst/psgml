@@ -1,4 +1,14 @@
+1998-11-16  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-set-local-variable): insert "mode: xml" for
+	xml-mode and "mode: sgml" otherwise
+
+	* psgml-edit.el (sgml-add-element-to-element): add end-tag to
+	empty xml-elements before inserting an element
+
 1998-11-15  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* Version 1.1.6 released
 
 	* psgml-parse.el (sgml-char-int): from XEmacs
 	(sgml-read-octet): modified for XEmacs
