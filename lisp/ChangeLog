@@ -1,3 +1,28 @@
+Tue Nov  9 16:25:53 1999  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-modify-dtd): use sgml-general-case on names
+	from modifier.
+
+Mon Nov  8 22:13:12 1999  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-info.el (sgml-eltype-refrenced-elements): Copy sequence
+	before sorting destructively.
+	(sgml-describe-element-type): Include exceptions in info display.
+
+Thu Nov  4 19:07:09 1999  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-note-change-at): If in XML mode and
+ 	previous char is /, back up one char. This allows for the />
+ 	delimiter to be recognized even if the start tag has been
+ 	previously parsed as an improperly ended tag.
+
+	* psgml-edit.el (sgml-last-element): don't use sgml-last-element
+	for XML (there is not omitted tags to account for).
+
+1999-10-19  Lennart Staflin  <lennarts@infotek.no>
+	
+	* Version 1.2.1 released
+	
 1999-10-14  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml-parse.el (sgml-log-entity-stack): don't use

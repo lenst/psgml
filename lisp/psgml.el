@@ -52,7 +52,7 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.2.0"
+(defconst psgml-version "1.2.2"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -972,12 +972,15 @@ as that may change."
     (when (or (null last-values)
               (sgml-any-option-changed (cdr last-values)
                                        option-vars))
-      (easy-menu-change '("SGML") menuname
+      (condition-case err
+          (easy-menu-change '("SGML") menuname
                       (nconc (sgml-options-menu-items option-vars)
                              (if save-func
                                  (list "---"
                                        (vector (format "Save %s" menuname)
                                                save-func t)))))
+        (error
+         (message "Error in update menu: %s" err)))
       (unless last-values
         (setq last-values (cons menuname nil))
         (push last-values sgml-last-options-menu-values))

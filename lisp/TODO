@@ -1,4 +1,9 @@
-TODO      [Time-stamp: "1999-06-13 14:28:44 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "1999-11-04 19:37:58 lenst"]           -*- outline -*- 
+
+* sgml-kill-element
+
+if there is no following element, kill up to the end tag of the
+current element.
 
 * Set-faces har andra variabler vettiga default.?
 
