@@ -74,7 +74,7 @@
 ;;;; Variables
 ;;; User settable options:
 
-(defvar sgml-max-menu-size 20
+(defvar sgml-max-menu-size 30
   "*Max number of entries in Tags and Entities menus before they are split
 into several panes.")
 
@@ -360,7 +360,6 @@ running the sgml-validate-command.")
 (define-key sgml-mode-map [menu-bar sgml-dtd parse]
   '("Parse DTD" . sgml-parse-prolog))
 
-
 
 ;;; Fold menu
 
@@ -393,11 +392,13 @@ running the sgml-validate-command.")
   '("" . nil))
 
 (define-key sgml-markup-menu [lv-comment]
-  (sgml-markup "Local variables comment" "<!--\nLocal variables:\n\rEnd:\n-->\n"))
+  (sgml-markup "Local variables comment"
+	       "<!--\nLocal variables:\n\rEnd:\n-->\n"))
 (define-key sgml-markup-menu [ comment]
   (sgml-markup "Comment" "<!-- \r -->\n"))
 (define-key sgml-markup-menu [ doctype]
-  (sgml-markup "Doctype" "<!doctype \r -- public or system -- [\n]>\n"))
+  (sgml-markup "Doctype"
+	       "<!doctype \r -- public or system -- [\n]>\n"))
 
 (define-key sgml-markup-menu [blank2]
   '("" . nil))
@@ -551,6 +552,8 @@ All bindings:
 	do (define-key sgml-mode-map
 	     (vector 'menu-bar 'sgml-markup (intern (concat "custom" i)))
 	     (sgml-markup (car e) (cadr e))))
+  (when sgml-custom-dtd
+    (define-key sgml-mode-map [menu-bar sgml-dtd blank-c] '("" . nil)))
   (loop for e in (reverse sgml-custom-dtd)
 	for i from 0
 	do (define-key sgml-mode-map
