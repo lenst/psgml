@@ -3157,6 +3157,7 @@ Assumes starts with point inside a markup declaration."
 	       (funcall sgml-data-function (buffer-substring start (point))))
 	     (setq done (or (sgml-is-delim "ETAGO" gi)
 			    (sgml-is-enabled-net)))))
+      (setq start (point))
       (cond
        (done)
        ((eobp)
