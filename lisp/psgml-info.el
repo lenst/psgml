@@ -1,5 +1,5 @@
 ;;;; psgml-info.el
-;;; Last edited: 1998-11-16 09:55:24 XBOT
+;;; Last edited: 1998-11-25 21:34:05 lenst
 ;;; $Id$
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
@@ -182,7 +182,7 @@ Next page...
        (cons (sgml-eltype-name eltype)
 	     (mapcar (function sgml-eltype-name)
 		     (sgml-eltype-refrenced-elements eltype))))))
-   "Elements refrenced by elements"
+   "Elements referenced by elements"
    "Element" "Content"))
 
 (defun sgml-list-occur-in-elements ()
