@@ -1,3 +1,12 @@
+2003-03-28  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-do-processing-instruction): new handling
+	of <?PSGML> processing instruction.
+	(sgml--pi-psgml-handler): new func
+	(sgml--pi-element-handler): new func. handles <?PSGML ELEMENT ..>
+	(sgml-psgml-pi-enable-outside-dtd): new variable. controls when
+	<?PSGML> is evaluated.
+
 2003-03-27  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el: fix wrong file name in error trace
