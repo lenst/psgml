@@ -123,6 +123,7 @@ into several panes.")
    ["Kill Markup"		sgml-kill-markup t]
    ["Kill Element"		sgml-kill-element t]
    ["Untag Element"		sgml-untag-element t]
+   ["Trim and leave element"	sgml-trim-and-leave-element t]
    ["Decode Character Entities"  sgml-charent-to-display-char t]
    ["Encode Characters"		sgml-display-char-to-charent t]
    )
