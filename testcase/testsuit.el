@@ -23,6 +23,7 @@
     ("tc19.sgml" (warning "B end-tag implied by B start-tag"))
     ("tc20.sgml" (warning "Start-tag of undefined element FOO"))
     ("tc21.sgml")
+    ("tc22.el")
     ))
 
 (defun testsuit-run-test-case (case-description)
