@@ -66,29 +66,29 @@
 (define-key sgml-mode-map [menu-bar sgml options]
   '("Options..." . sgml-options-menu))
 (define-key sgml-mode-map [menu-bar sgml fill]
-  '("Fill element        [C-c C-q]" . sgml-fill-element))
+  '("Fill element           [C-c C-q]" . sgml-fill-element))
 (define-key sgml-mode-map [menu-bar sgml normalize]
   '("Normalize                " . sgml-normalize))
 (define-key sgml-mode-map [menu-bar sgml validate]
-  '("Validate            [C-c C-l]" . sgml-validate))
+  '("Validate               [C-c C-v]" . sgml-validate))
 (define-key sgml-mode-map [menu-bar sgml show-log]
   '("Show/hide warning log  [C-c C-l]" . sgml-show-or-clear-log))
 (define-key sgml-mode-map [menu-bar sgml show-tags]
-  '("List valid tags     [C-c C-t]" . sgml-list-valid-tags))
+  '("List valid tags        [C-c C-t]" . sgml-list-valid-tags))
 (define-key sgml-mode-map [menu-bar sgml change-name]
-  '("Change element name  [C-c =]" . sgml-change-element-name))
+  '("Change element name    [C-c =]" . sgml-change-element-name))
 (define-key sgml-mode-map [menu-bar sgml edit-attributes]
-  '("Edit attributes     [C-c C-a]" . sgml-edit-attributes))
+  '("Edit attributes        [C-c C-a]" . sgml-edit-attributes))
 (define-key sgml-mode-map [menu-bar sgml next-trouble]
-  '("Next trouble spot   [C-c C-o]" . sgml-next-trouble-spot)) 
+  '("Next trouble spot      [C-c C-o]" . sgml-next-trouble-spot)) 
 (define-key sgml-mode-map [menu-bar sgml what-element]
-  '("What element        [C-c C-w]" . sgml-what-element))
+  '("What element           [C-c C-w]" . sgml-what-element))
 (define-key sgml-mode-map [menu-bar sgml show-context]
-  '("Show context        [C-c C-c]" . sgml-show-context))
+  '("Show context           [C-c C-c]" . sgml-show-context))
 (define-key sgml-mode-map [menu-bar sgml insert-end-tag]
-  '("End element         [C-c /]" . sgml-insert-end-tag))
+  '("End element            [C-c /]" . sgml-insert-end-tag))
 (define-key sgml-mode-map [menu-bar sgml next-data]
-  '("Next data field     [C-c C-d]" . sgml-next-data-field))
+  '("Next data field        [C-c C-d]" . sgml-next-data-field))
 
 
 ;;;; DTD menu
@@ -186,6 +186,7 @@
 
 
 ;;;; Build custom menus
+
 (defun sgml-build-custom-menus ()
   ;; Build custom menus
   (sgml-add-custom-entries
@@ -200,7 +201,7 @@
 	      (cons (first e)
 		    (` (lambda ()
 			 (interactive)
-			 (sgml-doctype-insert (,@ (cdr e))))))))
+			 (apply 'sgml-doctype-insert '(, (cdr e))))))))
 	   sgml-custom-dtd)))
 
 
@@ -224,6 +225,54 @@ The entries are added last in keymap and a blank line precede it."
 		     collect (cons (intern (concat "custom" i)) e)))))
     ;; add keymap name to keymap
     (setcdr (last keymap) last)))
+
+
+;;;; Insert with properties
+
+(defun sgml-insert (props format &rest args)
+  (let ((start (point)))
+    (insert (apply (function format)
+		   format
+		   args))
+    (add-text-properties start (point) props)))
+
+
+;;;; Set face of markup
+
+(defun sgml-set-face-for (start end type)
+  (let ((current (overlays-at start))
+	(face (cdr (assq type sgml-markup-faces
+			 )))
+	o)
+
+    (while current
+      (cond ((and (null o)
+		  (eq type (overlay-get (car current) 'type)))
+	     (setq o (car current)))
+	    (t (delete-overlay (car current))))
+      (setq current (cdr current)))
+    (cond (o
+	   (move-overlay o start end))
+	  (face
+	   (setq o (make-overlay start end))
+	   (overlay-put o 'type type)
+	   (overlay-put o 'face face)))))
+
+(defun sgml-set-face-after-change (start end &optional pre-len)
+  (when sgml-set-face
+    (loop for o in (overlays-at start)
+	  do (cond
+	      ((= start (overlay-start o))
+	       (move-overlay o end (overlay-end o)))
+	      (t (delete-overlay o))))))
+
+(defalias 'next-overlay-at 'next-overlay-change) ; fix bug in cl.el
+
+(defun sgml-clear-faces ()
+  (interactive)
+  (loop for o being the overlays
+	if (overlay-get o 'type)
+	do (delete-overlay o)))
 
 
 ;;;; Provide
