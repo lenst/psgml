@@ -1,6 +1,6 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
 
-<!ENTITY last.ed  'Time-stamp: "1998-07-18 00:00:53 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "1999-10-10 18:14:40 lenst"'>
 <!ENTITY % HTML.Deprecated "IGNORE">
 
 <!ENTITY rcs.id "$Id$">
@@ -20,10 +20,9 @@
 <!entity ftp.url "ftp://ftp.lysator.liu.se/">
 <!entity psgml.dir "&ftp.url;pub/sgml/">
 <!ENTITY alpha.dir "&psgml.dir;ALPHA/">
-<!ENTITY psgml0.4b  "&psgml.dir;psgml-0.4b.tar.gz">
-<!entity psgml0.4b2 "&psgml.dir;psgml-0.4b2.tar.gz">
 <!entity psgml0.4b3 "&psgml.dir;psgml-0.4b3.tar.gz">
-<!entity psgml1.0.1 "&psgml.dir;psgml-1.0.1.tar.gz">
+<!entity psgml1.0.3 "&psgml.dir;psgml-1.0.3.tar.gz">
+<!entity psgml1.2.0 "&psgml.dir;psgml-1.2.0.tar.gz">
 
 <!entity olddoc.url "&base.url;/psgml_toc.html">
 <!entity newdoc.url "&base.url;/psgml_toc.html">
@@ -42,7 +41,7 @@
   <meta name="template-type" content="software">
   <meta name="category" content="Emacs mode">
   <meta name="author-name" content="Lennart Staflin">
-  <meta name="version" content="1.0.1">
+  <meta name="version" content="1.2.0">
   <meta name="description"
     content="PSGML is a GNU Emacs Major Mode for editing SGML coded documents.">
   <meta name="keywords" content="sgml, emacs, syntax directed editing">
@@ -65,7 +64,7 @@ HR.divider { width: 50%; align: center; }
   <hr>
   <DIV> <h1>Information about PSGML</h1>
    <p>
-    PSGML is a GNU Emacs Major Mode for editing &SGML; coded
+    PSGML is a GNU Emacs Major Mode for editing &SGML; and XML coded
     documents.
    </p>
    <ul class="content">
@@ -100,6 +99,12 @@ HR.divider { width: 50%; align: center; }
    <DIV> <h2><A NAME="UPDATE">Update</A></h2>
     <DL>
 
+     <dt>1999-10-10</dt>
+     <dd><p>Version 1.2.0 of PSGML with <acronym>XML</acronym> support is
+      now released. Get <a href="&psgml1.2.0;">psgml-1.2.0.tar.gz</a>
+      from <a href="&psgml.dir">lystor ftp.</a></p>
+     </dd>
+
      <DT>1998-06-03</DT>
      <DD>
       <P><acronym>XML</acronym> support is in an
@@ -108,8 +113,8 @@ HR.divider { width: 50%; align: center; }
 
      <dt>1996-11-20</dt>
      <dd>
-      <p>Version 1.0.1 of psgml. A bug fix release. <a
-         href="#V1.0.1">The release is available for download.</a></p>
+      <p>Version 1.0.3 of psgml. A bug fix release. <a
+         href="#V1.0.3">The release is available for download.</a></p>
      </dd>
 
      <dt>1996-11-11</dt>
@@ -133,17 +138,19 @@ HR.divider { width: 50%; align: center; }
      directory <samp>pub/sgml</samp>.</p>
 
     <dl>
-     <DT><A NAME="V1.0.1">1.0.1</A></dt>
+     <DT><A NAME="V1.2.0">1.2.0</A></dt>
      <dd>
-      <p>This is the latest release. Available via ftp as <a
-         href="&psgml1.0.1">psgml-1.0.1.tar.gz</a>. You can look at
+      <p>This is the latest release. Available via ftp as 
+       <a href="&psgml1.2.0;">psgml-1.2.0.tar.gz</a>
+     </dd>
+
+     <DT><A NAME="V1.0.3">1.0.3</A></dt>
+     <dd>
+      <p>This is the previous stable release. Available via ftp as <a
+         href="&psgml1.0.3">psgml-1.0.3.tar.gz</a>. You can look at
          the <a href="&newdoc.url;">documentation</a>. </p>
      </dd>
-     <dt>0.4b3</dt>
-     <dd>
-      <p>This is the previous (beta) release.  Available via ftp as
-       <a href="&psgml0.4b3">psgml-0.4b3.tar.gz</a>.</p>
-     </dd>
+
     </dl>
    </div>
    <div> <h2><a name="NEW12">News in version 1.2</a></h2>
