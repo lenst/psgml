@@ -350,8 +350,6 @@ This uses the selective display feature."
 
 ;;;; SGML mode: indentation and movement
 
-(defvar sgml-content-indent-function 'sgml-indent-according-to-level)
-(defvar sgml-attribute-indent-function 'sgml-indent-according-to-stag)
 
 (defun sgml-indent-according-to-level (element)
   (* sgml-indent-step
@@ -451,6 +449,7 @@ Deprecated: ELEMENT"
 	       (or (eq sgml-last-element avoid-el)
 		   (not (sgml-element-data-p sgml-last-element)))))
       (sgml-set-last-element))))
+
 
 (defun sgml-next-trouble-spot ()
   "Move forward to next point where something is amiss with the structure."
@@ -566,24 +565,36 @@ Deprecated: ELEMENT"
 	    (princ str))
       (terpri))))
 
+
+(defun sgml-show-context-standard (el &optional markup-type)
+  (let* ((model (sgml-element-model el)))
+    (format "%s %s"
+            (cond (markup-type (format "%s" markup-type))
+                  ((sgml-element-mixed el)
+                   "#PCDATA")
+                  ((not (sgml-model-group-p model))
+                   model)
+                  (t ""))
+            (if (eq el sgml-top-tree)
+		      "in empty context"
+                      (sgml-element-context-string el)))))
+
+
+(defun sgml-show-context-backslash (el &optional markup-type)
+  (let ((gis nil))
+    (while (not (sgml-off-top-p el))
+      (push (sgml-element-gi el) gis)
+      (setq el (sgml-element-parent el)))
+    (mapconcat #'sgml-general-insert-case gis "\\")))
+
+
 (defun sgml-show-context (&optional element)
   "Display where the cursor is in the element hierarchy."
   (interactive)
-  (let* ((el (or element (sgml-last-element)))
-	 (model (sgml-element-model el)))
-    (sgml-message "%s %s" 
-		  (cond
-		   ((and (null element)	; Don't trust sgml-markup-type if
-					; explicit element is given as argument
-			 sgml-markup-type))
-		   ((sgml-element-mixed el)
-		    "#PCDATA")
-		   ((not (sgml-model-group-p model))
-		    model)
-		   (t ""))
-		  (if (eq el sgml-top-tree)
-		      "in empty context"
-		    (sgml-element-context-string el)))))
+  (message "%s" (funcall sgml-show-context-function
+                         (or element (sgml-last-element))
+                         (if element nil sgml-markup-type))))
+
 
 (defun sgml-what-element ()
   "Display what element is under the cursor."
@@ -1218,6 +1229,62 @@ buffers local variables list."
 			  (list 'sgml-insert-attribute name nil)))))))))
 
 
+;;;; New Right Button Menu
+
+(defun sgml-right-menu (event)
+  "Pop up a menu with valid tags and insert the choosen tag.
+If the variable sgml-balanced-tag-edit is t, also inserts the
+corresponding end tag. If sgml-leave-point-after-insert is t, the point
+is left after the inserted tag(s), unless the element has som required
+content.  If sgml-leave-point-after-insert is nil the point is left
+after the first tag inserted."
+  (interactive "*e")
+  (let ((end (sgml-mouse-region)))
+    (sgml-parse-to-here)
+    (cond
+     ((eq sgml-markup-type 'start-tag)
+      (sgml-right-stag-menu event))
+     (t
+      (let ((what
+	     (sgml-menu-ask event (if (or end sgml-balanced-tag-edit)
+                                      'element 'tags))))
+	(cond
+	 ((null what))
+	 (end
+	  (sgml-tag-region what (point) end))
+	 (sgml-balanced-tag-edit
+	  (sgml-insert-element what))
+	 (t
+	  (sgml-insert-tag what))))))))
+
+
+(defun sgml-right-stag-menu (event)
+  (let* ((el (sgml-find-attribute-element))
+         (attrib-menu (ignore-errors (sgml-make-attrib-menu el))))
+
+    (let* ((alt-gi (mapcar (function sgml-eltype-name)
+                           (progn
+                             (sgml-find-context-of (sgml-element-start el))
+                             (sgml-current-list-of-valid-eltypes))))
+           (change-menu
+            (cons "Change To"
+                  (loop for gi in alt-gi
+                        collect `(,gi (sgml-change-element-name ,gi))))))
+      (sgml-popup-multi-menu
+       event "Start Tag"
+       (list* `("Misc"
+                ("Edit attributes" (sgml-edit-attributes))
+                ("Normalize" (sgml-normalize-element))
+                ("Fill" (sgml-fill-element
+                         (sgml-find-context-of (point))))
+                ("Splice" (sgml-untag-element))
+                ("Fold"   (sgml-fold-element)))
+              change-menu
+              ;;`("--" "--")
+              attrib-menu)))))
+
+
+
 ;;;; SGML mode: Fill 
 
 (defun sgml-element-fillable (element)
@@ -1847,6 +1914,18 @@ characters in the current coding system."
        (delete-region sgml-markup-start (point))
        (sgml-entity-insert-text entity)))))
 
+
+
+(defun sgml-trim-and-leave-element ()
+  "Remove blanks at end of current element and move point to after element."
+  (interactive)
+  (goto-char (sgml-element-etag-start (sgml-last-element)))
+  (while (progn (forward-char -1)
+		(looking-at "\\s-"))
+    (delete-char 1))
+  (sgml-up-element))
+
+
 (defvar sgml-notation-handlers 
   '((gif . "xv") 
     (jpeg . "xv"))
@@ -2102,28 +2181,7 @@ will reset the variable.")
       (goto-char (point-max))
       (insert "\n" string))))
 
-;;;; NEW
-
-(defun sgml-trim-and-leave-element ()
-  (interactive)
-  (goto-char (sgml-element-etag-start (sgml-last-element)))
-  (while (progn (forward-char -1)
-		(looking-at "\\s-"))
-    (delete-char 1))
-  (sgml-up-element))
-
-(defun sgml-position ()
-  (interactive)
-  (let ((el (sgml-find-context-of (point)))
-        (gis nil))
-    (while (not (sgml-off-top-p el))
-      (push (sgml-element-gi el) gis)
-      (setq el (sgml-element-parent el)))
-    (message "%s" (mapconcat #'sgml-general-insert-case
-                             gis "\\"))))
-
-(define-key sgml-mode-map "\C-c\C-y" 'sgml-position)
-
+;;;; SGML mode: insert element where valid
 
 (defun sgml--add-before-p (tok state child)
   ;; Can TOK be added in STATE followed by CHILD 
@@ -2204,5 +2262,140 @@ otherwise it will be added at the first legal position."
              (sgml-insert-element gi))
             (t
              (error "A %s element is not valid in current element" gi))))))
+
+;;;; Show current element type
+;; Candidate for C-c C-t
+
+(autoload 'sgml-princ-names "psgml-info")
+(autoload 'sgml-eltype-refrenced-elements "psgml-info")
+
+(defun sgml-show-current-element-type ()
+  "Show information about the current element and its type."
+  (interactive)
+  (let* ((el (sgml-find-context-of (point)))
+         (et (sgml-element-eltype el)))
+    (with-output-to-temp-buffer "*Current Element Type*"
+      (princ (format "ELEMENT: %s%s\n" (sgml-eltype-name et)
+                     (let ((help-text (sgml-eltype-appdata et 'help-text)))
+                       (if help-text
+                           (format " -- %s" help-text)
+                           ""))))
+      (when sgml-omittag
+        (princ (format "\n Start-tag is %s.\n End-tag is %s.\n"
+                       (if (sgml-eltype-stag-optional et)
+                           "optional" "required")
+                       (if (sgml-eltype-etag-optional et)
+                           "optional" "required"))))
+      ;; ----
+      (princ "\nCONTENT: ")
+      (cond ((symbolp (sgml-eltype-model et)) (princ (sgml-eltype-model et)))
+	    (t
+	     (princ (if (sgml-eltype-mixed et)
+                        "mixed\n"
+                      "element\n"))
+             (sgml-print-position-in-model el et (point) sgml-current-state)
+             (princ "\n\n")
+	     (sgml-princ-names
+	      (mapcar #'symbol-name (sgml-eltype-refrenced-elements et))
+              "All: ")))
+      (let ((incl (sgml-eltype-includes et))
+            (excl (sgml-eltype-excludes et)))
+        (when (or incl excl)
+          (princ "\n\nEXCEPTIONS:"))
+        (when incl
+          (princ "\n + ")
+          (sgml-princ-names (mapcar #'symbol-name incl)))
+        (when excl
+          (princ "\n - ")
+          (sgml-princ-names (mapcar #'symbol-name excl))))
+      ;; ----
+      (princ "\n\nATTRIBUTES:\n")
+      (sgml-print-attlist et)
+      ;; ----
+      (let ((s (sgml-eltype-shortmap et)))
+	(when s
+	  (princ (format "\nUSEMAP: %s\n" s))))
+      ;; ----
+      (princ "\nOCCURS IN:\n")
+      (let ((occurs-in ()))
+	(sgml-map-eltypes
+	 (function (lambda (cand)
+		     (when (memq et (sgml-eltype-refrenced-elements cand))
+		       (push cand occurs-in))))
+	 (sgml-pstate-dtd sgml-buffer-parse-state))
+        (sgml-princ-names (mapcar 'sgml-eltype-name
+                                  (sort occurs-in (function string-lessp))))))))
+
+(defun sgml-print-attlist (et)
+  (let ((ob (current-buffer)))
+    (set-buffer standard-output)
+    (unwind-protect
+        (loop
+         for attdecl in (sgml-eltype-attlist et) do
+         (princ " ")
+         (princ (sgml-attdecl-name attdecl))
+         (let ((dval (sgml-attdecl-declared-value attdecl))
+               (defl (sgml-attdecl-default-value attdecl)))
+           (when (listp dval)
+             (setq dval (concat (if (eq (first dval)
+                                        'NOTATION)
+                                    "#NOTATION (" "(")
+                                (mapconcat (function identity)
+                                           (second dval)
+                                           "|")
+                                ")")))
+           (indent-to 15 1)
+           (princ dval)
+           (cond ((sgml-default-value-type-p 'FIXED defl)
+                  (setq defl (format "#FIXED '%s'"
+                                     (sgml-default-value-attval defl))))
+                 ((symbolp defl)
+                  (setq defl (upcase (format "#%s" defl))))
+                 (t
+                  (setq defl (format "'%s'"
+                                     (sgml-default-value-attval defl)))))
+
+           (indent-to 48 1)
+           (princ defl)
+           (terpri)))
+      (set-buffer ob))))
+
+
+(defun sgml-print-position-in-model (element element-type buffer-pos parse-state)
+  (let ((u (sgml-element-content element))
+        (names nil))
+    (while (and u (>= buffer-pos (sgml-element-end u)))
+      (push (sgml-element-gi u) names)
+      (setq u (sgml-element-next u)))
+    (when names
+      (sgml-princ-names (nreverse names) " " ", ")
+      (princ "\n")))
+  (princ " ->")
+  (let* ((state parse-state)
+         (required-seq                  ; the seq of req el following point
+          (loop for required = (sgml-required-tokens state)
+                while (and required (null (cdr required)))
+                collect (sgml-eltype-name (car required))
+                do (setq state (sgml-get-move state (car required)))))
+         (last-alt
+          (mapcar 'sgml-eltype-name
+                  (append (sgml-optional-tokens state)
+                          (sgml-required-tokens state)))))
+    (cond
+     (required-seq
+      (when last-alt
+        (nconc required-seq
+               (list (concat "("
+                             (mapconcat (lambda (x) x)
+                                        last-alt " | ")
+                             (if (sgml-final state)
+                                 ")?" ")")))))
+      (sgml-princ-names required-seq " " ", "))
+
+     (last-alt
+      (sgml-princ-names last-alt " (" " | ")
+      (princ ")")
+      (when (sgml-final state)
+        (princ "?"))))))
 
 ;;; psgml-edit.el ends here
