@@ -1,5 +1,5 @@
-;;;; psgml-info.el
-;;; Last edited: Fri Nov 25 23:07:38 1994 by lenst@lysistrate (Lennart Staflin)
+;;;; psgml-charent.el
+;;; Last edited: Mon Nov 28 22:18:09 1994 by lenst@lysistrate (Lennart Staflin)
 ;;; $Id$
 
 ;; Copyright (C) 1994 Lennart Staflin
@@ -114,3 +114,5 @@ Alist with entity name as key and display character as content."
 	      (replace-match (concat "&" (car pair) ";") t t))))))
 
 
+
+;;; psgml-charent.el ends here
