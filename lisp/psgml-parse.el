@@ -550,6 +550,8 @@ The actual value is a string. Return nil if no actual value."
        (cadr default-value)))
 
 (defun sgml-default-value-type-p (type default-value)
+  "Return true if DEFAULT-VALUE is of TYPE.
+Where TYPE is a symbol, one of required, implied, conref, or fixed."
   (or (eq type default-value)
       (and (consp default-value)
 	   (eq type (car default-value)))))
@@ -2155,9 +2157,9 @@ or if nil, until end of buffer."
 
 (defun sgml-find-context-of (pos)
   "Find the parser context for POS, returns the parse tree.
-Also sets sgml-current-tree and sgml-current-state.  If pos is in
-markup, sgml-current-state will be a symbol identifying the markup
-type."
+Also sets sgml-current-tree and sgml-current-state.  If POS is in
+markup, sgml-markup-type will be a symbol identifying the markup
+type.  It will be nil otherwise."
   (save-excursion
     (sgml-parse-to pos)
     (cond ((and (> (point) pos)
@@ -2694,7 +2696,12 @@ is determined."
 (defun sgml-next-data-field ()
   "Move forward to next point where data is allowed."
   (interactive)
-  (let ((sgml-throw-on-warning 'next-data))
+  (let ((sgml-throw-on-warning 'next-data)
+	(avoid-el (sgml-last-element)))
+    ;; Avoid stopping in current element, unless point is in the start
+    ;; tag of the element
+    (when (< (point) (sgml-element-stag-end avoid-el))
+      (setq avoid-el nil))
     (catch sgml-throw-on-warning
       (while (progn
 	       (sgml-parse-to (1+ (point)))
@@ -2702,9 +2709,8 @@ is determined."
 		     (if (not (eq ?< (following-char)))
 			 (sgml-find-element-of (point))
 		       sgml-current-tree))
-	       (not (and (sgml-element-data-p sgml-last-element)
-			 (eq (point)
-			     (sgml-element-stag-end sgml-last-element))))))
+	       (or (eq sgml-last-element avoid-el)
+		   (not (sgml-element-data-p sgml-last-element)))))
       (sgml-set-last-element))))
 
 (defun sgml-next-trouble-spot ()
