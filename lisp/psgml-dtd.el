@@ -917,6 +917,7 @@ Construct the binary coded DTD (bdtd) in the current buffer."
    ";;; This file was created by psgml on " (current-time-string) "\n"
    "(sgml-saved-dtd-version 6)\n")
   (sgml-code-dtd dtd)
+  (setq file-type 1)
   (write-region (point-min) (point-max) file))
 
 
