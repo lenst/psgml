@@ -301,6 +301,8 @@ into several panes.")
 
 ;;;; Pop Up Menus
 
+(defvar sgml-range-indicator-max-length 9)
+
 (defun sgml-popup-menu (event title entries)
   "Display a popup menu."
   (x-popup-menu
@@ -311,14 +313,23 @@ into several panes.")
 	    (setq menus
 		  (loop for i from 1 while entries
 			collect
-			(prog1 (cons
-				(format "%s %d" title i)
-				(subseq entries 0 (min (length entries)
-						       sgml-max-menu-size)))
+			(let ((submenu
+			       (subseq entries 0 (min (length entries)
+						      sgml-max-menu-size))))
 			  (setq entries (nthcdr sgml-max-menu-size
-						entries)))))))
+						entries))
+			  (cons
+			   (format "%s '%s-%s'"
+				   title
+				   (sgml-range-indicator (caar submenu))
+				   (sgml-range-indicator (caar (last submenu))))
+			   submenu))))))
      (cons title menus))))
 
+(defun sgml-range-indicator (string)
+  (substring string
+	     0
+	     (min (length string) sgml-range-indicator-max-length)))
 
 ;;;; Build Custom Menus
 
