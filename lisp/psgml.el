@@ -63,6 +63,9 @@
 
 ;;;; Code:
 
+(defconst psgml-version "0.3a1"
+  "Version of psgml package.")
+
 (require 'cl)
 
 (defvar sgml-debug nil)
