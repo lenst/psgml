@@ -1,3 +1,9 @@
+2001-02-28  Lennart Staflin  <lennarts@infostream.no>
+
+	* psgml-other.el (sgml-split-long-menus): new
+	(sgml-popup-menu): use above
+	(sgml-popup-multi-menu): use above
+
 Wed Feb 21 23:30:07 2001  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-parse-to): remove debug code

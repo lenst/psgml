@@ -729,10 +729,7 @@ after the first tag inserted."
 
 (defun sgml-right-stag-menu (event)
   (let* ((el (sgml-find-attribute-element))
-         (attrib-menu (cons "Attributes"
-                            (or (ignore-errors (sgml-make-attrib-menu el))
-                                (list "-")))))
-    
+         (attrib-menu (ignore-errors (sgml-make-attrib-menu el))))
 
     (let* ((alt-gi (mapcar (function sgml-eltype-name)
                            (progn
@@ -744,22 +741,51 @@ after the first tag inserted."
                         collect `(,gi (sgml-change-element-name ,gi))))))
       (sgml-popup-multi-menu
        event "Start Tag"
-       (list attrib-menu change-menu
+       (list* change-menu
              `("Misc"
                ("Edit attributes" (sgml-edit-attributes))
                ("Normalize" (sgml-normalize-element))
                ("Fill" (sgml-fill-element 
                         (sgml-find-context-of (point))))
                ("Splice" (sgml-untag-element))
-               ("Fold"   (sgml-fold-element))))))))
+               ("Fold"   (sgml-fold-element)))
+             `("--" "--")
+             attrib-menu)))))
 
 
 
+
+(defun sgml--empty-is-nil (s)
+  (if (equal s "")
+      nil
+    s))
 
-
-
-
-
+(defun sgml-dl-to-table (border table-width first-col-width)
+  (interactive "sBoder: \nsTab Width: \nsFist Col Width: \n")
+  (setq border (sgml--empty-is-nil border))
+  (setq table-width (sgml--empty-is-nil table-width))
+  (setq first-col-width (sgml--empty-is-nil first-col-width))
+  (let ((el (sgml-find-element-of (point))))
+    (goto-char (sgml-element-etag-start el))
+    (let ((end (point-marker)))
+      (goto-char (sgml-element-start el))
+      (sgml-change-element-name "TABLE")
+      (sgml-insert-attribute "BORDER" border)
+      (sgml-insert-attribute "WIDTH" table-width)      
+      (while (search-forward "<" end t)
+        (cond
+         ((looking-at "dt")
+          (backward-char 1)
+          (insert "<tr>")
+          (sgml-change-element-name "TD")
+          (sgml-insert-attribute "WIDTH" first-col-width))
+         ((looking-at "tr>\s-*<td")
+          (sgml-down-element)
+          (sgml-insert-attribute "WIDTH" first-col-width))
+         ((looking-at "dd")
+          (sgml-change-element-name "TD")
+          (sgml-up-element)
+          (insert "</tr>")))))))
 
 
 ;¤¤\end{codeseg}
