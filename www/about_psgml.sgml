@@ -1,6 +1,6 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
 
-<!ENTITY last.ed  'Time-stamp: "1999-10-19 22:27:36 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "1999-10-20 20:54:41 lenst"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
@@ -101,9 +101,9 @@ HR.divider { width: 50%; align: center; }
    <DIV> <h2><A NAME="UPDATE">Update</A></h2>
     <DL>
 
-     <dt>1999-10-22</dt>
+     <dt>1999-10-20</dt>
      <dd><p>Version 1.2.1 of PSGML with som bugfixes from <a
- href="&psgml.dir">lystor ftp</a> or <a href="&psgml1.2.1;">http</a></p>
+ href="&psgml.dir">lystor ftp</a> or <a href="&base.url;/&psgml1.2.1;">http</a></p>
      </dd>
 
      <dt>1999-10-10</dt>
