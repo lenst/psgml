@@ -728,7 +728,8 @@ as that may change."
        (reporter-submit-bug-report
 	psgml-maintainer-address
 	(concat "psgml.el " psgml-version)
-	(list 
+	(list
+	 'major-mode
 	 'sgml-always-quote-attributes
 	 'sgml-auto-activate-dtd
 	 'sgml-auto-insert-required-elements
@@ -820,11 +821,9 @@ as that may change."
 
 (easy-menu-define
  sgml-dtd-menu sgml-mode-map "DTD menu"
- '("DTD"))
-
-(defconst sgml-dtd-root-menu
-  '("DTD"
+ '("DTD"
     ["Parse DTD"  sgml-parse-prolog t]
+    ("Insert DTD" :filter sgml-compute-insert-dtd-menu)
     ("Info"
      ["General DTD info"	sgml-general-dtd-info           t]
      ["Describe element type"	sgml-describe-element-type	t]
@@ -838,7 +837,7 @@ as that may change."
     "--"
     ["Load Parsed DTD"  sgml-load-dtd t]
     ["Save Parsed DTD"  sgml-save-dtd t]
-    ))
+   ))
 
 (easy-menu-define
  sgml-view-menu sgml-mode-map "View menu"
@@ -853,24 +852,21 @@ as that may change."
    ["Hide Tags"		sgml-hide-tags		t]
    ["Hide Attributes"	sgml-hide-attributes	t]
    ["Show All Tags"	sgml-show-tags		t]
-   )
- )
+   ))
 
-
-(defconst sgml-markup-root-menu
-  '("Markup"
-    ["Insert Element"	sgml-element-menu	t]
-    ["Insert Start-Tag" sgml-start-tag-menu	t]
-    ["Insert End-Tag"	sgml-end-tag-menu	t]
-    ["Tag Region"	sgml-tag-region-menu	t]
-    ["Insert Attribute" sgml-attrib-menu	t]
-    ["Insert Entity"	sgml-entities-menu	t]
-    ["Add Element to element"	sgml-add-element-menu	t]
-    ))
 
 (easy-menu-define
  sgml-markup-menu sgml-mode-map "Markup menu"
- sgml-markup-root-menu)
+ '("Markup"
+   ["Insert Element"	sgml-element-menu	t]
+   ["Insert Start-Tag" sgml-start-tag-menu	t]
+   ["Insert End-Tag"	sgml-end-tag-menu	t]
+   ["Tag Region"	sgml-tag-region-menu	t]
+   ["Insert Attribute" sgml-attrib-menu	t]
+   ["Insert Entity"	sgml-entities-menu	t]
+   ["Add Element to element"	sgml-add-element-menu	t]
+   ("Custom markup" :filter sgml-compute-custom-markup-menu)
+   ))
 
 (easy-menu-define
  sgml-move-menu sgml-mode-map "Menu of move commands"
@@ -924,27 +920,28 @@ as that may change."
    )
  )
 
+(defun sgml-compute-insert-dtd-menu (menu)
+  (easy-menu-filter-return
+   (easy-menu-create-menu
+    "DTDs"
+    (loop for e in sgml-custom-dtd collect
+	  (vector (first e)
+		  (` (sgml-doctype-insert (, (cadr e))
+					  '(, (cddr e))))
+		  t)))))
+
+(defun sgml-compute-custom-markup-menu (menu)
+  (easy-menu-filter-return
+   (easy-menu-create-menu
+    "Markups"
+    (loop for e in sgml-custom-markup collect
+	  (vector (first e)
+		  (` (sgml-insert-markup  (, (cadr e))))
+		  t)))))
 
 (defun sgml-build-custom-menus ()
   "Build custom parts of Markup and DTD menus."
   (let ((button3 (lookup-key (current-local-map) [button3])))
-    (easy-menu-define
-     sgml-markup-menu sgml-mode-map "Markup menu"
-     (append sgml-markup-root-menu
-	     (list "----")
-	     (loop for e in sgml-custom-markup collect
-		   (vector (first e)
-			   (` (sgml-insert-markup  (, (cadr e))))
-			   t))))
-    (easy-menu-define
-     sgml-dtd-menu sgml-mode-map "DTD menu"
-     (append sgml-dtd-root-menu
-	     (list "----")
-	     (loop for e in sgml-custom-dtd collect
-		   (vector (first e)
-			   (` (sgml-doctype-insert (, (cadr e))
-						   '(, (cddr e))))
-			   t))))    
     (unless (or (null button3)
 		(numberp button3))
       (local-set-key [button3] button3))))
@@ -1126,19 +1123,7 @@ All bindings:
 ;;;###autoload
 (define-derived-mode xml-mode sgml-mode "XML"
   (setq sgml-xml-p t)
-					; Variant XML syntax
-  (require 'psgml-parse)
-  (let ((old-parser-syntax sgml-parser-syntax))
-    (make-local-variable 'sgml-parser-syntax)
-    (setq sgml-parser-syntax (copy-syntax-table old-parser-syntax)))
-  (modify-syntax-entry ?_ "w" sgml-parser-syntax)
-  (modify-syntax-entry ?: "w" sgml-parser-syntax)
-  (let ((i 128))
-    (while (< i (length sgml-parser-syntax))
-      (if (= (char-syntax i) ?w)
-	  (modify-syntax-entry i "w" sgml-parser-syntax))
-      (setq i (1+ i))))
-					; XML-friendly settings
+  ;; XML-friendly settings
   (setq sgml-omittag nil)
   (setq sgml-shorttag nil)
   (setq sgml-namecase-general nil)

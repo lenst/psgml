@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: Sun Mar 24 19:17:42 1996 by lenst@triton.lstaflin.pp.se (Lennart Staflin)
+;;;\Last edited: 1998-10-24 07:37:50 lenst
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -282,7 +282,7 @@
 
 (defun profile-sgml (&optional file)
   (interactive)
-  (or file (setq file (expand-file-name "~/src/psgml/0/test/shortref.sgml")))
+  (or file (setq file (expand-file-name "~/src/psgml/1.0/test/shortref.sgml")))
   (find-file file)
   (sgml-need-dtd)
   (sgml-instrument-parser)
@@ -315,6 +315,13 @@
 	  sgml-pcdata-move
 	  sgml-shortmap-skipstring
 	  ;;
+	  sgml-parse-attribute-specification-list
+	  sgml-check-tag-close
+	  sgml-do-move
+	  sgml-open-element
+	  sgml-execute-implied
+	  sgml-list-implications
+	  sgml-move-current-state
 	  ))
   (elp-instrument-list))
 

@@ -299,10 +299,25 @@ to point to the next scratch buffer.")
 
 ;;(progn (set-syntax-table sgml-parser-syntax) (describe-syntax))
 
+(defconst xml-parser-syntax
+  (let ((tab (make-syntax-table)))
+    (let ((i 0))
+      (while (< i 128)
+	(modify-syntax-entry i " " tab)
+	(setq i (1+ i))))
+    (mapconcat (function (lambda (c)
+			   (modify-syntax-entry c "w" tab)))
+	       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrtsuvwxyz" "")
+    (mapconcat (function (lambda (c)
+			   (modify-syntax-entry c "w" tab)))
+	       "-_:.0123456789" "")
+    tab))
+
+;;(progn (set-syntax-table xml-parser-syntax) (describe-syntax))
 
 (defmacro sgml-with-parser-syntax (&rest body)
   (` (let ((normal-syntax-table (syntax-table)))
-       (set-syntax-table sgml-parser-syntax)
+       (set-syntax-table (if sgml-xml-p xml-parser-syntax sgml-parser-syntax))
        (unwind-protect
 	   (progn (,@ body))
 	 (set-syntax-table normal-syntax-table)))))
@@ -3877,7 +3892,7 @@ pointing to start of short ref and point pointing to the end."
   (let ((sgml-shortref-handler shortref-fun))
     (sgml-parse-until-end-of nil)))
 
-(defun sgml-move-current-state (token)
+(defsubst sgml-move-current-state (token)
   (setq sgml-current-state
 	(or (sgml-get-move sgml-current-state token)
 	    sgml-current-state)))
@@ -3898,7 +3913,7 @@ pointing to start of short ref and point pointing to the end."
 	     (sgml-eltype-name (sgml-token-eltype token))
 	     type)))))
 
-(defun sgml-do-move (token type)
+(defsubst sgml-do-move (token type)
   (sgml-execute-implied (sgml-list-implications token type) type)
   (unless (eq sgml-any sgml-current-state)
     (sgml-move-current-state token)))
