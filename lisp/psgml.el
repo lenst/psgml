@@ -1572,10 +1572,11 @@ otherwise it will be added at the first legal position." t)
 (provide 'psgml)
 (provide 'sgml-mode)
 
-(cond
- (sgml-running-lucid
-  (require 'psgml-lucid))
- (t
-  (require 'psgml-other)))
+(eval-and-compile
+  (cond
+   (sgml-running-lucid
+    (require 'psgml-lucid))
+   (t
+    (require 'psgml-other))))
 
 ;;; psgml.el ends here
