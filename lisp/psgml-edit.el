@@ -907,6 +907,7 @@ of then current element."
 		  (sgml-element-name u)))
     ;; Do the split
     (sgml-insert-end-tag)
+    (insert ?\n)
     (sgml-insert-tag (sgml-start-tag-of u) 'silent)
     (skip-chars-forward " \t\n")
     (sgml-indent-line)
