@@ -1,7 +1,7 @@
 ;;;; psgml.el --- SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1993, 1994 Lennart Staflin
+;; Copyright (C) 1993, 1994, 1995 Lennart Staflin
 ;; Copyright (C) 1992 Free Software Foundation, Inc.
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
@@ -84,6 +84,10 @@
 
 ;;; User settable options:
 
+(defvar sgml-range-indicator-max-length 9
+  "*Maximum number of characters used from the first and last entry
+of a submenu to indicate the range of that menu.")
+
 (defvar sgml-default-doctype-name nil
   "*Document type name to use if no document type declaration is present.")
 (put 'sgml-default-doctype-name 'sgml-type 'string-or-nil)
@@ -104,7 +108,7 @@ doctype	- doctype declaration
 end-tag 
 ignored	- ignored marked section
 ms-end	- marked section start, if not ignored 
-ms-start - marked section end, if not ignored
+ms-start- marked section end, if not ignored
 pi	- processing instruction
 sgml	- SGML declaration
 start-tag
@@ -214,10 +218,16 @@ If nil, the point will be placed before the inserted tag(s).")
 If nil, recover from an undefined element by assuming it can occur any
 where and has content model ANY.")
 
-(defvar sgml-ignore-out-of-date-cdtd t
-  "*If non-nil, out of date compiled DTDs will not be automatically recompiled.
-A DTD that referes to undefined external entities is always out of date,
-thus in such case it can be useful to set this variable to t.")
+(defvar sgml-recompile-out-of-date-cdtd 'ask
+  "*If non-nil, out of date compiled DTDs will be automatically recompiled.
+If the value is `ask', PSGML will ask before recompiling. A `nil'
+value will cause PSGML to silently load an out of date compiled DTD.
+A DTD that referes to undefined external entities is always out of
+date, thus in such case it can be useful to set this variable to
+`nil'.")
+(put 'sgml-recompile-out-of-date-cdtd 'sgml-type '(("No" . nil)
+						   ("Yes" . t)
+						   ("Ask" . ask)))
 
 (defvar sgml-indent-step 2
   "*How much to increment indent for every element level.
@@ -368,14 +378,22 @@ Example:
 ;;; Its error messages can be parsed by next-error.
 ;;; The -s option suppresses output.
 
-(defvar sgml-validate-command
-  "sgmls -s %s %s"
+(defvar sgml-validate-command "sgmls -s %s %s"
   "*The shell command to validate an SGML document.
-This is a `format' control string that should contain two `%s'
+
+This is a `format' control string that by default should contain two `%s'
 conversion specifications: the first will be replaced by the value of
 `sgml-declaration' \(or the empty string, if nil\); the second will be
 replaced by the current buffer's file name \(or the empty string, if
-nil\).")
+nil\).
+
+If `sgml-validate-files' is non-nil, the format string should contain
+one `%s' conversion specification for each element of its result.")
+
+(defvar sgml-validate-files nil
+  "If non-nil, a function of no arguments that returns a list of file names.
+These file names will serve as the arguments to the `sgml-validate-command'
+format control string instead of the defaults.")
 
 (defvar sgml-validate-error-regexps
   '(("\\(error\\|warning\\) at \\([^,]+\\), line \\([0-9]+\\)" 2 3))
@@ -421,7 +439,7 @@ See `compilation-error-regexp-alist'.")
     sgml-warn-about-undefined-elements
     sgml-warn-about-undefined-entities
     sgml-ignore-undefined-elements
-    sgml-ignore-out-of-date-cdtd
+    sgml-recompile-out-of-date-cdtd
     sgml-default-doctype-name
     sgml-declaration
     sgml-validate-command
@@ -436,8 +454,8 @@ See `compilation-error-regexp-alist'.")
 
 ;;; Internal variables
 
-(defvar sgml-saved-validate-command nil
-  "The command last used to validate in this buffer.")
+(defvar sgml-validate-command-history nil
+  "The minibuffer history list for `sgml-validate''s COMMAND argument.")
 
 (defvar sgml-mode-map nil "Keymap for SGML mode")
 
@@ -630,6 +648,8 @@ as that may change."
 	 'sgml-set-face
 	 'sgml-markup-faces
 	 'sgml-public-map
+	 'sgml-catalog-files 'sgml-ecat-files
+	 'sgml-local-catalogs 'sgml-local-ecat-files
 	 ))))
 
 
@@ -819,7 +839,6 @@ All bindings:
   (set (make-local-variable 'paragraph-start)
        paragraph-separate)
 
-  (make-local-variable 'sgml-saved-validate-command)
   (set-syntax-table text-mode-syntax-table)
   (make-local-variable 'comment-start)
   (setq comment-start "<!-- ")
@@ -846,7 +865,7 @@ All bindings:
   (when (setq sgml-default-dtd-file (sgml-default-dtd-file))
     (unless (file-exists-p sgml-default-dtd-file)
       (setq sgml-default-dtd-file nil)))
-  (add-hook 'post-command-hook 'sgml-command-post)
+  (add-hook 'post-command-hook 'sgml-command-post 'append)
   (run-hooks 'text-mode-hook 'sgml-mode-hook)
   (sgml-build-custom-menus))
 
@@ -1017,15 +1036,16 @@ with output going to the buffer *compilation*.
 You can then use the command \\[next-error] to find the next error message
 and move to the line in the SGML document that caused it."
   (interactive
-   (list (read-string "Validate command: "
-		      (or sgml-saved-validate-command
-			  (format sgml-validate-command
-				  (or sgml-declaration "")
-				  (let ((name (buffer-file-name)))
- 				    (if name
- 					(file-name-nondirectory name)
- 				      "")))))))
-  (setq sgml-saved-validate-command command)
+   (list (read-from-minibuffer "Validate command: "
+			       (apply 'format sgml-validate-command
+				      (if sgml-validate-files
+					  (funcall sgml-validate-files)
+					(list (or sgml-declaration "")
+					      (let ((name (buffer-file-name)))
+						(if name
+						    (file-name-nondirectory name)
+						  "")))))
+			       nil nil 'sgml-validate-command-history)))
   (if sgml-offer-save
       (save-some-buffers nil nil))
   (compile-internal command "No more errors" "SGML validation"
