@@ -164,6 +164,9 @@
 (define-key sgml-markup-menu [entities]
   '("Insert entity" . sgml-entities-menu))
 
+(define-key sgml-markup-menu [attributes]
+  '("Insert attribute" . sgml-attrib-menu))
+
 (define-key sgml-markup-menu [tag-region]
   '("Tag region" . sgml-tag-region-menu))
 
