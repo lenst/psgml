@@ -33,8 +33,51 @@
 
 (require 'psgml)
 
+(eval-and-compile
+  (autoload 'sgml-do-set-option "psgml-edit"))
+
+(defvar sgml-max-menu-size (/ (* (screen-height) 2) 3)
+  "*Max number of entries in Tags and Entities menus before they are split
+into several panes.")
 
-;;;; These functions are needed for menus, etc. to work in lucid emacs
+;;;; Pop Up Menus
+
+(defun sgml-popup-menu (event title entries)
+  "Display a popup menu."
+  (setq entries
+	(loop for ent in entries collect
+	      (vector (car ent)
+		      (list 'setq 'value (list 'quote (cdr ent)))
+		      t)))
+  (let ((value nil)
+	(event nil)
+	(menudesc
+	 (cons
+	  title
+	  (if (> sgml-max-menu-size (length entries))
+	      entries
+	    (let* ((n (1+ (/ (1- (length entries)) sgml-max-menu-size)))
+		   (l (1+ (/ (1- (length entries)) n))))
+	      (loop for i from 1 while entries collect
+		    (prog1 (cons
+			    (format "%s %d" title i)
+			    (subseq entries 0 (min l (length entries))))
+		      (setq entries (nthcdr l entries)))))))))
+    (popup-menu menudesc)
+    (while (popup-menu-up-p)
+      (setq event (next-command-event event))
+      (cond ((and (menu-event-p event)
+		  (or (eq (event-object event) 'abort)
+		      (eq (event-object event) 'menu-no-selection-hook)))
+	     (signal 'quit nil))
+	    ((menu-event-p event)
+	     (eval (event-object event)))
+	    ((button-release-event-p event) ; don't beep twice
+	     nil)
+	    (t
+	     (beep)
+	     (message "please make a choice from the menu."))))
+    value))
 
 (defun sgml-fix-x-menu (menudesc)
   "Take a menu for x-popup-menu and return a lucid menu."
@@ -83,9 +126,13 @@
 		(beep)
 		(message "please make a choice from the menu."))))))))
 
+
+
+;;;; Lucid menu bar
+
 (defun sgml-install-lucid-menus ()
   "Install lucid menus for psgml mode"
-  (set-buffer-menubar (copy-sequence default-menubar))
+  (set-buffer-menubar (copy-sequence current-menubar))
   (add-menu nil (car sgml-sgml-menu) (cdr sgml-sgml-menu))
   (add-menu nil (car sgml-markup-menu) (cdr sgml-markup-menu))
   (add-menu nil (car sgml-fold-menu) (cdr sgml-fold-menu))
@@ -93,97 +140,90 @@
 
 (defvar sgml-markup-menu
   '("Markup"
-    ["Insert element" (sgml-element-menu last-command-event) t]
-    ["Insert start-tag" (sgml-start-tag-menu last-command-event) t]
-    ["Insert end-tag" (sgml-end-tag-menu last-command-event) t]
-    ["Tag region" (sgml-tag-region-menu last-command-event) t]
-    ["Insert attribute" (sgml-attrib-menu last-command-event) t]
-    ["Insert entity" (sgml-entities-menu last-command-event) t]
-    "----------"
-    ["Marked section" (sgml-insert-markup "<![ [\r]]>\n") t]
-    ["CDATA marked section" (sgml-insert-markup "<![CDATA[\r]]>\n") t]
-    ["RCDATA marked section" (sgml-insert-markup "<![RCDATA[\r]]>\n") t]
-    ["TEMP marked section" (sgml-insert-markup "<![TEMP[\r]]>") t]
-    "----------"
-    ["Comment" (sgml-insert-markup "<!-- \r -->\n") t]
-    ["Local variables comment" (sgml-insert-markup "<!--\nLocal Variables:\nmode: sgml\n\rEnd:\n-->\n")
-     t]
-    "----------"
-    ["<!doctype ... >" (sgml-insert-markup "<!doctype \r -- public or system --\n[\n]>\n") t]
-    ["<!entity ... >" (sgml-insert-markup "<!entity \r>\n") t]
-    ["<!attlist ... >" (sgml-insert-markup "<!attlist \r>\n") t]
-    ["<!element ... >" (sgml-insert-markup "<!element \r>\n") t]
+    ["Insert Element" (sgml-element-menu last-command-event) t]
+    ["Insert Start-Tag" (sgml-start-tag-menu last-command-event) t]
+    ["Insert End-Tag" (sgml-end-tag-menu last-command-event) t]
+    ["Tag Region" (sgml-tag-region-menu last-command-event) t]
+    ["Insert Attribute" (sgml-attrib-menu last-command-event) t]
+    ["Insert Entity" (sgml-entities-menu last-command-event) t]
     ))
 
 (defvar sgml-dtd-menu
   '("DTD"
     ["Parse DTD" sgml-parse-prolog t]
-    ["Load parsed DTD" sgml-load-dtd t]
-    ["Save parsed DTD" sgml-save-dtd t]
+    ["Load Parsed DTD" sgml-load-dtd t]
+    ["Save Parsed DTD" sgml-save-dtd t]
     ))
 
 (defvar sgml-fold-menu
   '("Fold"
-    ["Fold element" sgml-fold-element t]
-    ["Fold subelement" sgml-fold-subelement t]
-    ["Fold region" sgml-fold-region t]
-    ["Unfold line" sgml-unfold-line t]
-    ["Unfold element" sgml-unfold-element t]
-    ["Unfold all" sgml-unfold-all t]
+    ["Fold Element" sgml-fold-element t]
+    ["Fold Subelement" sgml-fold-subelement t]
+    ["Fold Region" sgml-fold-region t]
+    ["Unfold Line" sgml-unfold-line t]
+    ["Unfold Element" sgml-unfold-element t]
+    ["Unfold All" sgml-unfold-all t]
     ["Expand" sgml-expand-element t]
     ))
+
+(defun sgml-make-options-menu (vars)
+  (loop for var in vars 
+	for type = (sgml-variable-type var)
+	for desc = (sgml-variable-description var)
+	collect
+	(cond
+	 ((eq type 'toggle)
+	  (vector desc (list 'setq var (list 'not var))
+		  ':style 'toggle ':selected var))
+	 ((consp type)
+	  (cons desc
+		(loop for c in type collect
+		      (if (atom c)
+			  (vector (prin1-to-string c)
+				  (`(setq (, var) (, c)))
+				  :style 'toggle
+				  :selected (`(eq (, var) '(, c))))
+			(vector (car c)
+				(`(setq (, var) '(,(cdr c))))
+				:style 'toggle
+				:selected (`(eq (, var) '(,(cdr c)))))))))
+	 (t
+	  (vector desc
+		  (`(sgml-do-set-option '(, var)))
+		  t)))))
+
 
 (defvar sgml-sgml-menu
   (append
    '("SGML"
-     ["Next data field"  sgml-next-data-field t]
-     ["End element" sgml-insert-end-tag t]
-     ["Show context" sgml-show-context t]
-     ["What element" sgml-what-element t]
-     ["Next trouble spot" sgml-next-trouble-spot t]
-     ["Edit attributes" sgml-edit-attributes t]
-     ["Change element name" sgml-change-element-name t]
-     ["Show valid tags" sgml-list-valid-tags t]
-     ["Show/hide warning log" sgml-show-or-clear-log t]
+     ["Next Data Field"  sgml-next-data-field t]
+     ["End Element" sgml-insert-end-tag t]
+     ["Show Context" sgml-show-context t]
+     ["What Element" sgml-what-element t]
+     ["Next Trouble Spot" sgml-next-trouble-spot t]
+     ["Edit Attributes" sgml-edit-attributes t]
+     ["Change Element Name" sgml-change-element-name t]
+     ["Show Valid Tags" sgml-list-valid-tags t]
+     ["Show/Hide Warning Log" sgml-show-or-clear-log t]
      ["Validate" sgml-validate t]
      ["Normalize" sgml-normalize t]
-     ["Fill element" sgml-fill-element t])
+     ["Fill Element" sgml-fill-element t])
    (if (or (not (boundp 'emacs-major-version))
 	   (and (boundp 'emacs-minor-version)
 		(< emacs-minor-version 10)))
-       '(["Options" sgml-options-menu t])
+       '(
+	 ["File Options" sgml-file-options-menu t]
+	 ["User Options" sgml-user-options-menu t]
+	 )
      (list
-      (cons "Options"
-	    (mapcar
-	     (function
-	      (lambda (var)
-		(vector (capitalize
-			 (mapconcat (function (lambda (x)
-						(if (= x ?-) " "
-						  (char-to-string x))))
-				    (substring (symbol-name var) 5 nil)
-				    ""))
-			(list 'setq var (list 'not var))
-			':style 'toggle ':selected var)))
-	     (loop for v in sgml-user-options
-		   if (eq 'toggle (sgml-variable-type v))
-		   collect v)))
-      (cons "Indent Step"
-	    (mapcar
-	     (function
-	      (lambda (entry)
-		(vector (car entry)
-			(list 'setq 'sgml-indent-step (cdr entry))
-			':style 'radio ':active t
-			':selected
-			(list 'eq 'sgml-indent-step (cdr entry)))))
-	     '(("None" . nil)
-	       ("0" . 0) ("1" . 1) ("2" . 2) ("3" . 3)
-	       ("4" . 4) ("5" . 5) ("6" . 6) ("7" . 7) ("8" . 8))))))
-   '(["Save options" sgml-save-options t]
-     ["Submit bug report" sgml-submit-bug-report t]
+      (cons "File Options" (sgml-make-options-menu sgml-file-options))
+      (cons "User Options" (sgml-make-options-menu sgml-user-options))))
+   '(["Save File Options" sgml-save-options t]
+     ["Submit Bug Report" sgml-submit-bug-report t]
      )))
 
+
+;;;; Custom menus
 
 (defun sgml-build-custom-menus ()
   (and sgml-custom-markup (add-menu-item '("Markup") "------------" nil t))
@@ -200,6 +240,9 @@
 				  (list 'quote (cdr x)))
 			    t)))
 	  sgml-custom-dtd))
+
+
+;;;; Key definitions
 
 (define-key sgml-mode-map [button3] 'sgml-tags-menu)
 

@@ -61,7 +61,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "1.0a2"
+(defconst psgml-version "1.0a3"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -71,7 +71,7 @@
 (defvar sgml-debug nil)
 
 (defmacro sgml-debug (&rest x) 
-  (list 'if 'sgml-debug (cons 'sgml-log-warning x)))
+  (list 'if 'sgml-debug (cons 'sgml-log-message x)))
 
 
 ;;;; Variables
@@ -79,15 +79,6 @@
 (defvar sgml-running-lucid (string-match "Lucid" emacs-version))
 
 ;;; User settable options:
-
-(defvar sgml-exposed-tags '()
-  "*The list of tag names that remain visible, despite \\[sgml-hide-tags].
-Each name is a lowercase string, and start-tags and end-tags must be
-listed individually.
-
-`sgml-exposed-tags' is local to each buffer in which it has been set;
-use `setq-default' to set it to a value that is shared among buffers.")
-(make-variable-buffer-local 'sgml-exposed-tags)
 
 (defvar sgml-markup-faces '((start-tag 	. bold)
 			    (end-tag 	. bold)
@@ -125,10 +116,14 @@ will be slower.")
 (put 'sgml-set-face 'sgml-desc "Set face of parsed markup")
 
 (defvar sgml-live-element-indicator nil
-  "*If non-nil, indicate current element in mode line.
-NOTE: this implies that every command can cause a parse.
-Setting this variable automatically makes it local to the current buffer.")
-(make-variable-buffer-local 'sgml-live-element-indicator)
+  "*If non-nil, indicate current element in mode line.")
+
+(defvar sgml-auto-activate-dtd nil
+  "*If non-nil, loading a sgml-file will automatically try to activate its DTD.
+Activation means either to parse the document type declaration or to
+load a previously saved parsed DTD.  The name of the activated DTD
+will be shown in the mode line.")
+(put 'sgml-auto-activate-dtd 'sgml-desc "Auto Activate DTD")
 
 (defvar sgml-offer-save t
   "*If non-nil, ask about saving modified buffers before \\[sgml-validate] is run.")
@@ -140,7 +135,7 @@ containing a DOCTYPE declaration to use with the modification that the
 document type name is DOCTYPENAME.
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-parent-document)
-(put 'sgml-parent-document 'sgml-type 'string)
+(put 'sgml-parent-document 'sgml-type 'list-or-string)
 
 (defvar sgml-tag-region-if-active nil
   "*If non-nil, the Tags menu will tag a region if the region is 
@@ -157,6 +152,7 @@ when adding end tag.")
 Setting this variable automatically makes it local to the current buffer.")
 
 (make-variable-buffer-local 'sgml-omittag)
+(put 'sgml-omittag 'sgml-desc "OMITTAG")
 
 (defvar sgml-shorttag t
   "*Set to non-nil, if you use SHORTTAG YES.
@@ -164,6 +160,7 @@ Setting this variable automatically makes it local to the current buffer.")
 Setting this variable automatically makes it local to the current buffer.")
 
 (make-variable-buffer-local 'sgml-shorttag)
+(put 'sgml-shorttag 'sgml-desc "SHORTTAG")
 
 (defvar sgml-minimize-attributes nil
   "*Determines minimization of attributes inserted by edit-attributes.
@@ -174,12 +171,8 @@ Actually two things are done
 Setting this variable automatically makes it local to the current buffer.")
 
 (make-variable-buffer-local 'sgml-minimize-attributes)
-
-(defvar sgml-max-menu-size (/ (* (if sgml-running-lucid
-				     (screen-height)
-				   (frame-height)) 2) 3)
-  "*Max number of entries in Tags and Entities menus before they are split
-into several panes.")
+(put 'sgml-minimize-attributes 'sgml-type
+     '(("No" . nil) ("Yes" . t) ("Max" . max)))
 
 (defvar sgml-always-quote-attributes t
   "*If non-nil, quote all attribute values inserted after finishing edit attributes.
@@ -219,6 +212,7 @@ Setting this variable automatically makes it local to the current buffer.")
 
 (defvar sgml-system-path nil
   "*List of directories used to look for system identifiers.")
+(put 'sgml-system-path 'sgml-type 'list)
 
 (defun sgml-parse-colon-path (cd-path)
   "Explode a colon-separated list of paths into a string list."
@@ -251,18 +245,19 @@ used for the public identifier.  An element can also be a dotted pair
 (regexp . filename), the filename is a string treated as above, but
 only if the regular expression, regexp, matches the public
 identifier.")
-
+(put 'sgml-public-map 'sgml-type 'list)
 
 (defvar sgml-local-catalogs nil
 "*A list of SGML entity catalogs to be searched first when parsing the buffer.
 This is used in addtion to `sgml-catalog-files',  and `sgml-public-map'.
 This variable is automatically local to the buffer.")
-(make-local-variable 'sgml-local-catalogs)
+(make-variable-buffer-local 'sgml-local-catalogs)
+(put 'sgml-local-catalogs 'sgml-type 'list)
 
 (defvar sgml-catalog-files (sgml-parse-colon-path
 			    (or (getenv "SGML_CATALOG_FILES")
-				"/usr/local/lib/sgml/catalog"))
-  "*List of files catalog entry files.
+				"CATALOG:/usr/local/lib/sgml/CATALOG"))
+  "*List of catalog entry files.
 The files are in the format defined in the SGML Open Draft Technical
 Resolution on Entity Management.")
 
@@ -277,6 +272,18 @@ identifier are used to construct a file name.")
 This is set by sgml-mode from the buffer file name.
 Can be changed in the Local variables section of the file.")
 (put 'sgml-default-dtd-file 'sgml-type 'string)
+(put 'sgml-default-dtd-file 'sgml-desc "Default (saved) DTD File")
+
+(defvar sgml-exposed-tags '()
+  "*The list of tag names that remain visible, despite \\[sgml-hide-tags].
+Each name is a lowercase string, and start-tags and end-tags must be
+listed individually.
+
+`sgml-exposed-tags' is local to each buffer in which it has been set;
+use `setq-default' to set it to a value that is shared among buffers.")
+(make-variable-buffer-local 'sgml-exposed-tags)
+(put 'sgml-exposed-tags 'sgml-type 'list)
+
 
 (defvar sgml-custom-markup nil
   "*Menu entries to be added to the Markup menu.
@@ -348,26 +355,37 @@ See `compilation-error-regexp-alist'.")
 (defvar sgml-mode-hook nil
   "A hook or list of hooks to be run when entering sgml-mode")
 
-(defconst sgml-user-options
-  '(sgml-indent-data
-    sgml-indent-step
-    sgml-leave-point-after-insert
-    sgml-auto-insert-required-elements
-    sgml-balanced-tag-edit
-    sgml-omittag-transparent
-    sgml-warn-about-undefined-elements
-    sgml-always-quote-attributes
-    sgml-normalize-trims
+(defconst sgml-file-options
+  '(
+    sgml-parent-document
     sgml-omittag
     sgml-shorttag
     sgml-minimize-attributes
-    sgml-live-element-indicator
-    sgml-set-face
-    sgml-auto-activate-dtd
-    sgml-parent-document
-;;    sgml-system-path
-;;    sgml-public-map
+    sgml-always-quote-attributes
+    sgml-indent-step
+    sgml-indent-data
     sgml-default-dtd-file
+    sgml-exposed-tags
+    )
+  "Options for the current file, can be saved or set from menu."
+  )
+
+(defconst sgml-user-options
+  '(
+    sgml-markup-faces
+    sgml-set-face
+    sgml-live-element-indicator
+    sgml-auto-activate-dtd
+    sgml-offer-save
+    sgml-tag-region-if-active
+    sgml-normalize-trims
+    sgml-auto-insert-required-elements
+    sgml-balanced-tag-edit
+    sgml-omittag-transparent
+    sgml-leave-point-after-insert
+    sgml-warn-about-undefined-elements
+    sgml-system-path
+    sgml-public-map
     sgml-validate-command
     sgml-declaration
     )
@@ -441,19 +459,24 @@ See `compilation-error-regexp-alist'.")
 	       (beginning-of-line 1)
 	       (insert prefix (format "%s:%S" var val) suffix ?\n)))))))
 
+(defun sgml-valid-option (var)
+  (let ((type (sgml-variable-type var))
+	(val (symbol-value var)))
+    (cond ((eq 'string type)
+	   (stringp val))
+	  ((eq 'list-or-string type)
+	   (or (stringp val)
+	       (consp val)))
+	  (t
+	   t))))
+
 (defun sgml-save-options ()
   "Save user options for sgml-mode that have buffer local values."
   (interactive)
-  (let ((l sgml-user-options)
-	(bv (buffer-local-variables)))
-    (loop for var in sgml-user-options
-	  do
-	  (when (and (assq var bv)
-		     (or (not (eq var 'sgml-default-dtd-file))
-			 (stringp sgml-default-dtd-file)))
-	    (sgml-set-local-variable var (symbol-value var))))
-    ;;(when sgml-default-dtd-file (sgml-set-local-variable 'sgml-default-dtd-file sgml-default-dtd-file))
-    ))
+  (let ((l sgml-file-options))
+    (loop for var in sgml-file-options do
+	  (when (sgml-valid-option var)
+	    (sgml-set-local-variable var (symbol-value var))))))
 
 
 ;;;; SGML mode: template functions
@@ -608,13 +631,6 @@ See `compilation-error-regexp-alist'.")
 ;; load menu file at the end
 
 ;;;; Post command hook 
-
-(defvar sgml-auto-activate-dtd nil
-  "*If non-nil, loading a sgml-file will automatically try to activate its DTD.
-Activation means either to parse the document type declaration or to
-load a previously saved parsed DTD.  The name of the activated DTD
-will be shown in the mode line.")
-;;??(make-variable-buffer-local 'sgml-auto-activate-dtd)
 
 (defvar sgml-auto-activate-dtd-tried nil)
 (make-variable-buffer-local 'sgml-auto-activate-dtd-tried)
@@ -954,6 +970,7 @@ and move to the line in the SGML document that caused it."
 (autoload 'sgml-doctype-insert "psgml-edit"
 	  nil
 	  nil nil)
+(autoload 'sgml-indent-line "psgml-edit" nil)
 
 ;;; Generated by sgml-build-autoloads
 
@@ -1010,6 +1027,8 @@ after the first tag inserted." t)
 (autoload 'sgml-split-element "psgml-edit" "Split the current element at point.
 If repeated, the containing element will be split before the beginning
 of then current element." t)
+(autoload 'sgml-custom-dtd "psgml-edit" "Insert a DTD declaration from the sgml-custom-dtd alist." t)
+(autoload 'sgml-custom-markup "psgml-edit" "Insert markup from the sgml-custom-markup alist." t)
 (autoload 'sgml-tags-menu "psgml-edit" "Pop up a menu with valid tags and insert the choosen tag.
 If the variable sgml-balanced-tag-edit is t, also inserts the
 corresponding end tag. If sgml-leave-point-after-insert is t, the point

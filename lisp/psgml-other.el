@@ -32,6 +32,10 @@
 
 (require 'psgml)
 
+(defvar sgml-max-menu-size (/ (* (frame-height) 2) 3)
+  "*Max number of entries in Tags and Entities menus before they are split
+into several panes.")
+
 
 ;;;; Menu bar
 
@@ -60,35 +64,37 @@
 ;;;; SGML menu
 
 (define-key sgml-mode-map [menu-bar sgml report-buf]
-  '("Submit bug report" . sgml-submit-bug-report))
+  '("Submit Bug Report" . sgml-submit-bug-report))
 (define-key sgml-mode-map [menu-bar sgml save-options]
-  '("Save options" . sgml-save-options))
-(define-key sgml-mode-map [menu-bar sgml options]
-  '("Options..." . sgml-options-menu))
+  '("Save File Options" . sgml-save-options))
+(define-key sgml-mode-map [menu-bar sgml user-options]
+  '("User Options >" . sgml-user-options-menu))
+(define-key sgml-mode-map [menu-bar sgml file-options]
+  '("File Options >" . sgml-file-options-menu))
 (define-key sgml-mode-map [menu-bar sgml fill]
-  '("Fill element" . sgml-fill-element))
+  '("Fill Element" . sgml-fill-element))
 (define-key sgml-mode-map [menu-bar sgml normalize]
   '("Normalize" . sgml-normalize))
 (define-key sgml-mode-map [menu-bar sgml validate]
   '("Validate" . sgml-validate))
 (define-key sgml-mode-map [menu-bar sgml show-log]
-  '("Show/hide warning log" . sgml-show-or-clear-log))
+  '("Show/Hide Warning Log" . sgml-show-or-clear-log))
 (define-key sgml-mode-map [menu-bar sgml show-tags]
-  '("List valid tags" . sgml-list-valid-tags))
+  '("List Valid Tags" . sgml-list-valid-tags))
 (define-key sgml-mode-map [menu-bar sgml change-name]
-  '("Change element name" . sgml-change-element-name))
+  '("Change Element Name" . sgml-change-element-name))
 (define-key sgml-mode-map [menu-bar sgml edit-attributes]
-  '("Edit attributes" . sgml-edit-attributes))
+  '("Edit Attributes..." . sgml-edit-attributes))
 (define-key sgml-mode-map [menu-bar sgml next-trouble]
-  '("Next trouble spot" . sgml-next-trouble-spot)) 
+  '("Next Trouble Spot" . sgml-next-trouble-spot)) 
 (define-key sgml-mode-map [menu-bar sgml what-element]
-  '("What element" . sgml-what-element))
+  '("What Element" . sgml-what-element))
 (define-key sgml-mode-map [menu-bar sgml show-context]
-  '("Show context" . sgml-show-context))
+  '("Show Context" . sgml-show-context))
 (define-key sgml-mode-map [menu-bar sgml insert-end-tag]
-  '("End element" . sgml-insert-end-tag))
+  '("End Element" . sgml-insert-end-tag))
 (define-key sgml-mode-map [menu-bar sgml next-data]
-  '("Next data field" . sgml-next-data-field))
+  '("Next Data Field" . sgml-next-data-field))
 
 
 ;;;; DTD menu
@@ -96,9 +102,9 @@
 (define-key sgml-mode-map [menu-bar sgml-dtd blank-c]
   '("" . nil))
 (define-key sgml-mode-map [menu-bar sgml-dtd save]
-  '("Save parsed DTD" . sgml-save-dtd))
+  '("Save Parsed DTD" . sgml-save-dtd))
 (define-key sgml-mode-map [menu-bar sgml-dtd load]
-  '("Load parsed DTD" . sgml-load-dtd))
+  '("Load Parsed DTD" . sgml-load-dtd))
 (define-key sgml-mode-map [menu-bar sgml-dtd parse]
   '("Parse DTD" . sgml-parse-prolog))
 
@@ -106,26 +112,26 @@
 ;;;; View menu
 
 (define-key sgml-mode-map [menu-bar sgml-view unhide]
-  '("Show all tags" . sgml-show-tags))
+  '("Show All Tags" . sgml-show-tags))
 (define-key sgml-mode-map [menu-bar sgml-view hide-attributes]
-  '("Hide attributes" . sgml-hide-attributes))
+  '("Hide Attributes" . sgml-hide-attributes))
 (define-key sgml-mode-map [menu-bar sgml-view hide-tags]
-  '("Hide tags" . sgml-hide-tags))
+  '("Hide Tags" . sgml-hide-tags))
 
 (define-key sgml-mode-map [menu-bar sgml-view unfold-all]
-  '("Unfold all" . sgml-unfold-all))
+  '("Unfold All" . sgml-unfold-all))
 (define-key sgml-mode-map [menu-bar sgml-view fold-region]
-  '("Fold region" . sgml-fold-region))
+  '("Fold Region" . sgml-fold-region))
 (define-key sgml-mode-map [menu-bar sgml-view expand]
   '("Expand" . sgml-expand-element))
 (define-key sgml-mode-map [menu-bar sgml-view unfold-element]
-  '("Unfold element" . sgml-unfold-element))
+  '("Unfold Element" . sgml-unfold-element))
 (define-key sgml-mode-map [menu-bar sgml-view unfold]
-  '("Unfold line" . sgml-unfold-line))
+  '("Unfold Line" . sgml-unfold-line))
 (define-key sgml-mode-map [menu-bar sgml-view subfold]
-  '("Fold subelement"   . sgml-fold-subelement))
+  '("Fold Subelement"   . sgml-fold-subelement))
 (define-key sgml-mode-map [menu-bar sgml-view fold]
-  '("Fold element"   . sgml-fold-element))
+  '("Fold Element"   . sgml-fold-element))
 
 
 ;;;; Markup menu
@@ -133,61 +139,59 @@
 (define-key sgml-markup-menu [blank-c]
   '("" . nil))
 
-(define-key sgml-markup-menu [ entity]
-  (sgml-markup "<!entity ... >" "<!entity \r>\n"))
-(define-key sgml-markup-menu [ attlist]
-  (sgml-markup "<!attlist ... >" "<!attlist \r>\n"))
-(define-key sgml-markup-menu [ element]
-  (sgml-markup "<!element ... >" "<!element \r>\n"))
-(define-key sgml-markup-menu [ doctype]
-  (sgml-markup "<!doctype ...>"
-	       "<!doctype \r -- public or system --\n[\n]>\n"))
+;;(define-key sgml-markup-menu [ entity]
+;;  (sgml-markup "<!entity ... >" "<!entity \r>\n"))
+;;(define-key sgml-markup-menu [ attlist]
+;;  (sgml-markup "<!attlist ... >" "<!attlist \r>\n"))
+;;(define-key sgml-markup-menu [ element]
+;;  (sgml-markup "<!element ... >" "<!element \r>\n"))
+;;(define-key sgml-markup-menu [ doctype]
+;;  (sgml-markup "<!doctype ...>"
+;;	       "<!doctype \r -- public or system --\n[\n]>\n"))
 
-(define-key sgml-markup-menu [blank1]
-  '("" . nil))
+;;(define-key sgml-markup-menu [blank1]
+;;  '("" . nil))
 
-(define-key sgml-markup-menu [lv-comment]
-  (sgml-markup "Local variables comment"
-	       "<!--\nLocal variables:\n\rEnd:\n-->\n"))
-(define-key sgml-markup-menu [ comment]
-  (sgml-markup "Comment" "<!-- \r -->\n"))
+;;(define-key sgml-markup-menu [lv-comment]
+;;  (sgml-markup "Local variables comment"
+;;	       "<!--\nLocal variables:\n\rEnd:\n-->\n"))
+;;(define-key sgml-markup-menu [ comment]
+;;  (sgml-markup "Comment" "<!-- \r -->\n"))
 
 
-(define-key sgml-markup-menu [blank2]
-  '("" . nil))
+;;(define-key sgml-markup-menu [blank2]
+;;  '("" . nil))
 
-(define-key sgml-markup-menu [ temp]
-  (sgml-markup "TEMP marked section" "<![TEMP[\r]]>"))
-(define-key sgml-markup-menu [ rcdata]
-  (sgml-markup "RCDATA marked section" "<![RCDATA[\r]]>\n"))
-(define-key sgml-markup-menu [ cdata]
-  (sgml-markup "CDATA marked section" "<![CDATA[\r]]>\n"))
-(define-key sgml-markup-menu [ ms]
-  (sgml-markup "Marked section" "<![ [\r]]>\n"))
+;;(define-key sgml-markup-menu [ temp]
+;;  (sgml-markup "TEMP marked section" "<![TEMP[\r]]>"))
+;;(define-key sgml-markup-menu [ rcdata]
+;;  (sgml-markup "RCDATA marked section" "<![RCDATA[\r]]>\n"))
+;;(define-key sgml-markup-menu [ cdata]
+;;  (sgml-markup "CDATA marked section" "<![CDATA[\r]]>\n"))
+;;(define-key sgml-markup-menu [ ms]
+;;  (sgml-markup "Marked section" "<![ [\r]]>\n"))
 
-(define-key sgml-markup-menu [blank3]
-  '("" . nil))
 
 (define-key sgml-markup-menu [entities]
-  '("Insert entity" . sgml-entities-menu))
+  '("Insert Entity" . sgml-entities-menu))
 
 (define-key sgml-markup-menu [attributes]
-  '("Insert attribute" . sgml-attrib-menu))
+  '("Insert Attribute" . sgml-attrib-menu))
 
 (define-key sgml-markup-menu [tag-region]
-  '("Tag region" . sgml-tag-region-menu))
+  '("Tag Region" . sgml-tag-region-menu))
 
 (define-key sgml-markup-menu [insert-end-tag]
-  '("Insert end-tag" . sgml-end-tag-menu))
+  '("Insert End-Tag" . sgml-end-tag-menu))
 
 (define-key sgml-markup-menu [insert-start-tag]
-  '("Insert start-tag" . sgml-start-tag-menu))
+  '("Insert Start-Tag" . sgml-start-tag-menu))
 
 (define-key sgml-markup-menu [insert-element]
-  '("Insert element" . sgml-element-menu))
+  '("Insert Element" . sgml-element-menu))
 
 
-;;;; Key commands
+;;;; Key Commands
 
 ;; Doesn't this work in Lucid? ***
 (define-key sgml-mode-map [?\M-\C-\ ] 'sgml-mark-element)
@@ -195,7 +199,28 @@
 (define-key sgml-mode-map [S-mouse-1] 'sgml-tags-menu)
 
 
-;;;; Build custom menus
+;;;; Pop Up Menus
+
+(defun sgml-popup-menu (event title entries)
+  "Display a popup menu."
+  (x-popup-menu
+   event
+   (let ((menus (list (cons title entries))))
+     (cond ((> (length entries)
+	       sgml-max-menu-size)
+	    (setq menus
+		  (loop for i from 1 while entries
+			collect
+			(prog1 (cons
+				(format "%s %d" title i)
+				(subseq entries 0 (min (length entries)
+						       sgml-max-menu-size)))
+			  (setq entries (nthcdr sgml-max-menu-size
+						entries)))))))
+     (cons title menus))))
+
+
+;;;; Build Custom Menus
 
 (defun sgml-build-custom-menus ()
   ;; Build custom menus

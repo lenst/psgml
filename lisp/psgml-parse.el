@@ -995,6 +995,447 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
       (setq sgml-default-dtd-file file)
       (setq sgml-loaded-dtd real-file))))
 
+;;;; Parsing delimiters
+
+(eval-and-compile
+  (defconst sgml-delimiters
+    '("AND"   "&"
+      "COM"   "--"
+      "CRO"   "&#"
+      "DSC"   "]"
+      "DSO"   "["
+      "DTGC"  "]"
+      "DTGO"  "["
+      "ERO"   "&"
+      "ETAGO" "</"
+      "GRPC"  ")"
+      "GRPO"  "("
+      "LIT"   "\""
+      "LITA"  "'"
+      "MDC"   ">"
+      "MDO"   "<!"
+      "MINUS" "-"
+      "MSC"   "]]"
+      "NET"   "/"
+      "OPT"   "?"
+      "OR"    "|"
+      "PERO"  "%"
+      "PIC"   ">"
+      "PIO"   "<?"
+      "PLUS"  "+"
+      "REFC"  ";"
+      "REP"   "*"
+      "RNI"   "#"
+      "SEQ"   ","
+      "STAGO" "<"
+      "TAGC"  ">"
+      "VI"    "="
+      ;; Some combinations
+      "MS-START" "<!["			; MDO DSO
+      "MS-END"   "]]>"			; MSC MDC
+      ;; Pseudo
+      "NULL"  ""
+      )))
+
+
+(defmacro sgml-is-delim (delim &optional context move offset)
+  "Macro for matching delimiters.
+Syntax: DELIM &optional CONTEXT MOVE
+where DELIM is the delimiter name (string or symbol), 
+CONTEXT the contextual constraint, and
+MOVE is `nil', `move' or `check'.
+
+Test if the text following point in current buffer matches the SGML
+delimiter DELIM.  Also check the characters after the delimiter for
+CONTEXT.  Applicable values for CONTEXT is 
+`gi' -- name start or TAGC if SHORTTAG YES,
+`com' -- if COM or MDC,
+`nmstart' -- name start character, 
+`stagc' -- TAGC if SHORTTAG YES,
+`digit' -- any Digit,
+string -- delimiter with that name,
+list -- any of the contextual constraints in the list."
+
+  (or offset (setq offset 0))
+  (let ((ds (member (upcase (format "%s" delim))
+		    sgml-delimiters)))
+    (assert ds)
+    (setq delim (car ds)
+	  ds (cadr ds))
+    (cond ((eq context 'gi)
+	   (setq context '(nmstart stagc)))
+	  ((eq context 'com)
+	   (setq context '("COM" "MDC")))
+	  ((null context)
+	   (setq context '(t)))
+	  ((not (listp context))
+	   (setq context (list context))))
+    (`(if (and				; This and checks that characters
+					; of the delimiter
+	   (,@(loop for i from 0 below (length ds) collect
+		    (` (eq (, (aref ds i))
+			   (sgml-following-char (, (+ i offset)))))))
+	   (or
+	    (,@(loop
+		for c in context collect ; context check
+		(cond			
+		 ((eq c 'nmstart)	; name start character
+		  (`(sgml-startnm-char
+		     (or (sgml-following-char (, (length ds))) 0))))
+		 ((eq c 'stagc)
+		  (`(and sgml-current-shorttag
+			 (sgml-is-delim "TAGC" nil nil (, (length ds))))))
+		 ((eq c 'digit)
+		  (`(memq (sgml-following-char (, (length ds)))
+			  '(?0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9))))
+		 ((stringp c)
+		  (`(sgml-is-delim (, c) nil nil (, (length ds)))))
+		 ((eq c t))
+		 (t (error "Context type: %s" c))))
+	       )))
+	  
+	  (progn			; Do operations if delimiter found
+	    (,@ (if move (`((forward-char (, (length ds)))))))
+	    (,@ (if (not (eq move 'check))
+		    '(t))))
+	(,@ (if (eq move 'check)
+		(`((sgml-delimiter-parse-error (, delim))))))))))
+
+(defmacro sgml-following-char (n)
+  (cond ((zerop n)  '(following-char))
+	((= n 1)    '(char-after (1+ (point))))
+	(t          (` (char-after (+ (, n) (point)))))))
+
+(defun sgml-delimiter-parse-error (delim)
+  (sgml-parse-error "Delimiter %s (%s) expected"
+		    delim (cadr (member delim sgml-delimiters))))
+
+(defmacro sgml-parse-delim (delim &optional context)
+  (`(sgml-is-delim (, delim) (, context) move)))
+
+(defmacro sgml-check-delim (delim &optional context)
+  (`(sgml-is-delim (, delim) (, context) check)))
+
+(defmacro sgml-skip-upto (delim)
+  "Skip until the delimiter or first char of one of the delimiters.
+If DELIM is a string/symbol this is should be a delimiter role.
+Characters are skipped until the delimiter is recognized.
+If DELIM is a list of delimiters, skip until a character that is first
+in any of them."
+  (cond
+   ((consp delim)
+    (list 'skip-chars-forward
+	  (concat "^"
+		  (loop for d in delim
+			concat (let ((ds (member (upcase (format "%s" d))
+						 sgml-delimiters)))
+				 (assert ds)
+				 (let ((s (substring (cadr ds) 0 1)))
+				   (if (member s '("-" "\\"))
+				       (concat "\\" s)
+				     s)))))))
+   (t
+    (let ((ds (member (upcase (format "%s" delim))
+		      sgml-delimiters)))
+      (assert ds)
+      (setq ds (cadr ds))
+      (if (= 1 (length ds))
+	  (list 'skip-chars-forward (concat "^" ds))
+	(`(and (search-forward (, ds) nil t)
+	       (backward-char (, (length ds))))))))))
+
+
+;;(macroexpand '(sgml-is-delim mdo))
+;;(macroexpand '(sgml-parse-delim mdo))
+;;(macroexpand '(sgml-check-delim mdo))
+
+
+;;;; General lexical functions
+;;; Naming conventions
+;;; sgml-parse-xx  try to parse xx, return nil if can't else return
+;;;		   some propriate non-nil value.
+;;;                Except: for name/nametoken parsing, return 0 if can't.
+;;; sgml-check-xx  require xx, report error if can't parse.  Return 
+;;;                aproporiate value.
+
+(defmacro sgml-parse-char (char)
+  (` (cond ((eq (, char) (following-char))
+	    (forward-char 1)
+	    t))))
+
+(defmacro sgml-parse-chars (char1 char2 &optional char3)
+  "Parse two or three chars; return nil if can't"
+  (if (null char3)
+      (` (cond ((and (eq (, char1) (following-char))
+		 (eq (, char2) (char-after (1+ (point)))))
+	    (forward-char 2)
+	    t)))
+    (` (cond ((and (eq (, char1) (following-char))
+		 (eq (, char2) (char-after (1+ (point))))
+		 (eq (, char3) (char-after (1+ (1+ (point))))))
+	    (forward-char 3)
+	    t)))))
+
+(defun sgml-check-char (char)
+  (cond ((not (sgml-parse-char char))
+	 (sgml-parse-error "Expecting %c" char))))
+
+(defun sgml-parse-RE ()
+  (or (sgml-parse-char ?\n)
+      (sgml-parse-char ?\r)))
+
+(defmacro sgml-startnm-char (c)
+  (` (eq ?w (char-syntax (, c)))))
+
+(defun sgml-startnm-char-next ()
+  (and (not (eobp))
+       (sgml-startnm-char (following-char))))
+
+(defun sgml-name-char (c)
+  (and c
+       (or (sgml-startnm-char c)
+	   (eq ?_ (char-syntax c)))))
+
+(defun sgml-is-end-tag ()
+  (sgml-is-delim "ETAGO" nmstart))
+
+(defsubst sgml-is-enabled-net ()
+  (and (sgml-is-delim "NET")
+       sgml-current-shorttag
+       (sgml-tree-net-enabled sgml-current-tree)))
+
+(defun sgml-is-start-tag ()
+  (sgml-is-delim "STAGO" gi))
+
+(defsubst sgml-parse-s (&optional shortmap)
+  (if shortmap
+      (or (/= 0 (skip-chars-forward " "))
+	  (/= 0 (skip-chars-forward "\t"))
+	  (sgml-parse-char ?\n)
+	  (sgml-parse-char ?\r))
+    (/= 0 (skip-chars-forward " \t\n\r"))))
+
+(defsubst sgml-parse-processing-instruction ()
+  (if (sgml-parse-delim "PIO")
+      (sgml-do-processing-instruction)))
+
+(defun sgml-do-processing-instruction ()
+  (sgml-skip-upto "PIC")
+  (sgml-check-delim "PIC")
+  (sgml-set-markup-type 'pi)
+  t)
+
+
+(defmacro sgml-general-case (string)  (`(downcase (, string))))
+(defmacro sgml-entity-case (string)   string)
+
+(defun sgml-parse-name (&optional entity-name)
+  (if (sgml-startnm-char-next)
+      (let ((name (buffer-substring (point)
+				    (progn (skip-syntax-forward "w_")
+					   (point)))))
+	(if entity-name
+	    (sgml-entity-case name)
+	  (sgml-general-case name)))))
+
+(define-compiler-macro sgml-parse-name (&whole form &optional entity-name)
+  (cond
+   ((eq entity-name nil)
+    '(if (sgml-startnm-char-next)
+	 (sgml-general-case
+	  (buffer-substring (point)
+			    (progn (skip-syntax-forward "w_")
+				   (point))))))
+   ((eq entity-name t)
+    '(if (sgml-startnm-char-next)
+	 (sgml-entity-case
+	  (buffer-substring (point)
+			    (progn (skip-syntax-forward "w_")
+				   (point))))))
+   (t
+    form)))
+
+(defun sgml-check-name (&optional entity-name)
+  (or (sgml-parse-name entity-name)
+      (sgml-parse-error "Name expected")))
+
+(define-compiler-macro sgml-check-name (&optional entity-name)
+  (`(or (, (if entity-name
+	       (`(sgml-parse-name (, entity-name)))
+	     '(sgml-parse-name)))
+	(sgml-parse-error "Name expected"))))
+
+
+(defun sgml-parse-nametoken (&optional entity-name)
+  "Parses a name token and returns a string or nil if no nametoken."
+  (if (sgml-name-char (following-char))
+      (let ((name (buffer-substring (point)
+				    (progn (skip-syntax-forward "w_")
+					   (point)))))
+	(if entity-name
+	    (sgml-entity-case name)
+	  (sgml-general-case name)))))
+
+(defun sgml-check-nametoken ()
+  (or (sgml-parse-nametoken)
+      (sgml-parse-error "Name token expected")))
+
+(defun sgml-gname-symbol (string)
+  "Convert a string to a general name/nametoken/numbertoken."
+  (intern (sgml-general-case string)))
+
+(defun sgml-ename-symbol (string)
+  "Convert a string to an entity name."
+  (intern (sgml-entity-case string)))
+
+(defsubst sgml-parse-general-entity-ref ()
+  (if (sgml-parse-delim "ERO" nmstart)
+      (sgml-do-general-entity-ref)))
+
+(defun sgml-do-general-entity-ref ()
+  (let* ((name (sgml-parse-name t))
+	 (ent (sgml-lookup-entity name
+				  (sgml-dtd-entities sgml-dtd-info))))
+    (or (sgml-parse-delim "REFC")
+	(sgml-parse-RE))
+    (sgml-set-markup-type 'entity)
+    (cond ((null ent)
+	   (sgml-log-warning
+	    "Undefined entity %s" name))
+	  ((sgml-entity-data-p ent)
+	   (sgml-pcdata-move))
+	  (t
+	   (sgml-push-to-entity ent sgml-markup-start)))
+    t))
+
+(defsubst sgml-parse-parameter-entity-ref ()
+  "Parse and push to a parameter entity, return nil if no ref here."
+  ;;(setq sgml-markup-start (point))
+  (if (sgml-parse-delim "PERO" nmstart)
+      (sgml-do-parameter-entity-ref)))
+
+(defun sgml-do-parameter-entity-ref ()
+  (let* ((name (sgml-parse-name t))
+	     (ent (sgml-lookup-entity name
+				      (sgml-dtd-parameters sgml-dtd-info))))
+	(or (sgml-parse-delim "REFC")
+	    (sgml-parse-char ?\n))
+	;;(sgml-set-markup-type 'param)
+	(cond (ent
+	       (sgml-push-to-entity ent sgml-markup-start 'param))
+	      (t
+	       (sgml-log-warning
+		"Undefined parameter entity %s" name)))
+	t))
+
+(defun sgml-parse-comment ()
+  (if (sgml-parse-delim "COM")
+      (progn (sgml-skip-upto "COM")
+	     (sgml-check-delim "COM")
+	     t)))
+
+(defun sgml-skip-cs ()
+  "Skip over the separator used in the catalog."
+  (while (or (sgml-parse-s)
+	     (sgml-parse-comment))))
+
+(defsubst sgml-skip-ps ()
+  "Move point forward stopping before a char that isn't a parameter separator."
+  (while
+      (or (sgml-parse-s)
+	  (if (eobp) (sgml-pop-entity))
+	  (sgml-parse-parameter-entity-ref)
+	  (sgml-parse-comment))))
+
+(defsubst sgml-parse-ds ()
+;71  ds   = 5 s | EE | 60+ parameter entity reference
+;         | 91 comment declaration
+;         | 44 processing instruction
+;         | 93 marked section declaration ***
+  (or (and (eobp) (sgml-pop-entity))	;EE
+      (sgml-parse-s)			;5 s
+      ;;(sgml-parse-comment-declaration)	;91 comment declaration
+      (sgml-parse-parameter-entity-ref)
+      (sgml-parse-processing-instruction)))
+
+(defun sgml-skip-ds ()
+  (while (sgml-parse-ds)))
+
+(defmacro sgml-parse-rni (&optional name)
+  "Parse a RNI (#) return nil if none; with optional NAME, 
+a RNI must be followed by NAME."
+  (cond
+   (name
+    (` (if (sgml-parse-delim "RNI")
+	   (sgml-check-token (, name)))))
+   (t '(sgml-parse-delim "RNI"))))
+
+(defun sgml-check-token (name)
+  (or (equal (sgml-check-name) name)
+      (sgml-parse-error "Reserved name not expected")))
+
+(defun sgml-parse-literal ()
+  "Parse a literal and return a string, if no literal return nil."
+  (let (lita start value)
+    (cond ((or (sgml-parse-delim "LIT")
+	       (setq lita (sgml-parse-delim "LITA")))
+	   (setq start (point))
+	   (if lita
+	       (sgml-skip-upto "LITA")
+	     (sgml-skip-upto "LIT"))
+	   (setq value (buffer-substring start (point)))
+	   (if lita
+	       (sgml-check-delim "LITA")
+	     (sgml-check-delim "LIT"))
+	   value))))
+
+(defun sgml-parse-minimum-literal ()
+  "Parse a quoted SGML string and return it, if no string return nil."
+  (cond
+   ((memq (following-char) '(?\" ?\'))
+    (let* ((qchar (following-char))
+	   (blanks " \t\r\n")
+	   (qskip (format "^%s%c" blanks qchar))
+	   (start (point))
+	   (value			; accumulates the literal value
+	    "")
+	   (spaced ""))
+      (forward-char 1)
+      (skip-chars-forward blanks)
+      (while (not (sgml-parse-char qchar))
+	(cond ((eobp)
+	       (goto-char start)
+	       (sgml-parse-error "Unterminated literal"))
+	      ((sgml-parse-s)
+	       (setq spaced " "))
+	      (t
+	       (setq value
+		     (concat value spaced
+			     (buffer-substring
+			      (point)
+			      (progn (skip-chars-forward qskip)
+				     (point))))
+		     spaced ""))))
+      value))))
+
+(defun sgml-skip-cdata ()
+  "Move point forward until there is a end-tag open after point."
+  (while (progn (skip-chars-forward "^</")
+		(not (or (sgml-is-end-tag)
+			 (sgml-is-enabled-net))))
+    (forward-char 1)))
+
+(defun sgml-skip-tag ()
+  (when (sgml-parse-char ?<)
+    (sgml-parse-char ?/)
+    (unless (search-forward-regexp
+	       "\\([^\"'<>/]\\|\"[^\"]*\"\\|'[^']*'\\)*"
+	       nil t)
+      (sgml-error "Invalid tag"))
+    (or (sgml-parse-char ?>)
+	(sgml-parse-char ?/))))
+
+
 ;;;; Entity Manager
 
 (defstruct (sgml-entity
@@ -1170,7 +1611,7 @@ PTYPE can be 'param if this is a parameter entity."
 	 (setq name (sgml-parse-name t)))
 					; Document type.
 	((eq type 'doctype)
-	 (setq name (sgml-parse-nametoken t)))
+	 (setq name (sgml-parse-name)))
 					; Oops!
 	(t
 	 (error "Error in catalog file: \"%s\" should be \"PUBLIC\", \"ENTITY\", or \"DOCTYPE\"." type)))
@@ -1988,447 +2429,6 @@ remove it if it is showing."
 	 (sgml-display-log))
 	(t
 	 (sgml-clear-log))))
-
-;;;; Parsing delimiters
-
-(eval-and-compile
-  (defconst sgml-delimiters
-    '("AND"   "&"
-      "COM"   "--"
-      "CRO"   "&#"
-      "DSC"   "]"
-      "DSO"   "["
-      "DTGC"  "]"
-      "DTGO"  "["
-      "ERO"   "&"
-      "ETAGO" "</"
-      "GRPC"  ")"
-      "GRPO"  "("
-      "LIT"   "\""
-      "LITA"  "'"
-      "MDC"   ">"
-      "MDO"   "<!"
-      "MINUS" "-"
-      "MSC"   "]]"
-      "NET"   "/"
-      "OPT"   "?"
-      "OR"    "|"
-      "PERO"  "%"
-      "PIC"   ">"
-      "PIO"   "<?"
-      "PLUS"  "+"
-      "REFC"  ";"
-      "REP"   "*"
-      "RNI"   "#"
-      "SEQ"   ","
-      "STAGO" "<"
-      "TAGC"  ">"
-      "VI"    "="
-      ;; Some combinations
-      "MS-START" "<!["			; MDO DSO
-      "MS-END"   "]]>"			; MSC MDC
-      ;; Pseudo
-      "NULL"  ""
-      )))
-
-
-(defmacro sgml-is-delim (delim &optional context move offset)
-  "Macro for matching delimiters.
-Syntax: DELIM &optional CONTEXT MOVE
-where DELIM is the delimiter name (string or symbol), 
-CONTEXT the contextual constraint, and
-MOVE is `nil', `move' or `check'.
-
-Test if the text following point in current buffer matches the SGML
-delimiter DELIM.  Also check the characters after the delimiter for
-CONTEXT.  Applicable values for CONTEXT is 
-`gi' -- name start or TAGC if SHORTTAG YES,
-`com' -- if COM or MDC,
-`nmstart' -- name start character, 
-`stagc' -- TAGC if SHORTTAG YES,
-`digit' -- any Digit,
-string -- delimiter with that name,
-list -- any of the contextual constraints in the list."
-
-  (or offset (setq offset 0))
-  (let ((ds (member (upcase (format "%s" delim))
-		    sgml-delimiters)))
-    (assert ds)
-    (setq delim (car ds)
-	  ds (cadr ds))
-    (cond ((eq context 'gi)
-	   (setq context '(nmstart stagc)))
-	  ((eq context 'com)
-	   (setq context '("COM" "MDC")))
-	  ((null context)
-	   (setq context '(t)))
-	  ((not (listp context))
-	   (setq context (list context))))
-    (`(if (and				; This and checks that characters
-					; of the delimiter
-	   (,@(loop for i from 0 below (length ds) collect
-		    (` (eq (, (aref ds i))
-			   (sgml-following-char (, (+ i offset)))))))
-	   (or
-	    (,@(loop
-		for c in context collect ; context check
-		(cond			
-		 ((eq c 'nmstart)	; name start character
-		  (`(sgml-startnm-char
-		     (or (sgml-following-char (, (length ds))) 0))))
-		 ((eq c 'stagc)
-		  (`(and sgml-current-shorttag
-			 (sgml-is-delim "TAGC" nil nil (, (length ds))))))
-		 ((eq c 'digit)
-		  (`(memq (sgml-following-char (, (length ds)))
-			  '(?0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9))))
-		 ((stringp c)
-		  (`(sgml-is-delim (, c) nil nil (, (length ds)))))
-		 ((eq c t))
-		 (t (error "Context type: %s" c))))
-	       )))
-	  
-	  (progn			; Do operations if delimiter found
-	    (,@ (if move (`((forward-char (, (length ds)))))))
-	    (,@ (if (not (eq move 'check))
-		    '(t))))
-	(,@ (if (eq move 'check)
-		(`((sgml-delimiter-parse-error (, delim))))))))))
-
-(defmacro sgml-following-char (n)
-  (cond ((zerop n)  '(following-char))
-	((= n 1)    '(char-after (1+ (point))))
-	(t          (` (char-after (+ (, n) (point)))))))
-
-(defun sgml-delimiter-parse-error (delim)
-  (sgml-parse-error "Delimiter %s (%s) expected"
-		    delim (cadr (member delim sgml-delimiters))))
-
-(defmacro sgml-parse-delim (delim &optional context)
-  (`(sgml-is-delim (, delim) (, context) move)))
-
-(defmacro sgml-check-delim (delim &optional context)
-  (`(sgml-is-delim (, delim) (, context) check)))
-
-(defmacro sgml-skip-upto (delim)
-  "Skip until the delimiter or first char of one of the delimiters.
-If DELIM is a string/symbol this is should be a delimiter role.
-Characters are skipped until the delimiter is recognized.
-If DELIM is a list of delimiters, skip until a character that is first
-in any of them."
-  (cond
-   ((consp delim)
-    (list 'skip-chars-forward
-	  (concat "^"
-		  (loop for d in delim
-			concat (let ((ds (member (upcase (format "%s" d))
-						 sgml-delimiters)))
-				 (assert ds)
-				 (let ((s (substring (cadr ds) 0 1)))
-				   (if (member s '("-" "\\"))
-				       (concat "\\" s)
-				     s)))))))
-   (t
-    (let ((ds (member (upcase (format "%s" delim))
-		      sgml-delimiters)))
-      (assert ds)
-      (setq ds (cadr ds))
-      (if (= 1 (length ds))
-	  (list 'skip-chars-forward (concat "^" ds))
-	(`(and (search-forward (, ds) nil t)
-	       (backward-char (, (length ds))))))))))
-
-
-;;(macroexpand '(sgml-is-delim mdo))
-;;(macroexpand '(sgml-parse-delim mdo))
-;;(macroexpand '(sgml-check-delim mdo))
-
-
-;;;; General lexical functions
-;;; Naming conventions
-;;; sgml-parse-xx  try to parse xx, return nil if can't else return
-;;;		   some propriate non-nil value.
-;;;                Except: for name/nametoken parsing, return 0 if can't.
-;;; sgml-check-xx  require xx, report error if can't parse.  Return 
-;;;                aproporiate value.
-
-(defmacro sgml-parse-char (char)
-  (` (cond ((eq (, char) (following-char))
-	    (forward-char 1)
-	    t))))
-
-(defmacro sgml-parse-chars (char1 char2 &optional char3)
-  "Parse two or three chars; return nil if can't"
-  (if (null char3)
-      (` (cond ((and (eq (, char1) (following-char))
-		 (eq (, char2) (char-after (1+ (point)))))
-	    (forward-char 2)
-	    t)))
-    (` (cond ((and (eq (, char1) (following-char))
-		 (eq (, char2) (char-after (1+ (point))))
-		 (eq (, char3) (char-after (1+ (1+ (point))))))
-	    (forward-char 3)
-	    t)))))
-
-(defun sgml-check-char (char)
-  (cond ((not (sgml-parse-char char))
-	 (sgml-parse-error "Expecting %c" char))))
-
-(defun sgml-parse-RE ()
-  (or (sgml-parse-char ?\n)
-      (sgml-parse-char ?\r)))
-
-(defmacro sgml-startnm-char (c)
-  (` (eq ?w (char-syntax (, c)))))
-
-(defun sgml-startnm-char-next ()
-  (and (not (eobp))
-       (sgml-startnm-char (following-char))))
-
-(defun sgml-name-char (c)
-  (and c
-       (or (sgml-startnm-char c)
-	   (eq ?_ (char-syntax c)))))
-
-(defun sgml-is-end-tag ()
-  (sgml-is-delim "ETAGO" nmstart))
-
-(defsubst sgml-is-enabled-net ()
-  (and (sgml-is-delim "NET")
-       sgml-current-shorttag
-       (sgml-tree-net-enabled sgml-current-tree)))
-
-(defun sgml-is-start-tag ()
-  (sgml-is-delim "STAGO" gi))
-
-(defsubst sgml-parse-s (&optional shortmap)
-  (if shortmap
-      (or (/= 0 (skip-chars-forward " "))
-	  (/= 0 (skip-chars-forward "\t"))
-	  (sgml-parse-char ?\n)
-	  (sgml-parse-char ?\r))
-    (/= 0 (skip-chars-forward " \t\n\r"))))
-
-(defsubst sgml-parse-processing-instruction ()
-  (if (sgml-parse-delim "PIO")
-      (sgml-do-processing-instruction)))
-
-(defun sgml-do-processing-instruction ()
-  (sgml-skip-upto "PIC")
-  (sgml-check-delim "PIC")
-  (sgml-set-markup-type 'pi)
-  t)
-
-
-(defmacro sgml-general-case (string)  (`(downcase (, string))))
-(defmacro sgml-entity-case (string)   string)
-
-(defun sgml-parse-name (&optional entity-name)
-  (if (sgml-startnm-char-next)
-      (let ((name (buffer-substring (point)
-				    (progn (skip-syntax-forward "w_")
-					   (point)))))
-	(if entity-name
-	    (sgml-entity-case name)
-	  (sgml-general-case name)))))
-
-(define-compiler-macro sgml-parse-name (&whole form &optional entity-name)
-  (cond
-   ((eq entity-name nil)
-    '(if (sgml-startnm-char-next)
-	 (sgml-general-case
-	  (buffer-substring (point)
-			    (progn (skip-syntax-forward "w_")
-				   (point))))))
-   ((eq entity-name t)
-    '(if (sgml-startnm-char-next)
-	 (sgml-entity-case
-	  (buffer-substring (point)
-			    (progn (skip-syntax-forward "w_")
-				   (point))))))
-   (t
-    form)))
-
-(defun sgml-check-name (&optional entity-name)
-  (or (sgml-parse-name entity-name)
-      (sgml-parse-error "Name expected")))
-
-(define-compiler-macro sgml-check-name (&optional entity-name)
-  (`(or (, (if entity-name
-	       (`(sgml-parse-name (, entity-name)))
-	     '(sgml-parse-name)))
-	(sgml-parse-error "Name expected"))))
-
-
-(defun sgml-parse-nametoken (&optional entity-name)
-  "Parses a name token and returns a string or nil if no nametoken."
-  (if (sgml-name-char (following-char))
-      (let ((name (buffer-substring (point)
-				    (progn (skip-syntax-forward "w_")
-					   (point)))))
-	(if entity-name
-	    (sgml-entity-case name)
-	  (sgml-general-case name)))))
-
-(defun sgml-check-nametoken ()
-  (or (sgml-parse-nametoken)
-      (sgml-parse-error "Name token expected")))
-
-(defun sgml-gname-symbol (string)
-  "Convert a string to a general name/nametoken/numbertoken."
-  (intern (sgml-general-case string)))
-
-(defun sgml-ename-symbol (string)
-  "Convert a string to an entity name."
-  (intern (sgml-entity-case string)))
-
-(defsubst sgml-parse-general-entity-ref ()
-  (if (sgml-parse-delim "ERO" nmstart)
-      (sgml-do-general-entity-ref)))
-
-(defun sgml-do-general-entity-ref ()
-  (let* ((name (sgml-parse-name t))
-	 (ent (sgml-lookup-entity name
-				  (sgml-dtd-entities sgml-dtd-info))))
-    (or (sgml-parse-delim "REFC")
-	(sgml-parse-RE))
-    (sgml-set-markup-type 'entity)
-    (cond ((null ent)
-	   (sgml-log-warning
-	    "Undefined entity %s" name))
-	  ((sgml-entity-data-p ent)
-	   (sgml-pcdata-move))
-	  (t
-	   (sgml-push-to-entity ent sgml-markup-start)))
-    t))
-
-(defsubst sgml-parse-parameter-entity-ref ()
-  "Parse and push to a parameter entity, return nil if no ref here."
-  ;;(setq sgml-markup-start (point))
-  (if (sgml-parse-delim "PERO" nmstart)
-      (sgml-do-parameter-entity-ref)))
-
-(defun sgml-do-parameter-entity-ref ()
-  (let* ((name (sgml-parse-name t))
-	     (ent (sgml-lookup-entity name
-				      (sgml-dtd-parameters sgml-dtd-info))))
-	(or (sgml-parse-delim "REFC")
-	    (sgml-parse-char ?\n))
-	;;(sgml-set-markup-type 'param)
-	(cond (ent
-	       (sgml-push-to-entity ent sgml-markup-start 'param))
-	      (t
-	       (sgml-log-warning
-		"Undefined parameter entity %s" name)))
-	t))
-
-(defun sgml-parse-comment ()
-  (if (sgml-parse-delim "COM")
-      (progn (sgml-skip-upto "COM")
-	     (sgml-check-delim "COM")
-	     t)))
-
-(defun sgml-skip-cs ()
-  "Skip over the separator used in the catalog."
-  (while (or (sgml-parse-s)
-	     (sgml-parse-comment))))
-
-(defsubst sgml-skip-ps ()
-  "Move point forward stopping before a char that isn't a parameter separator."
-  (while
-      (or (sgml-parse-s)
-	  (if (eobp) (sgml-pop-entity))
-	  (sgml-parse-parameter-entity-ref)
-	  (sgml-parse-comment))))
-
-(defsubst sgml-parse-ds ()
-;71  ds   = 5 s | EE | 60+ parameter entity reference
-;         | 91 comment declaration
-;         | 44 processing instruction
-;         | 93 marked section declaration ***
-  (or (and (eobp) (sgml-pop-entity))	;EE
-      (sgml-parse-s)			;5 s
-      ;;(sgml-parse-comment-declaration)	;91 comment declaration
-      (sgml-parse-parameter-entity-ref)
-      (sgml-parse-processing-instruction)))
-
-(defun sgml-skip-ds ()
-  (while (sgml-parse-ds)))
-
-(defmacro sgml-parse-rni (&optional name)
-  "Parse a RNI (#) return nil if none; with optional NAME, 
-a RNI must be followed by NAME."
-  (cond
-   (name
-    (` (if (sgml-parse-delim "RNI")
-	   (sgml-check-token (, name)))))
-   (t '(sgml-parse-delim "RNI"))))
-
-(defun sgml-check-token (name)
-  (or (equal (sgml-check-name) name)
-      (sgml-parse-error "Reserved name not expected")))
-
-(defun sgml-parse-literal ()
-  "Parse a literal and return a string, if no literal return nil."
-  (let (lita start value)
-    (cond ((or (sgml-parse-delim "LIT")
-	       (setq lita (sgml-parse-delim "LITA")))
-	   (setq start (point))
-	   (if lita
-	       (sgml-skip-upto "LITA")
-	     (sgml-skip-upto "LIT"))
-	   (setq value (buffer-substring start (point)))
-	   (if lita
-	       (sgml-check-delim "LITA")
-	     (sgml-check-delim "LIT"))
-	   value))))
-
-(defun sgml-parse-minimum-literal ()
-  "Parse a quoted SGML string and return it, if no string return nil."
-  (cond
-   ((memq (following-char) '(?\" ?\'))
-    (let* ((qchar (following-char))
-	   (blanks " \t\r\n")
-	   (qskip (format "^%s%c" blanks qchar))
-	   (start (point))
-	   (value			; accumulates the literal value
-	    "")
-	   (spaced ""))
-      (forward-char 1)
-      (skip-chars-forward blanks)
-      (while (not (sgml-parse-char qchar))
-	(cond ((eobp)
-	       (goto-char start)
-	       (sgml-parse-error "Unterminated literal"))
-	      ((sgml-parse-s)
-	       (setq spaced " "))
-	      (t
-	       (setq value
-		     (concat value spaced
-			     (buffer-substring
-			      (point)
-			      (progn (skip-chars-forward qskip)
-				     (point))))
-		     spaced ""))))
-      value))))
-
-(defun sgml-skip-cdata ()
-  "Move point forward until there is a end-tag open after point."
-  (while (progn (skip-chars-forward "^</")
-		(not (or (sgml-is-end-tag)
-			 (sgml-is-enabled-net))))
-    (forward-char 1)))
-
-(defun sgml-skip-tag ()
-  (when (sgml-parse-char ?<)
-    (sgml-parse-char ?/)
-    (unless (search-forward-regexp
-	       "\\([^\"'<>/]\\|\"[^\"]*\"\\|'[^']*'\\)*"
-	       nil t)
-      (sgml-error "Invalid tag"))
-    (or (sgml-parse-char ?>)
-	(sgml-parse-char ?/))))
-
 
 ;;;; Shortref maps
 

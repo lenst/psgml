@@ -1,10 +1,11 @@
 ;;;;\filename dump.el
-;;;\Last edited: Thu Sep  8 23:55:05 1994 by lenst@lysita (Lennart Staflin)
+;;;\Last edited: Fri Sep 23 09:30:21 1994 by lenst@lysita (Lennart Staflin)
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
 
 ;;\begin{codeseg}
+(provide 'psgml-debug)
 (require 'psgml)
 (require 'psgml-parse)
 (require 'psgml-edit)
@@ -48,7 +49,7 @@
      (format
       "%s%s start:%s(%s) end:%s(%s) epos:%s/%s net:%s\n"
       (make-string (sgml-tree-level u) ?. )
-      (sgml-element-name u)
+      (sgml-element-gi u)
       (sgml-element-start u) (sgml-tree-stag-len u)
       (if (sgml-tree-etag-epos u) (sgml-tree-end u)) (sgml-tree-etag-len u)
       (sgml-comepos (sgml-tree-stag-epos u))
@@ -102,7 +103,7 @@
    (t
     (prin1 (sgml-eltype-model el))
     (terpri)))
-  (princ (format "Exeptions: +%s -%s\n"
+  (princ (format "Exeptions: +%S -%S\n"
 		 (sgml-eltype-includes el)
 		 (sgml-eltype-excludes el)))
   (princ (format "Attlist: %S\n" (sgml-eltype-attlist el)))
@@ -164,42 +165,143 @@
 		       "(autoload '%s \"%s\" %s t)\n"
 		       name file doc))))))))
 
+;;;; Test psgml with sgmls test cases
+
+(defun test-sgml (start)
+  (interactive "p")
+  (let (file)
+    (with-output-to-temp-buffer "*Testing psgml*"
+      (while
+	  (progn
+	    (setq file (format "/usr/local/src/sgmls-1.1/test/test%03d.sgm"
+			       start))
+	    (file-exists-p file))
+	(princ (format "*** File test%03d ***\n" start))
+	(find-file file)
+	(condition-case errcode
+	    (progn
+	      (sgml-parse-prolog)
+	      ;;(sgml-next-trouble-spot)
+	      (sgml-parse-until-end-of nil)
+	      )
+	  (error
+	   (princ errcode)
+	   (terpri)))
+	(if (get-buffer sgml-log-buffer-name)
+	    (princ (save-excursion
+		     (set-buffer sgml-log-buffer-name)
+		     (buffer-string))))
+	(terpri)
+	(terpri)
+	(sit-for 0)
+	(kill-buffer (current-buffer))
+	(setq start (1+ start))))))
+
+
 ;;;; Profiling
+
+(defun profile-sgml (&optional file)
+  (interactive)
+  (or file (setq file (expand-file-name "~/src/psgml/test/shortref.sgml")))
+  (find-file file)
+  (sgml-need-dtd)
+  (sgml-instrument-parser)
+  (elp-reset-all)
+  (dotimes (i 20)
+    (garbage-collect)
+    (sgml-reparse-buffer (function sgml-handle-shortref)))
+  (elp-results))
 
 (defun sgml-instrument-parser ()
   (interactive)
   (require 'elp)
+  (setq elp-function-list nil)
+  (elp-restore-all)
   (setq elp-function-list
 	'(
 	  sgml-parse-to
 	  sgml-parser-loop
-	  sgml-parse-s
 	  sgml-parse-markup-declaration
-	  sgml-parse-processing-instruction
-	  sgml-pop-entity
-	  sgml-is-enabled-net
-	  sgml-do-end-tag
+	  sgml-do-processing-instruction
 	  sgml-deref-shortmap
-	  sgml-element-mixed
+	  sgml-handle-shortref
+	  sgml-do-end-tag
 	  sgml-do-start-tag
-	  sgml-parse-general-entity-ref
-	  sgml-set-markup-type
+	  sgml-do-general-entity-ref
+	  sgml-pop-entity
 	  sgml-pcdata-move
-	  sgml-parse-pcdata
-	  ;; In sgml-set-markup-type
+	  sgml-skip-cdata
+	  sgml-eltype-mixed
 	  sgml-set-face-for
+	  sgml-shortmap-skipstring
 	  ;; In sgml-do-end-tag
 	  sgml-lookup-eltype
 	  sgml-check-tag-close
 	  sgml-implied-end-tag
 	  sgml-close-element
-	  sgml-check-name
 	  sgml-eltype-name
-	  sgml-final
 	  sgml-element-gi
 	  sgml-required-tokens
+	  ;; in do pcdata move
+	  sgml-do-implied
+	  ;;sgml-next-sub&
+	  ;;sgml-get-&move
+	  ;; in sgml-do-start-tag
+	  sgml-parse-attribute-specification-list
+	  sgml-open-element
+	  ;; in sgml-parse-general-entity-ref
+	  sgml-push-to-entity
+	  sgml-parse-name
+	  sgml-lookup-entity
 	  ))
+  (elp-instrument-list))
+
+
+(defun sgml-instrument-dtd-parser ()
+  (interactive)
+  (require 'elp)
+  (setq elp-function-list nil)
   (elp-restore-all)
+  (setq elp-function-list
+	'(
+	  sgml-parse-prolog
+	  sgml-skip-ds
+	  sgml-parse-markup-declaration
+	  sgml-check-doctype-body
+	  ;;
+	  sgml-check-dtd-subset
+	  sgml-parse-ds
+	  sgml-declare-attlist
+	  sgml-declare-entity
+	  sgml-declare-element
+	  sgml-declare-shortref
+	  ;;
+	  sgml-parse-parameter-literal
+	  sgml-check-element-type
+	  sgml-check-primitive-content-token
+	  sgml-check-model-group
+	  ;; In sgml-check-model-group
+	  sgml-parse-modifier
+	  sgml-make-pcdata
+	  sgml-skip-ts
+	  sgml-make-opt
+	  sgml-make-*
+	  sgml-make-+
+	  sgml-reduce-,
+	  sgml-reduce-|
+	  sgml-make-&
+	  sgml-make-conc
+	  sgml-copy-moves
+	  ;; is ps*
+	  sgml-do-parameter-entity-ref
+	  ;; 
+	  sgml-make-primitive-content-token
+	  sgml-push-to-entity
+	  sgml-lookup-entity
+	  sgml-lookup-eltype
+	  sgml-one-final-state
+	  sgml-remove-redundant-states-1
+	  ))
   (elp-instrument-list))
 
 
