@@ -332,7 +332,7 @@ Setting this variable automatically makes it local to the current buffer.")
 			  (or (getenv "SGML_SEARCH_PATH")
 			      "."))
   "*List of directories used to look for system identifiers.")
-(put 'sgml-system-path 'sgml-type 'list)
+(put 'sgml-system-path 'sgml-type 'file-list)
 
 (defvar sgml-public-map (or (sgml-parse-colon-path (getenv "SGML_PATH"))
 			    '("%S" "/usr/local/lib/sgml/%o/%c/%d" ))
@@ -356,7 +356,7 @@ identifier.")
 This is used in addtion to `sgml-catalog-files',  and `sgml-public-map'.
 This variable is automatically local to the buffer.")
 (make-variable-buffer-local 'sgml-local-catalogs)
-(put 'sgml-local-catalogs 'sgml-type 'list)
+(put 'sgml-local-catalogs 'sgml-type 'file-list)
 
 (defvar sgml-catalog-files (or (sgml-parse-colon-path
 				(getenv "SGML_CATALOG_FILES"))
@@ -364,18 +364,18 @@ This variable is automatically local to the buffer.")
   "*List of catalog entry files.
 The files are in the format defined in the SGML Open Draft Technical
 Resolution on Entity Management.")
-(put 'sgml-catalog-files 'sgml-type 'list)
+(put 'sgml-catalog-files 'sgml-type 'file-list)
 
 (defvar sgml-ecat-files '("ECAT" "~/sgml/ECAT" "/usr/local/lib/sgml/ECAT")
   "*List of catalog files for PSGML.")
-(put 'sgml-ecat-files 'sgml-type 'list)
+(put 'sgml-ecat-files 'sgml-type 'file-list)
 
 (defvar sgml-local-ecat-files nil
   "*List of local catalog files for PSGML.
 Automatically becomes buffer local if set.")
 
 (make-variable-buffer-local 'sgml-local-ecat-files)
-(put 'sgml-local-ecat-files 'sgml-type 'list)
+(put 'sgml-local-ecat-files 'sgml-type 'file-list)
 
 (defvar sgml-public-transliterations '((? . ?_) (?/ . ?%))
   "*Transliteration for characters that should be avoided in file names.
@@ -489,11 +489,11 @@ See `compilation-error-regexp-alist'.")
 
 (defvar sgml-declaration nil
   "*If non-nil, this is the name of the SGML declaration file.")
-(put 'sgml-declaration 'sgml-type 'string)
+(put 'sgml-declaration 'sgml-type 'file-or-nil)
 
 (defvar sgml-xml-declaration nil
   "*If non-nil, this is the name of the SGML declaration for XML files.")
-(put 'sgml-xml-declaration 'sgml-type 'string)
+(put 'sgml-xml-declaration 'sgml-type 'file-or-nil)
 
 (defvar sgml-mode-hook nil
   "A hook or list of hooks to be run when entering sgml-mode")

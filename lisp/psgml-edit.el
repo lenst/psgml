@@ -1813,6 +1813,39 @@ If it is something else complete with ispell-complete-word."
       (setq val (read-string (concat (sgml-variable-description var) ": ")))
       (when (stringp val)
 	(set var val)))
+     ((eq 'file-list  type)
+      (describe-variable var)
+      (save-excursion 
+	(set-buffer (get-buffer "*Help*"))
+	(goto-char (point-max))
+	(insert-string "\n
+Enter as many filenames as you want. Entering a directory 
+or non-existing filename will exit the loop."))
+      (setq val nil)
+      (while (let ((next
+		    (expand-file-name
+		     (read-file-name
+		      (concat (sgml-variable-description var) ": ")
+		      nil "" nil nil))))
+	       (if (and (file-exists-p next) (not (file-directory-p next)))
+		   (setq val (cons next val)))))
+      (set var val))
+     ((eq 'file-or-nil type) 
+      (describe-variable var)
+      (save-excursion 
+	(set-buffer (get-buffer "*Help*"))
+	(goto-char (point-max))
+	(insert-string "\n
+Entering a directory or non-existing filename here
+will reset the variable."))
+      (setq val (expand-file-name
+		 (read-file-name
+		  (concat (sgml-variable-description var) ": ") 
+		  nil (if (stringp val) (file-name-nondirectory val)) 
+		  nil (if (stringp val) (file-name-nondirectory val)) )))
+      (if (and (file-exists-p val) (not (file-directory-p val))) 
+	  (set var val) 
+	(set var nil)))   
      ((consp type)
       (let ((val
 	     (sgml-popup-menu event

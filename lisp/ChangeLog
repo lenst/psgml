@@ -1,3 +1,7 @@
+Fri Jul  3 18:14:21 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* Makefile.in: Change to call install with only one source file.
+	
 Fri Jul  3 17:54:06 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-complete): ignore case
@@ -5,13 +9,19 @@ Fri Jul  3 17:54:06 1998  Lennart Staflin  <lenst@lysator.liu.se>
 	* psgml-parse.el (sgml-push-to-entity): use setf to set 
 	sgml-entity-marked-undefined-p.
 	(setf sgml-entity-marked-undefined-p): define setf method
+	
+Tue Jun 30 22:06:20 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* psgml-edit.el (sgml-do-set-option): Added file-list and
+	file-or-nil types contributed by Matthias Clasen
+	<mclasen@sun2.mathematik.uni-freiburg.de>
+	
 Tue Jun 30 21:48:39 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el (sgml-mode-map): C-c C-i calls sgml-add-element-to-element
 
 	* psgml-edit.el (sgml-add-element-to-element): New command.
-
+	
 Wed Jun 24 23:23:38 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-attribute-buffer): Fixed another victim of
