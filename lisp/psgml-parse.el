@@ -2539,11 +2539,13 @@ subelements."
 	    (re-search-forward "[ \t]" opoint t))
 	(setq opoint (point))
 	(skip-chars-backward " \t")
+	(if (bolp)
+	    (setq give-up t)
 	(delete-region (point) opoint)
 	(newline)
 	(sgml-indent-line)
-	(setq give-up (>= (current-column) prev-column))
-	(end-of-line 1)))))
+	(end-of-line 1)
+	(setq give-up (>= (current-column) prev-column)))))))
 
 
 ;;;; SGML mode: attributes
