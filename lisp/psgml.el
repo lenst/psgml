@@ -52,7 +52,7 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.0.1"
+(defconst psgml-version "1.0.2"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -282,14 +282,19 @@ Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-indent-data)
 
 (defvar sgml-system-path nil
-  "*List of directories used to look for system identifiers.")
+  "*Not used any more.
+Used to be list of directories used to look for system identifiers.
+Currently only used by `sgml-load-dtd'.")
 (put 'sgml-system-path 'sgml-type 'list)
 
 (defun sgml-parse-colon-path (cd-path)
   "Explode a colon-separated list of paths into a string list."
-  (let (cd-list (cd-start 0) cd-colon)
-    (setq cd-path (concat cd-path ":"))
-    (while (setq cd-colon (string-match ":" cd-path cd-start))
+  (let ((cd-sep ":")
+	cd-list (cd-start 0) cd-colon)
+    (if (boundp 'path-separator)
+	(setq cd-sep path-separator))
+    (setq cd-path (concat cd-path cd-sep))
+    (while (setq cd-colon (string-match cd-sep cd-path cd-start))
       (setq cd-list
 	    (nconc cd-list
 		   (list (if (= cd-start cd-colon)
@@ -502,7 +507,6 @@ See `compilation-error-regexp-alist'.")
     sgml-markup-faces
     sgml-system-identifiers-are-preferred
     sgml-trace-entity-lookup
-    sgml-system-path
     sgml-public-map
     sgml-catalog-files
     sgml-ecat-files
@@ -1009,7 +1013,6 @@ sgml-indent-step  How much to increament indent for every element level.
 sgml-indent-data  If non-nil, indent in data/mixed context also.
 sgml-set-face     If non-nil, psgml will set the face of parsed markup.
 sgml-markup-faces The faces used when the above variable is non-nil.
-sgml-system-path  List of directorys used to look for system identifiers.
 sgml-public-map  Mapping from public identifiers to file names.
 sgml-offer-save  If non-nil, ask about saving modified buffers before
 		\\[sgml-validate] is run.

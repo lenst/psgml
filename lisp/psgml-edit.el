@@ -1528,21 +1528,82 @@ argument INVERT to non-nil."
 (defun sgml-expand-entity-reference ()
   "Insert the text of the entity referenced at point."
   (interactive)
-  (sgml-with-parser-syntax
-   (setq sgml-markup-start (point))
-   (sgml-check-delim "ERO")
-   (let* ((ename (sgml-check-name t))
-	  (entity (sgml-lookup-entity ename
-				      (sgml-dtd-entities
-				       (sgml-pstate-dtd
-					sgml-buffer-parse-state)))))
-     (unless entity
-       (error "Undefined entity %s" ename))
-     (or (sgml-parse-delim "REFC")
-	 (sgml-parse-RE))
-     (delete-region sgml-markup-start (point))
-     (sgml-entity-insert-text entity))))
+  (save-excursion
+    (sgml-with-parser-syntax
+     (setq sgml-markup-start (point))
+     (or (sgml-parse-delim "ERO")
+	 (progn
+	   (skip-syntax-backward "w_")
+	   (forward-char -1)		; @@ Really length of ERO
+	   (setq sgml-markup-start (point))
+	   (sgml-check-delim "ERO")))
+     (let* ((ename (sgml-check-name t))
+	    (entity (sgml-lookup-entity ename
+					(sgml-dtd-entities
+					 (sgml-pstate-dtd
+					  sgml-buffer-parse-state)))))
+       (unless entity
+	 (error "Undefined entity %s" ename))
+       (or (sgml-parse-delim "REFC")
+	   (sgml-parse-RE))
+       (delete-region sgml-markup-start (point))
+       (sgml-entity-insert-text entity)))))
 
+;; Function contributed by Matthias Clasen <clasen@netzservice.de>
+(defun sgml-edit-external-entity ()
+  "Open	a new window and display the external entity at the point."
+  (interactive)
+  (sgml-need-dtd)
+  (save-excursion                     
+    (sgml-with-parser-syntax  
+     (setq sgml-markup-start (point))
+     (unless (sgml-parse-delim "ERO")
+       (search-backward-regexp "[&>;]")
+       (setq sgml-markup-start (point))
+       (sgml-check-delim "ERO"))
+     (sgml-parse-to-here)		; get an up-to-date parse tree
+     (let* ( (parent (buffer-file-name)) ; used to be (sgml-file)
+	     (ename (sgml-check-name t))
+	     (entity (sgml-lookup-entity ename       
+					 (sgml-dtd-entities
+					  (sgml-pstate-dtd
+					   sgml-buffer-parse-state))))
+	     (buffer nil)
+	     (ppos nil))
+       (unless entity
+	 (error "Undefined entity %s" ename))
+       (unless (and (eq (sgml-entity-type entity) 'text)               
+		    (not (stringp (sgml-entity-text entity))))
+	 (error "The entity %s is not an external text entity" ename))
+
+       ;; here I try to construct a useful value for
+       ;; `sgml-parent-element'.
+
+       ;; find sensible values for the HAS-SEEN-ELEMENT part
+       (let ((seen nil)
+	     (child (sgml-tree-content sgml-current-tree)))
+	 (while (and child
+		     (sgml-tree-etag-epos child)
+		     (<= (sgml-tree-end child) (point)))
+	   (push (sgml-element-gi child) seen)
+	   (setq child (sgml-tree-next child)))
+	 (push (nreverse seen) ppos))
+       
+       ;; find ancestors
+       (let ((rover sgml-current-tree))
+	 (while (not (eq rover sgml-top-tree))
+	   (push (sgml-element-gi rover) ppos)
+	   (setq rover (sgml-tree-parent rover))))
+
+       (find-file-other-window
+	(sgml-external-file (sgml-entity-text entity)
+			    (sgml-entity-type entity)
+			    (sgml-entity-name entity)))
+       (goto-char (point-min))
+       (sgml-mode)
+       (setq sgml-parent-document (cons parent ppos))
+       ;; update the live element indicator of the new window
+       (sgml-parse-to-here)))))
 
 ;;;; SGML mode: TAB completion
 

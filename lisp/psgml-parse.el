@@ -320,13 +320,13 @@ to point to the next scratch buffer.")
 ;; The and-model groups creates too big state machines, therefor
 ;; there is a datastruture called and-node.
 
-;; A and-node is a specification for a dfa that has not been computed.
+;; An and-node is a specification for a dfa that has not been computed.
 ;; It contains a set of dfas that all have to be traversed befor going
 ;; to the next state.  The and-nodes are only stored in moves and are
 ;; not seen by the parser.  When a move is taken the and-node is converted
-;; to a and-state.
+;; to an and-state.
 
-;; A and-state keeps track of which dfas still need to be
+;; An and-state keeps track of which dfas still need to be
 ;; traversed and the state of the current dfa.
 
 ;; move = <token, node>
@@ -3452,19 +3452,23 @@ Assumes starts with point inside a markup declaration."
       (sgml-do-usemap-element mapname)))))
 
 (defconst sgml-markup-declaration-table
-  '(("sgml"     . sgml-do-sgml-declaration)
-    ("doctype"  . sgml-do-doctype)
-    ("element"  . sgml-declare-element)
-    ("entity"   . sgml-declare-entity)
-    ("usemap"   . sgml-do-usemap)
-    ("shortref" . sgml-declare-shortref)
-    ("notation" . sgml-declare-notation)
-    ("attlist"  . sgml-declare-attlist)
-    ("uselink"  . sgml-skip-upto-mdc)
-    ("linktype" . sgml-skip-upto-mdc)
-    ("link"     . sgml-skip-upto-mdc)
-    ("idlink"   . sgml-skip-upto-mdc)
-    ))
+  (mapcar (lambda (pair)
+	    (cons (sgml-general-case (car pair))
+		  (cdr pair)))
+	
+	  '(("sgml"     . sgml-do-sgml-declaration)
+	    ("doctype"  . sgml-do-doctype)
+	    ("element"  . sgml-declare-element)
+	    ("entity"   . sgml-declare-entity)
+	    ("usemap"   . sgml-do-usemap)
+	    ("shortref" . sgml-declare-shortref)
+	    ("notation" . sgml-declare-notation)
+	    ("attlist"  . sgml-declare-attlist)
+	    ("uselink"  . sgml-skip-upto-mdc)
+	    ("linktype" . sgml-skip-upto-mdc)
+	    ("link"     . sgml-skip-upto-mdc)
+	    ("idlink"   . sgml-skip-upto-mdc))))
+
 
 (defun sgml-parse-markup-declaration (option)
   "Parse a markup declartion.
@@ -3647,7 +3651,7 @@ VALUE is a string.  Returns nil or an attdecl."
     (setq sgml-current-state
 	  (sgml-make-primitive-content-token et))
 
-    (when (consp (cadr modifier))	; There are "seen" elements
+    (when (consp (cdr modifier))	; There are "seen" elements
       (sgml-open-element et nil (point-min) (point-min))
       (loop for seenel in (cadr modifier)
 	    do (setq sgml-current-state
@@ -3659,7 +3663,8 @@ VALUE is a string.  Returns nil or an attdecl."
     (setf (sgml-tree-excludes top) (sgml-tree-excludes sgml-current-tree))
     (setf (sgml-tree-shortmap top) sgml-current-shortmap)
     (setf (sgml-eltype-model (sgml-tree-eltype top))
-	  sgml-current-state)))
+	  sgml-current-state)
+    (setf (sgml-tree-content top) nil)))
 
 
 (defun sgml-set-global ()
@@ -4002,8 +4007,8 @@ pointing to start of short ref and point pointing to the end."
 	   (sgml-log-warning
 	    "Unclosed tag is not allowed with SHORTTAG NO")
 	   t))
-   (sgml-error "Invalid character in markup %c"
-	       (following-char))))
+   (sgml-log-warning "Invalid character in markup %c"
+		     (following-char))))
 
 (defun sgml-implied-end-tag (type start end)
   (cond ((eq sgml-current-tree sgml-top-tree)

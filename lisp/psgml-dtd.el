@@ -466,7 +466,8 @@ Case transformed for general names."
 	(setq el (if con1
 		     (funcall con1 subs)
 		   (car subs)))))
-     ((sgml-parse-rni "pcdata")		; #PCDATA
+     ((sgml-parse-rni (eval-when-compile
+			(sgml-general-case "PCDATA"))) ; #PCDATA
       (setq sgml-used-pcdata t)
       (setq el (sgml-make-pcdata)))
      ((sgml-parse-delim "DTGO")			; data tag group
