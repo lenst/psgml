@@ -1104,7 +1104,8 @@ settings in ENTS."
   (or (and (file-readable-p cfile)
 	   (insert-file-contents cfile nil nil nil t)
 	   (equal '(sgml-saved-dtd-version 6) (sgml-read-sexp))
-	   (sgml-up-to-date-p cfile (sgml-read-sexp)))
+	   (or sgml-ignore-out-of-date-cdtd
+	       (sgml-up-to-date-p cfile (sgml-read-sexp))))
       (sgml-compile-dtd dtdfile cfile ents)))
 
 (defun sgml-up-to-date-p (file dependencies)
@@ -3559,6 +3560,9 @@ pointing to start of short ref and point pointing to the end."
 	   (setq et (sgml-lookup-eltype (sgml-check-name)))
 	   (sgml-parse-s)
 	   (sgml-check-tag-close)))
+    (sgml-set-markup-type 'end-tag)	; This will create the overlay for
+					; the end-tag before the element
+					; is closed
     (when et
       (setq gi (sgml-eltype-name et))
       (setq found			; check if there is an open element
@@ -3590,7 +3594,7 @@ pointing to start of short ref and point pointing to the end."
 	  (sgml-implied-end-tag (format "%s end-tag" gi)
 				sgml-markup-start sgml-markup-start)))
       (sgml-close-element sgml-markup-start (point))))
-  (sgml-set-markup-type 'end-tag))
+)
 
 
 (defun sgml-is-goal-after-start (goal tree)
