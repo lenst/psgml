@@ -1,5 +1,5 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
-<!ENTITY last.ed  'Time-stamp: "2002-04-19 11:59:05 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "2002-04-25 22:43:37 lenst"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
@@ -45,7 +45,7 @@
   <meta name="template-type" content="software">
   <meta name="category" content="Emacs mode">
   <meta name="author-name" content="Lennart Staflin">
-  <meta name="version" content="1.2.2">
+  <meta name="version" content="1.2.5">
   <meta name="description"
     content="PSGML is a GNU Emacs Major Mode for editing SGML coded documents.">
   <meta name="keywords" content="sgml, emacs, syntax directed editing">
@@ -201,7 +201,7 @@ HR.divider { width: 50%; align: center; }
        <td>stable</td>
        <td>bugfixes</td>
        <td><a href="&base.url;/&psgml1.2.5;">http</a></td>
-       <td>-</td>
+       <td><a href="&psgml.dir;&psgml1.2.5;">ftp</a></td>
       </tr>
       <tr>
        <td>1.2.4</td>
