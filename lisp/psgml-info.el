@@ -1,5 +1,5 @@
 ;;;; psgml-info.el
-;;; Last edited: Sun Mar 19 16:43:11 1995 by lenst@tiny.lysator.liu.se (Lennart Staflin)
+;;; Last edited: Mon Aug  7 23:00:54 1995 by lenst@katja.lysator.liu.se (Lennart Staflin)
 ;;; $Id$
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
@@ -199,7 +199,8 @@
 
 ;;;; Display table
 
-(defun sgml-display-table (table title col-title1 col-title2 &optional width)
+(defun sgml-display-table (table title col-title1 col-title2
+				 &optional width nosort)
   (or width
       (setq width sgml-attr-col))
   (let ((buf (get-buffer-create (format "*%s*" title))))
@@ -213,11 +214,14 @@
     (indent-to width)
     (insert-char ?= (length col-title2))
     (insert "\n")
-    (setq table (sort table (function (lambda (a b)
-					(string< (car a) (car b))))))
+    (unless nosort
+      (setq table (sort table (function (lambda (a b)
+					  (string< (car a) (car b)))))))
     (loop for e in table do
 	  (insert (format "%s" (car e)))
-	  (loop for name in (sort (cdr e) (function string-lessp))
+	  (loop for name in (if nosort
+				(cdr e)
+			      (sort (cdr e) (function string-lessp)))
 		do
 		(when (> (+ (length name) (current-column))
 			 fill-column)
@@ -354,16 +358,40 @@
   "Display information about the current DTD."
   (interactive)
   (sgml-need-dtd)
-  (sgml-display-table
-   (list (list "Doctype" (sgml-dtd-doctype sgml-dtd-info))
-	 (list "Compiled DTD"
-	       (if (sgml-dtd-merged sgml-dtd-info)
-		   (car (sgml-dtd-merged sgml-dtd-info))
-		 "Maybe"))
-	 (cons "Files used:"
-	       (loop for x in (sgml-dtd-dependencies sgml-dtd-info)
-		     if (stringp x) collect x)))
-   "DTD Info" "What" "Value"))
+  (let ((elements 0)
+	(entities 0)
+	(parameters 0)
+	(fmt "%20s %s\n")
+	(hdr "")
+	)
+    (sgml-map-eltypes (function (lambda (e) (incf elements)))
+		      sgml-dtd-info)
+    (sgml-map-entities (function (lambda (e) (incf entities)))
+		       (sgml-dtd-entities sgml-dtd-info))
+    (sgml-map-entities (function (lambda (e) (incf parameters)))
+		       (sgml-dtd-parameters sgml-dtd-info))
 
+    (with-output-to-temp-buffer "*Help*"
+      (princ (format fmt "Doctype:" (sgml-dtd-doctype sgml-dtd-info)))
+      (when (sgml-dtd-merged sgml-dtd-info)
+	(princ (format fmt "Compiled DTD:"
+		       (car (sgml-dtd-merged sgml-dtd-info)))))
+      (princ (format fmt "Element types:" (format "%d" elements)))
+      (princ (format fmt "Entities:" (format "%d" entities)))
+      (princ (format fmt "Parameter entities:" (format "%d" parameters)))
+
+      (setq hdr "Files used:")
+      (loop for x in (sgml-dtd-dependencies sgml-dtd-info)
+	    if (stringp x)
+	    do (princ (format fmt hdr x))
+	    (setq hdr ""))
+
+      (setq hdr "Undef parameters:")
+      (sgml-map-entities
+       (function (lambda (entity)
+		   (when (sgml-entity-marked-undefined-p entity)
+		     (princ (format fmt hdr (sgml-entity-name entity)))
+		     (setq hdr ""))))
+       (sgml-dtd-parameters sgml-dtd-info)))))
 
 ;;; psgml-info.el ends here
