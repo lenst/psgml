@@ -52,7 +52,7 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.2.4"
+(defconst psgml-version "1.2.5"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -479,6 +479,9 @@ string will be replaced according to the list below, if the string contains
 %d means the file containing the DOCTYPE declaration, if not in the buffer 
 ")
 (make-variable-buffer-local 'sgml-validate-command)
+
+(defvar sgml-xml-validate-command "nsgmls -wxml -s %s %s"
+  "*The default for `sgml-validate-command' in XML mode.")
 
 (defvar sgml-validate-files nil
   "If non-nil, a function of no arguments that returns a list of file names.
@@ -1224,11 +1227,10 @@ All bindings:
   (setq sgml-namecase-general nil)
   (setq sgml-minimize-attributes nil)
   (setq sgml-always-quote-attributes t)
-  (setq sgml-validate-command "nsgmls -wxml -s %s %s")
-  ;; FIXME: why conditional?
-  (unless sgml-declaration
-    (make-local-variable 'sgml-declaration)
-    (setq sgml-declaration sgml-xml-declaration)))
+  (setq sgml-validate-command sgml-xml-validate-command)
+  (make-local-variable 'sgml-declaration)
+  (setq sgml-declaration sgml-xml-declaration))
+
 
 (defun sgml-default-dtd-file ()
   (and (buffer-file-name)
