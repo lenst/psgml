@@ -1,3 +1,8 @@
+Wed Jun 10 23:28:42 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-catalog-lookup): Take additional catalogs
+	in right order.
+
 Thu May 14 20:02:42 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.1.1

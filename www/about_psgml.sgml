@@ -1,0 +1,247 @@
+<!doctype htmlplus system [
+<!entity last.ed
+"Last edited: 1996-11-20 20:49:29 lenst
+">
+<!entity rcs.id "$Id$">
+
+<!ENTITY % HTML.emph "INCLUDE">
+
+<!entity news  system "news.sgml" subdoc >
+
+<!entity mail.url "mailto:">
+<!entity my.email cdata "lenst@lysator.liu.se">
+<!entity mme.url "&mail.url;&my.email">
+
+<!entity % TEST  "IGNORE">
+<![ %TEST [ <!entity base.url "."> ]]>
+
+<!entity base.url
+   "http://www.lysator.liu.se/~lenst/about_psgml">
+
+<!entity logo.url "&base.url;/newpsgml2.gif">
+
+<!entity ftp.url "ftp://ftp.lysator.liu.se/">
+<!entity psgml.dir "&ftp.url;pub/sgml/">
+<!entity psgml0.4b "&psgml.dir;psgml-0.4b.tar.gz">
+<!entity psgml0.4b2 "&psgml.dir;psgml-0.4b2.tar.gz">
+<!entity psgml0.4b3 "&psgml.dir;psgml-0.4b3.tar.gz">
+<!entity psgml1a12  "&psgml.dir;psgml-1a12.tar.gz">
+<!entity psgml1.0.1  "&psgml.dir;psgml-1.0.1.tar.gz">
+
+<!entity olddoc.url "&base.url;/psgml_toc.html">
+<!entity newdoc.url "&base.url;/psgml_toc.html">
+<!entity source "&base.url;/about_psgml.sgml" >
+<!entity script "&base.url;/htmlminus" >
+<!entity script.lib "&base.url;/htmlminus.pl" >
+<!entity sgml1.pl "&base.url;/sgml1.pl" >
+<!entity sgml2.pl "&base.url;/sgml2.pl" >
+<!entity attr-sgmls.pl "&base.url;/attr-sgmls.pl" >
+
+<!entity nl     "<br>" >
+<!entity SGML   "SGML" -- alt <acronym>SGML</acronym> -- >
+
+<!-- not in use 
+<!entity doc.url "http://gopher.lysator.liu.se:7070/CGI/cgi-bin/info2html.cgi?(psgml.info)Top">
+<!entity addon.url "http://www.lysator.liu.se/~lenst/addon">
+<!entity addon.url "&base.url;">
+<!entity nefarious.url "&addon.url;/nefarious.el">
+-->
+]>
+
+<htmlplus>
+ <head>
+  <title>A GNU Emacs mode for SGML files</title>
+  <link href="&mme.url" rev="made">
+  <meta name="template-type" value="software">
+  <meta name="category" value="Emacs mode">
+  <meta name="author-name" value="Lennart Staflin">
+  <meta name="version" value="1.0.1">
+  <meta name="description" value="PSGML is a GNU Emacs Major Mode for editing SGML coded documents.">
+  <meta name="keywords" value="sgml, emacs, syntax directed editing">
+  <meta name="distribution" value="global">
+ </head>
+ <body>
+  <address>
+   <p>Lennart Staflin <a href="&mme.url">&lt;&my.email;&gt;</a>&nl;
+    &last.ed;</p>
+  </address>
+
+  <div1> <h1>Information about PSGML</h1>
+   <p>
+    PSGML is a GNU Emacs Major Mode for editing &SGML; coded
+    documents.
+   </p>
+   <ul>
+    <li><p><a href="#UPDATE">Update</a></p> </li>
+    <li><p><a href="#VERSIONS">Versions and how to get them</a></p> </li>
+    <li><p><a href="#COMPAT">Compatibility</a></p> </li>
+    <li><p><a href="#NEW10">New in version 1.0</a></p> </li>
+    <li><p><a href="&newdoc.url;">Latest manual</a></p></li>
+    <li><p><a href="&olddoc.url;">Version 0.4 manual</a></p></li>
+   </ul>
+
+   <abstract>
+    <p>
+     Emacs is an advanced and extensible editor. A <dfn>Major
+     Mode</dfn> customizes Emacs for editing text of a particular
+     sort.  PSGML is a major mode for &SGML; documents.
+    </p>
+    <p>
+     PSGML has several functions for editing &SGML; documents.
+     Indentation according to element nesting depth and identification
+     of structural errors (but it is not a validating &SGML; parser).
+     Menus and commands for inserting tags with only the contextually
+     valid tags.  Attribute values can be edited in separate window
+     with information about types and defaults. Structure based
+     editing includes movement and killing; and also several commands
+     for folding editing.
+    </p>
+   </abstract>
+
+   <div2 id="UPDATE"> <h2>Update</h2>
+    <dl>
+
+     <dt>1996-11-20</dt>
+     <dd>
+      <p>Version 1.0.1 of psgml. A bug fix release.
+       <a href="#V1.0.1">The release is available for download.</a></p>
+     </dd>
+
+     <dt>1996-11-11</dt>
+     <dd>
+      <p>Version 1.0 of psgml is ready.</p>
+     </dd>
+
+     <dt>1995-03-12</dt>
+     <dd>
+      <p>Release of psgml 0.4 beta 3. Fixes compatibility with
+       oemacs. Fixes small bug in indentation code.</p>
+     </dd>
+    </dl>
+   </div2>
+
+   <div2 id="VERSIONS"> <h2>Versions</h2>
+
+    <p>
+     You can fetch PSGML with anonymous ftp from <a
+      href="&psgml.dir"><samp>ftp.lysator.liu.se</samp></a> in
+     directory <samp>pub/sgml</samp>.</p>
+
+    <dl>
+     <dt id="v1.0.1">1.0.1</dt>
+     <dd>
+      <p>This is the latest (beta) release. Available via ftp as <a
+        href="&psgml1.0.1">psgml-1.0.1.tar.gz</a>. A <a
+        href="#NEW10">section</a> below contains a list of news and
+       changes for version 1.0.  You can also look at the <a
+        href="&newdoc.url;">documentation</a>.
+      </p>
+     </dd>
+
+     <dt>0.4b3</dt>
+     <dd>
+      <p>This is the previous (beta) release.  Available via ftp as  <a
+        href="&psgml0.4b3">psgml-0.4b3.tar.gz</a>.</p>
+     </dd>
+
+    </dl>
+
+   </div2>
+   
+   <div2 id="COMPAT"> <h2>Compatibility</h2>
+
+    <p>Version 0.4 works as follows:</p>
+    <dl>
+     <dt>GNU Emacs 19.19,22,28</dt>
+     <dd>
+      <p>Works OK, tested.</p>
+     </dd>
+     <dt>GNU Emacs 19.20,21,23,24</dt>
+     <dd>
+      <p>Has not been tested, but probably works as 19.19</p>
+     </dd>
+     <dt>GNU Emacs 19.25</dt>
+     <dd>
+      <p>This is the development platform so everything works.</p>
+     </dd>
+     <dt>Lucid Emacs 19.8</dt>
+     <dd>
+      <p>Not tested but probably works apart from the <q>Edit
+        attributes</q> window.</p>
+     </dd>
+     <dt>Lucid Emacs 19.9,10</dt>
+     <dd>
+      <p>Works.</p>
+     </dd>
+     <dt>OEmacs</dt>
+     <dd>
+      <p>With psgml 0.4b3 every thing works. In earlier versions of
+       psgml saved DTDs does not work.</p>
+     </dd>
+    </dl>
+
+    <p>Version 0.3 works as follows:</p>
+    <dl>
+     <dt>GNU Emacs 19.19</dt>
+     <dd>
+      <p>Works OK, tested.</p>
+     </dd>
+     <dt>GNU Emacs 19.20,21</dt>
+     <dd>
+      <p>Has not been tested, but probably works as 19.19</p>
+     </dd>
+     <dt>GNU Emacs 19.22</dt>
+     <dd>
+      <p>This is the development platform so everything works.</p>
+     </dd>
+     <dt>Lucid Emacs 19.8</dt>
+     <dd>
+      <p>Works apart from the <q>Edit attributes</q> window.</p>
+     </dd>
+     <dt>Lucid Emacs 19.9</dt>
+     <dd>
+      <p>Works.</p>
+     </dd>
+     <dt>OEmacs</dt>
+     <dd>
+      <p>Saved DTDs does not work. Otherwise I think it works.</p>
+     </dd>
+    </dl>
+   
+    <p>Compatibility with related Emacs packages:</p>
+    <dl>
+     <dt>powerkey 1.5</dt>
+     <dd>
+      <p>
+       <cite>Powerkey</cite> is a package that adds short-cuts to the
+       menu-bar.</p>
+      <p>
+       GNU Emacs 19.25 and Lucid Emacs has the functionality of
+       <cite>powerkey</cite> built in.</p>
+     </dd>
+    </dl>
+
+   </div2>
+
+   <div2 id="NEW10"> <h2>New in version 1.0</h2>
+    <p>&news;</p>
+   </div2>
+   
+  </div1>
+
+ </body>
+</htmlplus>
+
+<!--
+Local variables:
+mode: sgml
+sgml-declaration:"~/sgml/htmlplus+subdoc.dcl"
+indent-tabs-mode:nil
+sgml-omittag:t
+sgml-shorttag:nil
+sgml-minimize-attributes:nil
+sgml-always-quote-attributes:t
+sgml-indent-step:1
+sgml-indent-data:t
+End:
+-->
