@@ -77,6 +77,19 @@
 ;;;; Variables
 ;;; User settable options:
 
+(defvar sgml-normalize-trims t
+  "*If non-nil, sgml-normalize will trim off white space from end of element
+when adding end tag.")
+
+(defvar sgml-omittag t
+  "*Determines interpretation of empty start tag.")
+
+(defvar sgml-minimize-attributes t
+  "*Determines minimization of attributes inserted by edit-attributes.
+Actually two things are done
+1. If non-nil, omit attribute name, if attribute value is from a token group.
+2. If 'max, omit attributes with default value.")
+
 (defvar sgml-max-menu-size 30
   "*Max number of entries in Tags and Entities menus before they are split
 into several panes.")
@@ -241,7 +254,10 @@ running the sgml-validate-command.")
 	     sgml-balanced-tag-edit
 	     sgml-omittag-transparent
 	     sgml-warn-about-undefined-elements
-	     sgml-always-quote-attributes))
+	     sgml-always-quote-attributes
+	     sgml-normalize-trims
+	     sgml-omittag
+	     sgml-minimize-attributes))
 	(bv (buffer-local-variables)))
     (while l
       (when (assq (car l) bv)
@@ -442,6 +458,7 @@ running the sgml-validate-command.")
 (define-key sgml-mode-map "\C-c\C-r" 'sgml-tag-region)
 (define-key sgml-mode-map "\C-c\C-s" 'sgml-unfold-line)
 (define-key sgml-mode-map "\C-c\C-t" 'sgml-list-valid-tags)
+(define-key sgml-mode-map "\C-c\C-q" 'sgml-fill-element)
 
 (define-key sgml-mode-map "\C-c\C-f\C-e" 'sgml-fold-element)
 (define-key sgml-mode-map "\C-c\C-f\C-r" 'sgml-fold-region)
@@ -463,6 +480,7 @@ running the sgml-validate-command.")
 (define-key sgml-mode-map [?\M-\C-\ ] 'sgml-mark-element)
 (define-key sgml-mode-map "\e\C-h"   'sgml-fold-element)
 (define-key sgml-mode-map "\e\C-t"   'sgml-transpose-element)
+(define-key sgml-mode-map "\M-\t"    'sgml-complete)
 
 ;;;; SGML mode: major mode definition
 
@@ -552,8 +570,9 @@ All bindings:
   (setq comment-indent-function 'sgml-comment-indent)
   (make-local-variable 'comment-start-skip)
   ;; This will allow existing comments within declarations to be
-  ;; recognized.
-  (setq comment-start-skip "--[ \t]*")
+  ;; recognized.  [Does not work well with auto-fill, Lst/940205]
+  ;;(setq comment-start-skip "--[ \t]*")
+  (setq comment-start-skip "<!--[ \t]*")
   ;; Added for psgml:
   (make-local-variable 'indent-line-function)
   (setq indent-line-function 'sgml-indent-line)
