@@ -964,7 +964,8 @@ remove it if it is showing."
 		       pubid))
 	   file)
 	  (t
-	   (sgml-error "No externa file to be found")))))
+	   (sgml-error
+	    "No external file to be found: need a system identifier")))))
 
 (defun sgml-map-public (pubid)
   (let ((pubid-parts (sgml-pubid-parts pubid))
@@ -2114,7 +2115,7 @@ after the first tag inserted."
   (interactive "e")
   (or event (setq event (list '(0 0) (selected-frame))))
   (let (start end)
-    (cond
+    (cond				;*** can I use sgml-mouse-region ?
      ((and transient-mark-mode
 	   mark-active)
       (setq start (region-beginning)
