@@ -1762,7 +1762,8 @@ or if nil, until end of buffer."
 	     ;; the extent of the element.
 	     ((and (sgml-tree-end u)	
 		   (> at (sgml-tree-end u))
-		   (> (sgml-tree-etag-len u) 0))
+		   (or (> (sgml-tree-etag-len u) 0)
+		       (sgml-element-empty u)))
 	      nil) 
 	     (t
 	      (setf (sgml-tree-end u) nil)
