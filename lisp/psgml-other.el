@@ -40,9 +40,6 @@ into several panes.")
 
 ;;;; Menu bar
 
-;;;(define-key sgml-mode-map [menu-bar sgml-dtd]
-;;;  (cons "DTD" (make-sparse-keymap "DTD")))
-
 (easy-menu-define
  sgml-dtd-menu sgml-mode-map "DTD menu"
  '("DTD"))
@@ -65,18 +62,40 @@ into several panes.")
     ["Save Parsed DTD"  sgml-save-dtd t]
     ))
 
-(define-key sgml-mode-map [menu-bar sgml-view]
-  (cons "View" (make-sparse-keymap "View")))
+(easy-menu-define
+ sgml-view-menu sgml-mode-map "View menu"
+ '("View"
+   ["Fold Element"	sgml-fold-element	t]
+   ["Fold Subelement"	sgml-fold-subelement	t]
+   ["Unfold Line"	sgml-unfold-line	t]
+   ["Unfold Element"	sgml-unfold-element	t]
+   ["Expand"		sgml-expand-element	t]
+   ["Fold Region"	sgml-fold-region	t]
+   ["Unfold All"	sgml-unfold-all		t]
+   ["Hide Tags"		sgml-hide-tags		t]
+   ["Hide Attributes"	sgml-hide-attributes	t]
+   ["Show All Tags"	sgml-show-tags		t]
+   )
+ )
 
-(defvar sgml-markup-menu (make-sparse-keymap "Markup"))
-(fset 'sgml-markup-menu sgml-markup-menu)
-(define-key sgml-mode-map [menu-bar sgml-markup]
-  '("Markup" . sgml-markup-menu ))
 
 (easy-menu-define
- sgml-move-menu
- sgml-mode-map
- "Menu of move commands"
+ sgml-markup-menu sgml-mode-map "Markup menu"
+ '("Markup")
+)
+
+(defconst sgml-markup-root-menu
+  '("Markup"
+    ["Insert Element"	sgml-element-menu	t]
+    ["Insert Start-Tag" sgml-start-tag-menu	t]
+    ["Insert End-Tag"	sgml-end-tag-menu	t]
+    ["Tag Region"	sgml-tag-region-menu	t]
+    ["Insert Attribute" sgml-attrib-menu	t]
+    ["Insert Entity"	sgml-entities-menu	t]
+    ))
+
+(easy-menu-define
+ sgml-move-menu sgml-mode-map "Menu of move commands"
  '("Move"
    ["Next trouble spot" sgml-next-trouble-spot t]
    ["Next data field"   sgml-next-data-field   t]
@@ -87,13 +106,10 @@ into several panes.")
    ["Backward up element" sgml-backward-up-element t]
    ["Beginning of element" sgml-beginning-of-element t]
    ["End of element"	sgml-end-of-element t]
-   )
- )
+   ))
 
 (easy-menu-define
- sgml-modify-menu
- sgml-mode-map
- "Menu of modification commands"
+ sgml-modify-menu sgml-mode-map "Menu of modification commands"
  '("Modify"
    ["Normalize"			sgml-normalize	t]
    ["Expand All Short References"	sgml-expand-all-shortrefs t]
@@ -112,19 +128,8 @@ into several panes.")
    )
  )
 
-
-;;(define-key sgml-mode-map [menu-bar sgml-entities]
-;;  '("Entities" . sgml-entities-menu))
-
-;;(define-key sgml-mode-map [menu-bar sgml-tags]
-;;  '("Tags" . sgml-tags-menu))
-
-;;(define-key sgml-mode-map [menu-bar sgml]
-;;  (cons "SGML" (make-sparse-keymap "SGML")))
-
 (easy-menu-define
- sgml-main-menu sgml-mode-map
- "Main menu"
+ sgml-main-menu sgml-mode-map "Main menu"
  '("SGML"
    ["Reset Buffer"	normal-mode t]
    ["End Element"	sgml-insert-end-tag t]
@@ -139,157 +144,6 @@ into several panes.")
    ["Submit Bug Report"  sgml-submit-bug-report t]
    )
  )
-
-
-
-;;;; SGML menu
-
-;;;(define-key sgml-mode-map [menu-bar sgml report-buf]
-;;;  '("Submit Bug Report" . sgml-submit-bug-report))
-;;;(define-key sgml-mode-map [menu-bar sgml save-options]
-;;;  '("Save File Options" . sgml-save-options))
-;;;(define-key sgml-mode-map [menu-bar sgml user-options]
-;;;  '("User Options >" . sgml-user-options-menu))
-;;;(define-key sgml-mode-map [menu-bar sgml file-options]
-;;;  '("File Options >" . sgml-file-options-menu))
-;;;(define-key sgml-mode-map [menu-bar sgml char-chent]
-;;;  '("Encode characters" . sgml-display-char-to-charent))
-;;;(define-key sgml-mode-map [menu-bar sgml chent-char]
-;;;  '("Decode character entities" . sgml-charent-to-display-char))
-;;;(define-key sgml-mode-map [menu-bar sgml fill]
-;;;  '("Fill Element" . sgml-fill-element))
-;;;(define-key sgml-mode-map [menu-bar sgml normalize]
-;;;  '("Normalize" . sgml-normalize))
-;;;(define-key sgml-mode-map [menu-bar sgml validate]
-;;;  '("Validate" . sgml-validate))
-;;;(define-key sgml-mode-map [menu-bar sgml show-log]
-;;;  '("Show/Hide Warning Log" . sgml-show-or-clear-log))
-;;;(define-key sgml-mode-map [menu-bar sgml show-tags]
-;;;  '("List Valid Tags" . sgml-list-valid-tags))
-;;;(define-key sgml-mode-map [menu-bar sgml change-name]
-;;;  '("Change Element Name" . sgml-change-element-name))
-;;;(define-key sgml-mode-map [menu-bar sgml edit-attributes]
-;;;  '("Edit Attributes..." . sgml-edit-attributes))
-;;;(define-key sgml-mode-map [menu-bar sgml next-trouble]
-;;;  '("Next Trouble Spot" . sgml-next-trouble-spot)) 
-;;;(define-key sgml-mode-map [menu-bar sgml what-element]
-;;;  '("What Element" . sgml-what-element))
-;;;(define-key sgml-mode-map [menu-bar sgml show-context]
-;;;  '("Show Context" . sgml-show-context))
-;;;(define-key sgml-mode-map [menu-bar sgml insert-end-tag]
-;;;  '("End Element" . sgml-insert-end-tag))
-;;;(define-key sgml-mode-map [menu-bar sgml next-data]
-;;;  '("Next Data Field" . sgml-next-data-field))
-;;;(define-key sgml-mode-map [menu-bar sgml reset]
-;;;  '("Reset" . normal-mode))
-
-
-;;;; DTD menu
-
-;;;(define-key sgml-mode-map [menu-bar sgml-dtd blank-c]
-;;;  '("" . nil))
-;;;(define-key sgml-mode-map [menu-bar sgml-dtd save]
-;;;  '("Save Parsed DTD" . sgml-save-dtd))
-;;;(define-key sgml-mode-map [menu-bar sgml-dtd load]
-;;;  '("Load Parsed DTD" . sgml-load-dtd))
-;;;(define-key sgml-mode-map [menu-bar sgml-dtd parse]
-;;;  '("Parse DTD" . sgml-parse-prolog))
-
-
-;;;(let ((menu
-;;;       '))
-;;;  (define-key sgml-mode-map [menu-bar sgml-dtd info]
-;;;    (let ((map (make-sparse-keymap (car menu))))
-;;;      (loop for e in (reverse (cdr menu)) do
-;;;	    (define-key map (vector (aref e 1))
-;;;	      (cons (aref e 0) (aref e 1))))
-;;;      (cons (car menu) map))))
-
-
-
-;;;; View menu
-
-(define-key sgml-mode-map [menu-bar sgml-view unhide]
-  '("Show All Tags" . sgml-show-tags))
-(define-key sgml-mode-map [menu-bar sgml-view hide-attributes]
-  '("Hide Attributes" . sgml-hide-attributes))
-(define-key sgml-mode-map [menu-bar sgml-view hide-tags]
-  '("Hide Tags" . sgml-hide-tags))
-
-(define-key sgml-mode-map [menu-bar sgml-view unfold-all]
-  '("Unfold All" . sgml-unfold-all))
-(define-key sgml-mode-map [menu-bar sgml-view fold-region]
-  '("Fold Region" . sgml-fold-region))
-(define-key sgml-mode-map [menu-bar sgml-view expand]
-  '("Expand" . sgml-expand-element))
-(define-key sgml-mode-map [menu-bar sgml-view unfold-element]
-  '("Unfold Element" . sgml-unfold-element))
-(define-key sgml-mode-map [menu-bar sgml-view unfold]
-  '("Unfold Line" . sgml-unfold-line))
-(define-key sgml-mode-map [menu-bar sgml-view subfold]
-  '("Fold Subelement"   . sgml-fold-subelement))
-(define-key sgml-mode-map [menu-bar sgml-view fold]
-  '("Fold Element"   . sgml-fold-element))
-
-
-;;;; Markup menu
-
-(define-key sgml-markup-menu [blank-c]
-  '("" . nil))
-
-;;(define-key sgml-markup-menu [ entity]
-;;  (sgml-markup "<!entity ... >" "<!entity \r>\n"))
-;;(define-key sgml-markup-menu [ attlist]
-;;  (sgml-markup "<!attlist ... >" "<!attlist \r>\n"))
-;;(define-key sgml-markup-menu [ element]
-;;  (sgml-markup "<!element ... >" "<!element \r>\n"))
-;;(define-key sgml-markup-menu [ doctype]
-;;  (sgml-markup "<!doctype ...>"
-;;	       "<!doctype \r -- public or system --\n[\n]>\n"))
-
-;;(define-key sgml-markup-menu [blank1]
-;;  '("" . nil))
-
-;;(define-key sgml-markup-menu [lv-comment]
-;;  (sgml-markup "Local variables comment"
-;;	       "<!--\nLocal variables:\n\rEnd:\n-->\n"))
-;;(define-key sgml-markup-menu [ comment]
-;;  (sgml-markup "Comment" "<!-- \r -->\n"))
-
-
-;;(define-key sgml-markup-menu [blank2]
-;;  '("" . nil))
-
-;;(define-key sgml-markup-menu [ temp]
-;;  (sgml-markup "TEMP marked section" "<![TEMP[\r]]>"))
-;;(define-key sgml-markup-menu [ rcdata]
-;;  (sgml-markup "RCDATA marked section" "<![RCDATA[\r]]>\n"))
-;;(define-key sgml-markup-menu [ cdata]
-;;  (sgml-markup "CDATA marked section" "<![CDATA[\r]]>\n"))
-;;(define-key sgml-markup-menu [ ms]
-;;  (sgml-markup "Marked section" "<![ [\r]]>\n"))
-
-
-(define-key sgml-markup-menu [entities]
-  '("Insert Entity" . sgml-entities-menu))
-
-(define-key sgml-markup-menu [entities]
-  '("Insert Entity" . sgml-entities-menu))
-
-(define-key sgml-markup-menu [attributes]
-  '("Insert Attribute" . sgml-attrib-menu))
-
-(define-key sgml-markup-menu [tag-region]
-  '("Tag Region" . sgml-tag-region-menu))
-
-(define-key sgml-markup-menu [insert-end-tag]
-  '("Insert End-Tag" . sgml-end-tag-menu))
-
-(define-key sgml-markup-menu [insert-start-tag]
-  '("Insert Start-Tag" . sgml-start-tag-menu))
-
-(define-key sgml-markup-menu [insert-element]
-  '("Insert Element" . sgml-element-menu))
 
 
 ;;;; Key Commands
@@ -337,6 +191,9 @@ STRING."
 MENUS is a list of menus on the form (TITLE ITEM1 ITEM2 ...).
 ITEM should have to form (STRING EXPR) or STRING.  The EXPR gets evaluated
 if the item is selected."
+  (nconc menus '(("---" "---")))	; Force x-popup-menu to use two level
+					; menu even if there is only one entry
+					; on the first level
   (eval (car (x-popup-menu event (cons title menus)))))
 
 
@@ -345,11 +202,19 @@ if the item is selected."
 
 (defun sgml-build-custom-menus ()
   ;; Build custom menus
-  (sgml-add-custom-entries
-   sgml-markup-menu
-   (mapcar (function (lambda (e)
-		       (sgml-markup (car e) (cadr e))))
-	   sgml-custom-markup))
+;;  (sgml-add-custom-entries
+;;   sgml-markup-menu
+;;   (mapcar (function (lambda (e)
+;;		       (sgml-markup (car e) (cadr e))))
+;;	   sgml-custom-markup))
+  (easy-menu-define
+   sgml-markup-menu sgml-mode-map "Markup menu"
+   (append sgml-markup-root-menu
+	   (list "----")
+	   (loop for e in sgml-custom-markup collect
+		 (vector (first e)
+			 (` (sgml-markup '(,@(cdr e))))
+			 t))))
   (easy-menu-define
    sgml-dtd-menu sgml-mode-map "DTD menu"
    (append sgml-dtd-root-menu
@@ -357,39 +222,29 @@ if the item is selected."
 	   (loop for e in sgml-custom-dtd collect
 		 (vector (first e)
 			 (` (sgml-doctype-insert '(,@(cdr e))))
-			 t))))
-;;;  (sgml-add-custom-entries
-;;;   (lookup-key sgml-mode-map [menu-bar sgml-dtd])
-;;;   (mapcar (function
-;;;	    (lambda (e)
-;;;	      (cons (first e)
-;;;		    (` (lambda ()
-;;;			 (interactive)
-;;;			 (apply 'sgml-doctype-insert '(, (cdr e))))))))
-;;;	   sgml-custom-dtd))
-  )
+			 t)))))
 
 
-(defun sgml-add-custom-entries (keymap entries)
-  "Add to KEYMAP the ENTRIES, a list of (name . command) pairs.
-The entries are added last in keymap and a blank line precede it."
-  (let ((l keymap)
-	(last (last keymap)))		; cons with keymap name
-    ;; Find the cons before 'blank-c' event, or last cons.
-    (while (and (cdr l)
-		(consp (cadr l))
-		(not (eq 'blank-c (caadr l))))
-      (setq l (cdr l)))
-    ;; Delete entries after
-    (setcdr l nil)
-    (when entries			; now add the entries
-      (setcdr l
-	      (cons
-	       '(blank-c "")		; a blank line before custom entries
-	       (loop for i from 0 as e in entries
-		     collect (cons (intern (concat "custom" i)) e)))))
-    ;; add keymap name to keymap
-    (setcdr (last keymap) last)))
+;(defun sgml-add-custom-entries (keymap entries)
+;  "Add to KEYMAP the ENTRIES, a list of (name . command) pairs.
+;The entries are added last in keymap and a blank line precede it."
+;  (let ((l keymap)
+;	(last (last keymap)))		; cons with keymap name
+;    ;; Find the cons before 'blank-c' event, or last cons.
+;    (while (and (cdr l)
+;		(consp (cadr l))
+;		(not (eq 'blank-c (caadr l))))
+;      (setq l (cdr l)))
+;    ;; Delete entries after
+;    (setcdr l nil)
+;    (when entries			; now add the entries
+;      (setcdr l
+;	      (cons
+;	       '(blank-c "")		; a blank line before custom entries
+;	       (loop for i from 0 as e in entries
+;		     collect (cons (intern (concat "custom" i)) e)))))
+;    ;; add keymap name to keymap
+;    (setcdr (last keymap) last)))
 
 
 
