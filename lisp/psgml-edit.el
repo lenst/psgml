@@ -1,5 +1,5 @@
 ;;; psgml-edit.el --- Editing commands for SGML-mode with parsing support
-;;-*-byte-compile-warnings:(free-vars unused-vars unresolved callargs redefine)-*-
+;;
 ;; $Id$
 
 ;; Copyright (C) 1994, 1995, 1996 Lennart Staflin
@@ -31,6 +31,9 @@
 (provide 'psgml-edit)
 (require 'psgml)
 (require 'psgml-parse)
+
+(eval-when-compile
+  (setq byte-compile-warnings '(free-vars unresolved callargs redefine)))
 
 
 ;;;; Variables
@@ -1901,24 +1904,6 @@ will reset the variable.")
       (when (stringp val)
 	(set var (car (read-from-string val)))))))
   (force-mode-line-update))
-
-(defun sgml-option-value-indicator (var)
-  (let ((type (sgml-variable-type var))
-	(val (symbol-value var)))
-    (cond
-     ((eq type 'toggle)
-      (if val "Yes" "No"))
-     ((eq type 'string)
-      (if (stringp val)
-	  (substring val 0 (min (length val) 4))
-	"-"))
-     ((and (atom type) val)
-      "...")
-     ((consp type)
-      (or (car (rassq val type))
-	  val))
-     (t
-      "-"))))
 
 (defun sgml-append-to-help-buffer (string)
   (save-excursion

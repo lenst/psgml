@@ -939,6 +939,24 @@ as that may change."
                      (vector desc `(sgml-do-set-option ',var) t)))))
 	  vars))
 
+(defun sgml-option-value-indicator (var)
+  (let ((type (sgml-variable-type var))
+	(val (symbol-value var)))
+    (cond
+     ((eq type 'toggle)
+      (if val "Yes" "No"))
+     ((eq type 'string)
+      (if (stringp val)
+	  (substring val 0 (min (length val) 4))
+	"-"))
+     ((and (atom type) val)
+      "...")
+     ((consp type)
+      (or (car (rassq val type))
+	  val))
+     (t
+      "-"))))
+
 (defvar sgml-last-options-menu-values ())
 
 (defun sgml-any-option-changed (oldvalues vars)

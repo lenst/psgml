@@ -1,3 +1,7 @@
+1998-11-15  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml.el (sgml-option-value-indicator): moved here.
+
 1998-11-14  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el, psgml-edit.el: Fix from David Megginson to some
