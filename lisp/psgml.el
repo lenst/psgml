@@ -52,7 +52,7 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.1.5"
+(defconst psgml-version "1.1.6"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -861,10 +861,11 @@ as that may change."
    ["Insert Element"	sgml-element-menu	t]
    ["Insert Start-Tag" sgml-start-tag-menu	t]
    ["Insert End-Tag"	sgml-end-tag-menu	t]
+   ["End Current Element"	sgml-insert-end-tag t]
    ["Tag Region"	sgml-tag-region-menu	t]
-   ["Insert Attribute" sgml-attrib-menu	t]
+   ["Insert Attribute"  sgml-attrib-menu	t]
    ["Insert Entity"	sgml-entities-menu	t]
-   ["Add Element to element"	sgml-add-element-menu	t]
+   ["Add Element to Element"	sgml-add-element-menu	t]
    ("Custom markup")
    ))
 
@@ -907,18 +908,37 @@ as that may change."
  sgml-main-menu sgml-mode-map "Main menu"
  '("SGML"
    ["Reset Buffer"	normal-mode t]
-   ["End Element"	sgml-insert-end-tag t]
    ["Show Context"	sgml-show-context t]
    ["What Element"	sgml-what-element t]
    ["List Valid Tags"	sgml-list-valid-tags t]
    ["Show/Hide Warning Log"  sgml-show-or-clear-log t]
    ["Validate"		sgml-validate t]
-   ["File Options >"	sgml-file-options-menu t]
-   ["User Options >"	sgml-user-options-menu t]
-   ["Save File Options"  sgml-save-options t]
+   ("File Options")
+   ("User Options")
    ["Submit Bug Report"  sgml-submit-bug-report t]
    ))
 
+
+(defun sgml-options-menu-items (vars)
+  (mapcar (lambda (var)
+	    (vector
+	     (format "%s [%s]"
+		     (sgml-variable-description var)
+		     (sgml-option-value-indicator var))
+	     `(sgml-do-set-option ',var) t))
+	  vars))
+
+(defun sgml-update-options-menu (menuname option-vars &optional save-func)
+  (easy-menu-change '("SGML") menuname
+		    (nconc (sgml-options-menu-items option-vars)
+			   (if save-func
+			       (list "---"
+				     (vector (format "Save %s" menuname)
+					     save-func t))))))
+
+(defun sgml-update-all-options-menus ()
+  (sgml-update-options-menu "File Options" sgml-file-options 'sgml-save-options)
+  (sgml-update-options-menu "User Options" sgml-user-options))
 
 (defun sgml-compute-insert-dtd-items ()
   (loop for e in sgml-custom-dtd collect
@@ -1107,6 +1127,8 @@ All bindings:
 	(t
 	 ;; emacs< 19.29
 	 (add-hook 'post-command-hook 'sgml-command-post 'append)))
+  (make-local-hook 'activate-menubar-hook)
+  (add-hook 'activate-menubar-hook 'sgml-update-all-options-menus nil 'local)
   (run-hooks 'text-mode-hook 'sgml-mode-hook)
   (sgml-build-custom-menus)
   (easy-menu-add sgml-main-menu)
@@ -1115,6 +1137,7 @@ All bindings:
   (easy-menu-add sgml-markup-menu)
   (easy-menu-add sgml-view-menu)
   (easy-menu-add sgml-dtd-menu))
+
 
 
 ;;;###autoload

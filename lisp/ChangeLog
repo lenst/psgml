@@ -1,3 +1,15 @@
+1998-11-14  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-do-set-option): Don't modify the *Help*
+	buffer directly, call sgml-append-to-help-buffer. Fixes problem
+	with read-only buffer.
+	(sgml-append-to-help-buffer): new func.
+
+	* psgml.el (sgml-main-menu):  Options handling changed after
+	suggestion and code from Matthias Clasen
+	(sgml-update-all-options-menus): new func. called by
+	activate-menubar-hook
+	
 1998-10-31  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.1.5 released

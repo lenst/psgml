@@ -1856,12 +1856,9 @@ If it is something else complete with ispell-complete-word."
 	(set var val)))
      ((eq 'file-list  type)
       (describe-variable var)
-      (save-excursion 
-	(set-buffer (get-buffer "*Help*"))
-	(goto-char (point-max))
-	(insert-string "\n
+      (sgml-append-to-help-buffer "\
 Enter as many filenames as you want. Entering a directory 
-or non-existing filename will exit the loop."))
+or non-existing filename will exit the loop.")
       (setq val nil)
       (while (let ((next
 		    (expand-file-name
@@ -1873,12 +1870,9 @@ or non-existing filename will exit the loop."))
       (set var val))
      ((eq 'file-or-nil type) 
       (describe-variable var)
-      (save-excursion 
-	(set-buffer (get-buffer "*Help*"))
-	(goto-char (point-max))
-	(insert-string "\n
+      (sgml-append-to-help-buffer "\
 Entering a directory or non-existing filename here
-will reset the variable."))
+will reset the variable.")
       (setq val (expand-file-name
 		 (read-file-name
 		  (concat (sgml-variable-description var) ": ") 
@@ -1922,6 +1916,13 @@ will reset the variable."))
 	  val))
      (t
       "-"))))
+
+(defun sgml-append-to-help-buffer (string)
+  (save-excursion
+    (set-buffer "*Help*")
+    (let ((inhibit-read-only t))
+      (goto-char (point-max))
+      (insert "\n" string))))
 
 ;;;; NEW
 

@@ -1000,6 +1000,9 @@ FORMS should produce the binary coding of element in VAR."
 (defun sgml-write-dtd (dtd file)
   "Save the parsed dtd on FILE.
 Construct the binary coded DTD (bdtd) in the current buffer."
+  (when (fboundp 'set-buffer-multibyte)
+    (setq buffer-file-coding-system 'no-conversion)
+    (set-buffer-multibyte nil))
   (insert
    ";;; This file was created by psgml on " (current-time-string) "\n"
    "(sgml-saved-dtd-version 7)\n")
