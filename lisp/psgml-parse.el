@@ -3541,11 +3541,13 @@ Assumes starts with point inside a markup declaration."
 	   (sgml-check-dtd-subset)
 	   (sgml-check-end-of-entity "DTD subset")
 	   (sgml-pop-entity)))
-;;;    (loop for map in sgml-dtd-shortmaps do
-;;;	  (sgml-add-shortref-map
-;;;	   (sgml-dtd-shortmaps sgml-dtd-info)
-;;;	   (car map)
-;;;	   (sgml-make-shortmap (cdr map))))
+    (when sgml-xml-p
+      (let ((table (sgml-dtd-entities sgml-dtd-info)))
+        (sgml-entity-declare "lt" table 'text "&#60;")
+        (sgml-entity-declare "gt" table 'text ">")
+        (sgml-entity-declare "amp" table 'text "&#38;")
+        (sgml-entity-declare "apos" table 'text "'")
+        (sgml-entity-declare "quot" table 'text "\"")))
     (sgml-set-initial-state sgml-dtd-info)
     (run-hooks 'sgml-doctype-parsed-hook)))
 
