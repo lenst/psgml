@@ -995,6 +995,18 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
       (setq sgml-default-dtd-file file)
       (setq sgml-loaded-dtd real-file))))
 
+;;;; Set markup type
+
+(defsubst sgml-set-markup-type (type)
+  "Set the type of the markup parsed to TYPE.
+The markup starts at position given by variable sgml-markup-start and
+ends at point."
+  (when (and sgml-set-face
+	     (null sgml-current-eref))
+    (sgml-set-face-for sgml-markup-start (point) type))
+  (setq sgml-markup-type type))
+
+
 ;;;; Parsing delimiters
 
 (eval-and-compile
@@ -2042,18 +2054,6 @@ PTYPE can be 'param if this is a parameter entity."
 	     '(sgml-live-element-indicator ("/" sgml-current-element-name))
 	     "]"))
   (force-mode-line-update))
-
-;;;; Set markup type
-
-(defsubst sgml-set-markup-type (type)
-  "Set the type of the markup parsed to TYPE.
-The markup starts at position given by variable sgml-markup-start and
-ends at point."
-  (when (and sgml-set-face
-	     (null sgml-current-eref))
-    (sgml-set-face-for sgml-markup-start (point) type))
-  (setq sgml-markup-type type))
-
 
 ;;;; Parser state
 
