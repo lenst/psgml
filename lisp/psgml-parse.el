@@ -1347,8 +1347,9 @@ ends at point."
       "NULL"  ""
       )))
 
+(eval-and-compile
 (defun sgml-get-delim-string (drole)
-  (car (cdr (member drole sgml-delimiters))))
+  (car (cdr (member drole sgml-delimiters)))))
 
 (defmacro sgml-delim (drole)
   (if (stringp drole)

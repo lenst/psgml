@@ -1,5 +1,7 @@
 Mon Jun 22 19:58:43 1998  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* psgml.el (psgml-version): Version 1.1.2
+
 	* Installed patch from Matthias Clasen
 	<clasen@pong.mathematik.uni-freiburg.de>.
 	Adding notation to entities and a sgml-notation-handlers variable
