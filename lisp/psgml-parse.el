@@ -2084,7 +2084,7 @@ With implied tags this is ambigous."
 
 (defun sgml-change-element-name (gi)
   "Replace the name (generic identifyer) of the current element with a new name."
-  (interactive "*"
+  (interactive
    (list
     (let ((el (sgml-find-element-of (point))))
       (goto-char (sgml-element-start el))
@@ -2865,7 +2865,7 @@ insted of the whole buffer."
   (sgml-element-content (sgml-find-context-of (point-min))))
 
 (defun sgml-normalize-element ()
-  (interactive "*"
+  (interactive "*")
   (sgml-normalize (sgml-find-element-of (point))))
 
 (defun sgml-normalize-content (element only-first)
