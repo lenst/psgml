@@ -1,3 +1,13 @@
+2000-06-05  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-dtd.el (sgml-parse-parameter-literal): use
+	buffer-substring-no-properties .
+
+2000-05-31  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-api.el (sgml-parse-data): Don't call sgml-parse-loop
+	directly, use sgml-parse-continue.
+
 Sat May 27 00:04:31 2000  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-attr-clean-and-insert): new command. Used to
