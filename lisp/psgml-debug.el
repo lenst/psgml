@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: Mon May  9 01:18:23 1994 by lenst@lysita (Lennart Staflin)
+;;;\Last edited: Fri Aug 19 04:12:13 1994 by lenst@lysita (Lennart Staflin)
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -13,7 +13,7 @@
 ;;;; Debugging
 
 (define-key sgml-mode-map "\C-c," 'sgml-goto-cache)
-(define-key sgml-mode-map "\C-c\C-x" 'sgml-dump)
+(define-key sgml-mode-map "\C-c\C-x" 'sgml-dump-tree)
 
 (defun sgml-this-element ()
   (interactive)
@@ -22,25 +22,37 @@
 
 (defun sgml-goto-cache ()
   (interactive)
+  (setq sgml-dtd-info (sgml-pstate-dtd sgml-buffer-parse-state)
+	sgml-top-tree (sgml-pstate-top-tree sgml-buffer-parse-state))
   (sgml-find-start-point (point))
-  (message "%s" (sgml-context-as-string)))
+  (message "%s" (sgml-element-context-string sgml-top-tree)))
 
-(defun sgml-dump (arg)
+(defun sgml-dump-tree (arg)
   (interactive "P")
   (when arg
     (sgml-parse-to-here))
   (with-output-to-temp-buffer "*Dump*"
-    (sgml-dump-rec sgml-top-tree)))
+    (sgml-dump-rec (sgml-pstate-top-tree sgml-buffer-parse-state))))
+
+(defun sgml-comepos (epos)
+  (if (sgml-strict-epos-p epos)
+      (format "%s:%s"
+	      (sgml-entity-name (sgml-eref-entity (sgml-epos-eref epos)))
+	      (sgml-epos-pos epos))
+    (format "%s" epos)))
 
 (defun sgml-dump-rec (u)
   (while u
     (princ
      (format
-      "%s%s start:%s(%s) end:%s(%s)\n"
+      "%s%s start:%s(%s) end:%s(%s) epos:%s/%s net:%s\n"
       (make-string (sgml-tree-level u) ?. )
       (sgml-element-name u)
-      (sgml-tree-start u) (sgml-tree-stag-len u)
-      (sgml-tree-end u) (sgml-tree-etag-len u)))
+      (sgml-element-start u) (sgml-tree-stag-len u)
+      (if (sgml-tree-etag-epos u) (sgml-tree-end u)) (sgml-tree-etag-len u)
+      (sgml-comepos (sgml-tree-stag-epos u))
+      (sgml-comepos (sgml-tree-etag-epos u))
+      (sgml-tree-net-enabled u)))
     (sgml-dump-rec (sgml-tree-content u))
     (setq u (sgml-tree-next u))))
 
@@ -54,22 +66,21 @@
 
 ;;;; dump
 
-(defun dump-dtd ()
+(defun sgml-dump-dtd ()
   (interactive )
   (with-output-to-temp-buffer "*DTD dump*"
-    (let ((l sgml-buffer-eltype-map))
-      (while l
-	(sgml-dp-element (cdr (car l)))
-	(setq l (cdr l))))))
+    (loop for et being the symbols of
+	  (sgml-dtd-eltypes (sgml-pstate-dtd sgml-buffer-parse-state))
+	  do (sgml-dp-element et))))
 
-(defun dump-element (el-name)
+(defun sgml-dump-element (el-name)
   (interactive
    (list (completing-read "Element: "
-			  (mapcar (lambda (p) (cons (symbol-name (car p)) nil))
-				  sgml-buffer-eltype-map)
+			  (sgml-dtd-eltypes
+			   (sgml-pstate-dtd sgml-buffer-parse-state))
 			  nil t)))
   (with-output-to-temp-buffer "*Element dump*"
-    (sgml-dp-element (sgml-lookup-element el-name))))
+    (sgml-dp-element (sgml-lookup-eltype el-name))))
 
 
 (defun sgml-dp-element (el)
