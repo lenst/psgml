@@ -78,6 +78,9 @@
 ;;;; Variables
 ;;; User settable options:
 
+(defvar sgml-offer-save t
+  "*If non-nil, ask about saving modified buffers before M-x sgml-validate is run.")
+
 (defvar sgml-parent-document nil
   "*File name (a string) of a file containing a DOCTYPE declaration to use,
 or a list (FILENAME DOCTYPENAME), where FILENAME is a file name of a file '
@@ -472,6 +475,8 @@ sgml-indent-step  How much to increament indent for every element level.
 sgml-indent-data  If non-nil, indent in data/mixed context also.
 sgml-system-path  List of directorys used to look for system identifiers.
 sgml-public-map  Mapping from public identifiers to file names.
+sgml-offer-save  If non-nil, ask about saving modified buffers before ]
+		M-x sgml-validate is run.
 
 All bindings:
 \\{sgml-mode-map}
@@ -694,6 +699,8 @@ and move to the line in the SGML document that caused it."
 				    (and name
 					 (file-name-nondirectory name))))))))
   (setq sgml-saved-validate-command command)
+  (if sgml-offer-save
+      (save-some-buffers nil nil))
   (compile-internal command "No more errors" "SGML validation"
 		    nil
 		   '(("error at \\([^,]+\\), line \\([0-9]+\\)" 1 2))))
