@@ -474,7 +474,7 @@ element the value."
   (prog1 (following-char)
     (forward-char 1)))
 
-(defun sgml-read-number ()
+(defsubst sgml-read-number ()
   (let ((n (sgml-read-octet)))
     (if (> n sgml-singel-octet-threshold)
 	(+ (* (- n (eval-when-compile
@@ -495,7 +495,7 @@ element the value."
     (forward-char 1)))
 
 (defsubst sgml-read-token ()
-  (aref sgml-read-token-vector (inline (sgml-read-number))))
+  (aref sgml-read-token-vector (sgml-read-number)))
 
 (defsubst sgml-read-node-ref ()
   (aref sgml-read-nodes (sgml-read-octet)))
@@ -1484,7 +1484,7 @@ or if nil, until end of buffer."
   (unless (and (boundp 'pre-command-hook)
 	       (not (null pre-command-hook)))
     (make-local-variable 'pre-command-hook)
-    (setq pre-command-hook 'sgml-reset-log))
+    (setq pre-command-hook '(sgml-reset-log)))
   (when (and (null sgml-buffer-element-map)
 	     sgml-default-dtd-file
 	     (file-exists-p sgml-default-dtd-file))
