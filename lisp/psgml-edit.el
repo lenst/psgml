@@ -386,6 +386,8 @@ is determined."
 (defun sgml-next-data-field ()
   "Move forward to next point where data is allowed."
   (interactive)
+  (when (eobp)
+    (error "End of buffer"))
   (let ((sgml-throw-on-warning 'next-data)
 	(avoid-el (sgml-last-element)))
     ;; Avoid stopping in current element, unless point is in the start
@@ -875,9 +877,9 @@ tag inserted."
 	(title (capitalize (symbol-name type))))
     (cond
      ((eq type 'element)
-	   (setq tab
-		 (mapcar (function symbol-name)
-			 (sgml-current-list-of-valid-eltypes))))
+      (setq tab
+	    (mapcar (function symbol-name)
+		    (sgml-current-list-of-valid-eltypes))))
      (t
       (unless (eq type 'start-tag)
 	(setq tab
@@ -891,10 +893,10 @@ tag inserted."
     (or tab
 	(error "No valid %s at this point" type))
     (or
-     (x-popup-menu event
-		   (sgml-split-menu title
-				   (mapcar (function (lambda (x) (cons x x)))
-					   tab)))
+     (sgml-popup-menu event
+		      title
+		      (mapcar (function (lambda (x) (cons x x)))
+			      tab))
      (signal 'quit nil))))
 
 (defun sgml-entities-menu (event)
@@ -908,24 +910,9 @@ tag inserted."
 	choice)
     (unless menu
       (error "No entities defined"))
-    (setq choice (x-popup-menu event
-			       (sgml-split-menu "Entities" menu)))
+    (setq choice (sgml-popup-menu event "Entities" menu))
     (when choice
       (insert "&" choice ";"))))
-
-(defun sgml-split-menu (title menu)
-  (let ((menus (list (cons title menu))))
-    (cond ((> (length menu)
-	    sgml-max-menu-size)
-	   (setq menus
-		 (loop for i from 1 while menu
-		 collect
-		 (prog1 (cons
-			 (format "%s %d" title i)
-			 (subseq menu 0 (min (length menu)
-					    sgml-max-menu-size)))
-		   (setq menu (nthcdr sgml-max-menu-size menu)))))))
-    (cons title menus)))
 
 (defun sgml-doctype-insert (doctype &rest vars)
   "Insert string DOCTYPE (ignored if nil) and set variables in &rest VARS.
@@ -1442,9 +1429,15 @@ elements with omitted end-tags."
 (defun sgml-normalize-start-tag (element)
   (when (sgml-bpos-p (sgml-element-stag-epos element))
     (goto-char (min (point) (sgml-element-start element)))
-    (let ((asl (sgml-element-attribute-specification-list element)))
+    (let ((name (sgml-element-gi element))
+	  (attlist (sgml-element-attlist element))
+	  (asl (sgml-element-attribute-specification-list element)))
       (save-excursion
-	(sgml-change-start-tag element asl)))))
+	(assert (or (zerop (sgml-element-stag-len element))
+		    (= (point) (sgml-element-start element))))
+	(delete-char (sgml-element-stag-len element))
+	(sgml-insert-start-tag name asl attlist
+			       (eq t (sgml-element-net-enabled element)))))))
 
 (defun sgml-normalize-end-tag (element)
   (unless (sgml-element-empty element)
@@ -1563,60 +1556,82 @@ If it is something else complete with ispell-complete-word."
 	       (message "Making completion list...%s" "done")))))))
 
 
-;;;; SGML mode: menus
+;;;; SGML mode: Options menu
 
-(defun sgml-options-menu (&optional event)
+(defun sgml-file-options-menu (&optional event)
   (interactive "e")
-  (let ((toggles
-	 (sgml-make-options-menu
-	  "Options" 'toggle
-	  (loop for var in sgml-user-options
-		if (eq 'toggle (sgml-variable-type var))
-		collect (cons (sgml-variable-description var)
-			      (cons var (not (symbol-value var)))))))
-	(other
-	 (loop for var in sgml-user-options
-	       if (consp (sgml-variable-type var))
-	       collect  (sgml-make-options-menu
-			 (sgml-variable-description var) nil
-			 (loop for val in (sgml-variable-type var)
-			       collect (if (consp val)
-					   (cons (car val)
-						 (cons var (cdr val)))
-					 (cons (format "%s" val)
-					       (cons var val)))))))
+  (sgml-options-menu event sgml-file-options))
 
-	chooice)
+(defun sgml-user-options-menu (&optional event)
+  (interactive "e")
+  (sgml-options-menu event sgml-user-options))
 
-    (setq chooice
-	  (x-popup-menu event (cons "Options" (cons toggles other))))
-    (let (var val)
-      (cond
-       ((consp chooice)
-	(setq var (car chooice)
-	      val (cdr chooice)))
-       (chooice
-	(setq var chooice
-	      val (not (symbol-value var)))))
-      (when var
-	(make-local-variable var)
+(defun sgml-options-menu (event vars)
+  (let ((var
+	 (let ((maxlen 
+		(loop for var in vars
+		      maximize (length (sgml-variable-description var)))))
+	   (sgml-popup-menu
+	    event "Options"
+	    (loop for var in vars
+		  for desc = (sgml-variable-description var)
+		  collect
+		  (cons
+		   (format "%s%s [%s]"
+			   desc
+			   (make-string (- maxlen (length desc)) ? )
+			   (sgml-option-value-indicator var))
+		   var))))))
+    (when var
+      (sgml-do-set-option var))))
+
+(defun sgml-do-set-option (var)
+  (let ((type (sgml-variable-type var))
+	(val (symbol-value var)))
+    (cond
+     ((eq 'toggle type)
+      (message "%s set to %s" var (not val))
+      (set var (not val)))
+     ((eq 'string type)
+      (describe-variable var)
+      (setq val (read-string (concat (sgml-variable-description var) ": ")))
+      (when (stringp val)
+	(set var val)))
+     ((consp type)
+      (let ((val
+	     (sgml-popup-menu event
+			      (sgml-variable-description var)
+			      (loop for c in type collect
+				    (cons
+				     (if (consp c) (car c) (format "%s" c))
+				     (if (consp c) (cdr c) c))))))
 	(set var val)
 	(message "%s set to %s" var val)))
-    (force-mode-line-update)))
+     (t
+      (describe-variable var)
+      (setq val (read-string (concat (sgml-variable-description var)
+				     " (sexp): ")))
+      (when (stringp val)
+	(set var (read-from-string val))))))
+  (force-mode-line-update))
 
-(defun sgml-make-options-menu (title toggle-p entries)
-  (let ((maxlen 
-	 (loop for entry in entries maximize (length (car entry)))))
-    (cons title
-	  (loop for entry in entries collect
-		(cons (concat (car entry)
-			      (make-string (- maxlen (length (car entry))) ? )
-			      "  "
-			      (if (if toggle-p
-				      (symbol-value (cadr entry))
-				    (eq (symbol-value (cadr entry))
-					(cddr entry)))
-				  "[X]" "[ ]"))
-		      (cdr entry))))))
+(defun sgml-option-value-indicator (var)
+  (let ((type (sgml-variable-type var))
+	(val (symbol-value var)))
+    (cond
+     ((eq type 'toggle)
+      (if val "Yes" "No"))
+     ((eq type 'string)
+      (if (stringp val)
+	  (substring val 0 4)
+	"-"))
+     ((consp type)
+      (or (car (rassq val type))
+	  val))
+     (t
+      "-"))))
+
+
+
 
 ;;; psgml-edit.el ends here
