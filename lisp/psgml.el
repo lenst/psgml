@@ -504,6 +504,7 @@ See `compilation-error-regexp-alist'.")
     sgml-omittag
     sgml-shorttag
     sgml-namecase-general
+    sgml-general-insert-case
     sgml-minimize-attributes
     sgml-always-quote-attributes
     sgml-indent-step
@@ -922,20 +923,45 @@ as that may change."
 
 (defun sgml-options-menu-items (vars)
   (mapcar (lambda (var)
-	    (vector
-	     (format "%s [%s]"
-		     (sgml-variable-description var)
-		     (sgml-option-value-indicator var))
-	     `(sgml-do-set-option ',var) t))
+            (let ((desc (format "%s [%s]"
+                                (sgml-variable-description var)
+                                (sgml-option-value-indicator var)))
+                  (type (sgml-variable-type var)))
+              (cond ((consp type)
+                     (cons desc
+                           (mapcar (lambda (c)
+                                     (vector
+                                      (if (consp c) (car c) (format "%s" c))
+                                      `(setq ,var ',(if (consp c) (cdr c) c))
+                                      t))
+                                   type)))
+                    (t
+                     (vector desc `(sgml-do-set-option ',var) t)))))
 	  vars))
 
+(defvar sgml-last-options-menu-values ())
+
+(defun sgml-any-option-changed (oldvalues vars)
+  (not (loop for val in oldvalues
+             for var in vars
+             always (eq val (symbol-value var)))))
+
 (defun sgml-update-options-menu (menuname option-vars &optional save-func)
-  (easy-menu-change '("SGML") menuname
-		    (nconc (sgml-options-menu-items option-vars)
-			   (if save-func
-			       (list "---"
-				     (vector (format "Save %s" menuname)
-					     save-func t))))))
+  (let ((last-values (assoc menuname sgml-last-options-menu-values)))
+    (when (or (null last-values)
+              (sgml-any-option-changed (cdr last-values)
+                                       option-vars))
+      (easy-menu-change '("SGML") menuname
+                      (nconc (sgml-options-menu-items option-vars)
+                             (if save-func
+                                 (list "---"
+                                       (vector (format "Save %s" menuname)
+                                               save-func t)))))
+      (unless last-values
+        (setq last-values (cons menuname nil))
+        (push last-values sgml-last-options-menu-values))
+      (setf (cdr last-values) (mapcar #'symbol-value option-vars)))))
+
 
 (defun sgml-update-all-options-menus ()
   (sgml-update-options-menu "File Options" sgml-file-options 'sgml-save-options)
@@ -1126,12 +1152,14 @@ All bindings:
   (cond ((fboundp 'make-local-hook)
 	 ;; emacs>= 19.29
 	 (make-local-hook 'post-command-hook)
-	 (add-hook 'post-command-hook 'sgml-command-post 'append 'local))
+	 (add-hook 'post-command-hook 'sgml-command-post 'append 'local)
+         (make-local-hook 'activate-menubar-hook)
+         (add-hook 'activate-menubar-hook 'sgml-update-all-options-menus nil 'local))
 	(t
 	 ;; emacs< 19.29
-	 (add-hook 'post-command-hook 'sgml-command-post 'append)))
-  (make-local-hook 'activate-menubar-hook)
-  (add-hook 'activate-menubar-hook 'sgml-update-all-options-menus nil 'local)
+	 (add-hook 'post-command-hook 'sgml-command-post 'append)
+         (add-hook 'menu-bar-update-hook 'sgml-update-all-options-menus)
+         ))
   (run-hooks 'text-mode-hook 'sgml-mode-hook)
   (sgml-build-custom-menus)
   (easy-menu-add sgml-main-menu)

@@ -15,6 +15,15 @@
 	(sgml-update-all-options-menus): new func. called by
 	activate-menubar-hook
 	
+Thu Nov  5 20:59:08 1998  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-parse-processing-instruction): removed let
+	of sgml-markup-start. Was probably wrong solution to problem with
+	sgml-markup-start beeing nil. Added in-declaration parameter. If
+	in a declaration, no fontification should be done.
+	(sgml-parse-prolog): do not call sgml-skip-ds, rather call
+	parse-s, parse-pi as this is what "other prolog" contains.
+
 1998-10-31  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.1.5 released

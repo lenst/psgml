@@ -479,6 +479,7 @@ to point to the next scratch buffer.")
 (defsubst sgml-get-move (state token)
   "Return a new state or nil, after traversing TOKEN from STATE."
   (cond
+   ((symbolp state) nil)                ;if EMPTY slips thru...
    ((sgml-normal-state-p state)
     (let ((c (or (sgml-moves-lookup token (sgml-state-opts state))
 		 (sgml-moves-lookup token (sgml-state-reqs state)))))
@@ -1523,10 +1524,9 @@ in any of them."
 	  (sgml-parse-char ?\r))
     (/= 0 (skip-chars-forward " \t\n\r"))))
 
-(defsubst sgml-parse-processing-instruction ()
-  (let ((sgml-markup-start (point)))
-    (if (sgml-parse-delim "PIO")
-	(sgml-do-processing-instruction))))
+(defsubst sgml-parse-processing-instruction (&optional in-declaration)
+  (if (sgml-parse-delim "PIO")
+      (sgml-do-processing-instruction in-declaration)))
 
 (defun sgml-parse-set-appflag (flagsym)
   (loop for name = (sgml-parse-name)
@@ -1536,24 +1536,19 @@ in any of them."
         (message "Defining element %s as %s" name flagsym)
         (sgml-skip-cs)))
 
-(defun sgml-do-processing-instruction ()
+(defun sgml-do-processing-instruction (in-declaration)
   (let ((start (point)))
     (when (and (eq ?P (following-char))
 	       (looking-at "PSGML +\\(\\sw+\\) *"))
-      (let ((command (downcase (match-string 1))))
+      (let* ((command (downcase (match-string 1)))
+             (flag-command (assoc command
+                                  '(("nofill"      . nofill)
+                                    ("breakafter"  . break-after-stag)
+                                    ("breakbefore" . break-before-stag)
+                                    ("structure"   . structure)))))
 	(goto-char (match-end 0))
-	(cond ((string-equal command "nofill")
-	       ;; ?? (unless sgml-parsing-dtd (sgml-need-dtd))
-	       (loop for name = (sgml-parse-name)
-		     while name
-		     for et = (sgml-lookup-eltype name)
-		     do (setf (sgml-eltype-appdata et 'nofill) t)
-		     (message "Defining element %s as a NOFILL" name)
-		     (sgml-skip-cs)))
-              ((string-equal command "breakafter")
-               (sgml-parse-set-appflag 'break-after-stag))
-              ((string-equal command "breakbefore")
-               (sgml-parse-set-appflag 'break-brefore-stag))
+	(cond (flag-command
+               (sgml-parse-set-appflag (cdr flag-command)))
               (t
                (sgml-log-warning "Unknown processing instruction for PSGML: %s"
                                  command)))))
@@ -1566,7 +1561,8 @@ in any of them."
   (if sgml-xml-p
       (sgml-check-delim "XML-PIC")
     (sgml-check-delim "PIC"))
-  (sgml-set-markup-type 'pi)
+  (unless in-declaration
+    (sgml-set-markup-type 'pi))
   t)
 
 
@@ -1738,7 +1734,7 @@ Return true if not at the end of the buffer."
       (sgml-parse-s)			;5 s
       ;;(sgml-parse-comment-declaration)	;91 comment declaration
       (sgml-parse-parameter-entity-ref)
-      (sgml-parse-processing-instruction)))
+      (sgml-parse-processing-instruction 'in-declaration)))
 
 (defun sgml-skip-ds ()
   (while (sgml-parse-ds)))
@@ -3803,7 +3799,8 @@ VALUE is a string.  Returns nil or an attdecl."
 	sgml-current-shorttag sgml-shorttag
 	sgml-current-localcat sgml-local-catalogs
 	sgml-current-local-ecat sgml-local-ecat-files
-	sgml-current-top-buffer (current-buffer)))
+	sgml-current-top-buffer (current-buffer)
+        sgml-markup-start nil))
 
 (defun sgml-parse-prolog ()
   "Parse the document prolog to learn the DTD."
@@ -3817,10 +3814,11 @@ VALUE is a string.  Returns nil or an attdecl."
   (setq	sgml-dtd-info nil)
   (goto-char (point-min))
   (sgml-with-parser-syntax
-   (while (progn (sgml-skip-ds)
-		 (setq sgml-markup-start (point))
-		 (and (sgml-parse-markup-declaration 'prolog)
-		      (null sgml-dtd-info))))
+   (while (progn (setq sgml-markup-start (point))
+		 (or (sgml-parse-s)
+                     (sgml-parse-processing-instruction)
+                     (and (sgml-parse-markup-declaration 'prolog)
+                          (null sgml-dtd-info)))))
    (unless sgml-dtd-info		; Set up a default doctype
      (let ((docname (or sgml-default-doctype-name
 			(if (sgml-parse-delim "STAGO" gi)
@@ -3903,7 +3901,10 @@ pointing to start of short ref and point pointing to the end."
 	  (when sgml-throw-on-element-change
 	    (throw sgml-throw-on-element-change 'start))
 	  (sgml-open-element (sgml-token-eltype token)
-			     nil sgml-markup-start sgml-markup-start)
+			     (and sgml-xml-p
+                                  (eq sgml-empty
+                                      (sgml-eltype-model (sgml-token-eltype token))))
+                             sgml-markup-start sgml-markup-start)
 	  (unless (and sgml-current-omittag
 		       (sgml-element-stag-optional sgml-current-tree))
 	    (sgml-log-warning
