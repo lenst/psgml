@@ -3284,6 +3284,7 @@ VALUE is a string.  Returns nil or an attdecl."
   (when (null sgml-buffer-parse-state)	; first parse in this buffer
     ;;(sgml-set-initial-state)		; fall back DTD
     (add-hook 'pre-command-hook 'sgml-reset-log)
+    (setq auto-fill-function 'sgml-do-auto-fill)
     (if sgml-default-dtd-file
 	(sgml-load-dtd sgml-default-dtd-file)
       (let ((buf (and sgml-parent-document
@@ -3883,6 +3884,12 @@ This is a list of (attname value) lists."
 (defun sgml-off-top-p (element)
   "True if ELEMENT is the pseudo element above the document element."
   (null (sgml-tree-parent element)))
+
+(defun sgml-do-auto-fill ()
+  (when (and (> (current-column) fill-column)
+	     (not (sgml-off-top-p (sgml-parse-to-here))))
+    (message "Fill element %s" (sgml-element-gi sgml-current-tree))
+    (do-auto-fill)))
 
 ;;;; Provide
 
