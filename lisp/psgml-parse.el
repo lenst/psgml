@@ -3986,7 +3986,8 @@ VALUE is a string.  Returns nil or an attdecl."
 		       (and (sgml-parse-markup-declaration 'prolog)
 			    (null sgml-dtd-info)))))
      (unless sgml-dtd-info		; Set up a default doctype
-       (let ((docname (or sgml-default-doctype-name
+       (let ((docname (or (and sgml-default-doctype-name
+                               (sgml-general-case sgml-default-doctype-name))
 			  (if (sgml-parse-delim "STAGO" gi)
 			      (sgml-parse-name)))))
 	 (when docname
