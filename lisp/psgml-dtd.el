@@ -370,7 +370,7 @@ Case transformed for general names."
 	       (push (sgml-general-case (sgml-check-nametoken)) names)
 	       (sgml-parse-connector)))
       (sgml-check-delim GRPC)
-      names)
+      (nreverse names))			; store in same order as declared
      (t
       (list (sgml-general-case (sgml-check-nametoken)))))))
 
@@ -655,7 +655,7 @@ Case transformed for general names."
   (sgml-skip-ps)
   (if (sgml-is-delim MDC) ; End of attlist?
       nil
-    (sgml-make-attdecl (sgml-general-case (sgml-check-name))
+    (sgml-make-attdecl (sgml-check-name)
 		       (sgml-check-declared-value)
 		       (sgml-check-default-value))))
 
