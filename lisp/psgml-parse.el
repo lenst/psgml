@@ -799,7 +799,18 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 			   tem
 			   t
 			   (file-name-nondirectory tem)))))
-  (let ((real-file (expand-file-name file)))
+  ;; Search for 'file' on the sgml-system-path [ndw]
+  (let (real-file)
+    (let ((l (cons "." sgml-system-path)))
+      (while (and l (not real-file))
+	(unless (file-exists-p
+		 (setq real-file
+		       (expand-file-name (concat (car l) "/" file))))
+	  (setq real-file nil))
+	(setq l (cdr l)))
+      real-file)
+    (or real-file
+	(error "Saved DTD file %s not found" file))
     (let ((cb (current-buffer))
 	  (tem nil)
 	  (doctype nil)
@@ -815,8 +826,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	(sgml-set-global))
        (t				; load DTD from file
 	(set-buffer cb)
-	(or (file-exists-p real-file)
-	    (error "DTD file %s not found" real-file))
+
 	(setq tem (generate-new-buffer " *saveddtd*"))
 	(unwind-protect
 	    (progn
@@ -864,6 +874,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (while fields
       (push
        (` (defmacro (, (intern (format "%s-%s" dest (car fields)))) (element)
+	    (, (format "Return %s field of ELEMENT." (car fields)))
 	    (list
 	     '(, (intern (format "%s-%s" orig (car fields))))
 	     element)))
@@ -890,15 +901,23 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (sgml-eltype-model (sgml-tree-element element)))
 
 (defun sgml-element-name (element)
+  "Return name (symbol) of ELEMENT."
   (sgml-eltype-name (sgml-tree-element element)))
 
+(defun sgml-element-gi (element)
+  "Return general identifier (string) of ELEMENT."
+  (symbol-name (sgml-eltype-name (sgml-tree-element element))))
+
 (defmacro sgml-element-stag-optional (element)
+  "True if start-tag of ELEMENT is omissible."
   (`(sgml-eltype-stag-optional (sgml-tree-element (, element)))))
 
 (defmacro sgml-element-etag-optional (element)
+  "True if end-tag of ELEMENT is omissible."
   (`(sgml-eltype-etag-optional (sgml-tree-element (, element)))))
 
 (defun sgml-element-attlist (element)
+  "Return the attribute specification list of ELEMENT."
   (sgml-eltype-attlist (sgml-tree-element element)))
 
 (defun sgml-element-stag-end (element)
@@ -919,11 +938,13 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 				    t))))))
 
 (defun sgml-element-data-p (element)
+  "True if ELEMENT can have data characters in its content."
   (or (sgml-element-mixed element)
       (eq sgml-cdata (sgml-element-model element))
       (eq sgml-rcdata (sgml-element-model element))))
 
 (defun sgml-element-context-string (element)
+  "Return string describing context of ELEMENT."
   (if (eq element sgml-top-tree)
       ""
     (format "in %s %s"
@@ -2246,6 +2267,7 @@ Returns parse tree; error if no element after POS."
   (sgml-tree-content element))
 
 (defun sgml-element-next (element)
+  "Next sibling of ELEMENT."
   (unless (sgml-tree-end element)
     (save-excursion (sgml-parse-until-end-of element)))
   (unless (or (sgml-tree-next element)
@@ -2254,6 +2276,7 @@ Returns parse tree; error if no element after POS."
   (sgml-tree-next element))
 
 (defun sgml-element-end (element)
+  "First position after ELEMENT."
   (unless (sgml-tree-end element)
     (save-excursion
       (sgml-parse-until-end-of element)))
@@ -2261,6 +2284,7 @@ Returns parse tree; error if no element after POS."
   (sgml-tree-end element))
 
 (defun sgml-element-etag-start (element)
+  "Last position in content of ELEMENT and start of end-tag, if any."
   (- (sgml-element-end element)
      (sgml-tree-etag-len element)))
 
@@ -2314,12 +2338,14 @@ This is a list of (attname value) lists."
 (defun sgml-find-attribute-element ()
   "Return the element to which an attribute editing command should be applied."
   (let ((el (sgml-find-element-of (point))))
-    (sgml-parse-to-here)
-    ;; If after a start-tag of an empty element return that element
-    ;; instead of current element
-    (if (eq sgml-markup-type 'start-tag)
-	sgml-markup-tree		; the element of the start-tag
-      el)))
+    (save-excursion
+      (sgml-parse-to (point))
+      ;; If after a start-tag of an empty element return that element
+      ;; instead of current element
+      (if (eq sgml-markup-type 'start-tag)
+	  sgml-markup-tree		; the element of the start-tag
+	el))))
+
 
 (defun sgml-element-attval (element attribute)
   "Return the value of the ATTRIBUTE in ELEMENT, string or nil."
@@ -3092,7 +3118,7 @@ after the first tag inserted."
   (let ((end (sgml-mouse-region)))
     (sgml-parse-to-here)
     (cond
-     ((eq sgml-current-state 'start-tag)
+     ((eq sgml-markup-type 'start-tag)
       (sgml-attrib-menu event))
      (end
       (sgml-tag-region (sgml-menu-ask event 'element) (point) end))
@@ -3240,7 +3266,8 @@ buffers local variables list."
 		  other))))
     (setq menu (cons "Attributes"
 		     (append menu
-			     (list (cons "Other Attributes" other)))))
+			     (if other
+				 (list (cons "Other Attributes" other))))))
     (let ((result (x-popup-menu event menu)))
       (and result
 	   (sgml-insert-attribute
