@@ -830,7 +830,7 @@ as that may change."
 (define-key sgml-mode-map "\e\C-k"   'sgml-kill-element)
 (define-key sgml-mode-map "\e\C-@"   'sgml-mark-element)
 ;;(define-key sgml-mode-map [?\M-\C-\ ] 'sgml-mark-element)
-(define-key sgml-mode-map "\e\C-h"   'sgml-mark-current-element)
+(define-key sgml-mode-map [(meta control h)] 'sgml-mark-current-element)
 (define-key sgml-mode-map "\e\C-t"   'sgml-transpose-element)
 (define-key sgml-mode-map "\M-\t"    'sgml-complete)
 
