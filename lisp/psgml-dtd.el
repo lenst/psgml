@@ -268,20 +268,25 @@ Syntax: var dfa-expr &body forms"
   ;;*** some comments are accepted that shouldn't
   (sgml-skip-ps))
 
-(defun sgml-parse-character-reference ()
+(defun sgml-parse-character-reference (&optional dofunchar)
   ;; *** Actually only numerical character references
   ;; I don't know how to handel the function character references.
-  (if (sgml-parse-delim "CRO" digit)
-      (prog1 (string-to-int (sgml-check-nametoken))
+  ;; For the shortrefs let's give them numeric values.
+  (if (sgml-parse-delim "CRO" (digit nmstart))
+      (prog1 (if (sgml-is-delim "NULL" digit)
+		 (string-to-int (sgml-check-nametoken))
+	       (let ((spec (sgml-check-name)))
+		 (or (cdr (assoc spec '(("re" . 10)
+					("rs" . 1)
+					("tab" . 9)
+					("space" . 32))))
+		     ;; *** What to do with other names?
+		     127)))
 	(or (sgml-parse-delim "REFC")
-	    (sgml-parse-char ?\n)))))
+	    (sgml-parse-RE)))))
 
-(defun sgml-parse-parameter-literal ()
+(defun sgml-parse-parameter-literal (&optional dofunchar)
   (let* (lita				; flag if lita
-	 (qchar				; LIT or LITA
-	  (following-char))
-	 (qregexp			; what can be skipped in literal
-	  (format "^%c%%&" qchar))
 	 (value				; accumulates literals value
 	  "")
 	 (original-buffer		; Buffer (entity) where lit started
@@ -292,12 +297,14 @@ Syntax: var dfa-expr &body forms"
      ((or (sgml-parse-delim "LIT")
 	  (setq lita (sgml-parse-delim "LITA")))
       (while (not (and (eq (current-buffer) original-buffer)
-		       (sgml-parse-char qchar)))
+		       (if lita
+			   (sgml-parse-delim "LITA")
+			 (sgml-parse-delim "LIT"))))
 	(cond ((eobp)
 	       (or (sgml-pop-entity)
 		   (sgml-error "Parameter literal unterminated")))
 	      ((sgml-parse-parameter-entity-ref))
-	      ((setq temp (sgml-parse-character-reference))
+	      ((setq temp (sgml-parse-character-reference dofunchar))
 	       (setq value (concat value (format "%c" temp))))
 	      (t
 	       (setq value
@@ -305,7 +312,9 @@ Syntax: var dfa-expr &body forms"
 			     (buffer-substring
 			      (point)
 			      (progn (forward-char 1)
-				     (skip-chars-forward qregexp)
+				     (if lita
+					 (sgml-skip-upto ("LITA" "PERO" "CRO"))
+				       (sgml-skip-upto ("LIT" "PERO" "CRO")))
 				     (point)))))))
 	)
       value))))
@@ -667,23 +676,31 @@ Case transformed for general names."
 ;;;                        [[65 ps]]*, MDC
 
 (defun sgml-declare-shortref ()
-  (sgml-check-name)			; map name
-  (while (progn
-	   (sgml-skip-ps)
-	   (sgml-parse-parameter-literal))
-    (sgml-skip-ps)
-    (sgml-check-name)))
+  (let ((mapname (sgml-check-name))
+	mappings literal name)
+    (while (progn
+	     (sgml-skip-ps)
+	     (setq literal (sgml-parse-parameter-literal)))
+      (sgml-skip-ps)
+      (setq name (sgml-check-name))
+      (push (cons literal name) mappings))
+    (sgml-add-shortref-map
+     (sgml-dtd-shortmaps sgml-dtd-info)
+     mapname
+     (sgml-make-shortmap mappings))))
 
 ;;;152  short reference use declaration = MDO, "USEMAP",
 ;;;                        [[65 ps]]+, [[153 map specification]],
 ;;;                        ([[65 ps]]+, [[72 associated element type]])?,
 ;;;                        [[65 ps]]*, MDC
 
-(defun sgml-declare-usemap ()
-  (or (sgml-parse-rni "empty")
-      (sgml-check-name))		; map specification
-  (sgml-skip-ps)
-  (sgml-parse-name-group)) 		; associated element type
+(defun sgml-do-usemap-element (mapname)
+  ;; This is called from sgml-do-usemap with the mapname
+  (loop for e in (sgml-parse-name-group) do
+	(setf (sgml-eltype-shortmap (sgml-lookup-eltype e sgml-dtd-info))
+	      (if (null mapname)
+		  'empty
+		mapname))))
 
 
 ;;;; Parse doctype
@@ -867,7 +884,7 @@ FORMS should produce the binary coding of element in VAR."
     (erase-buffer)
     (insert
      ";;; This file was created by psgml on " (current-time-string) "\n"
-     "(sgml-saved-dtd-version 3)\n")
+     "(sgml-saved-dtd-version 4)\n")
     (sgml-code-sexp (sgml-dtd-doctype dtd))
     (let ((done 0)			; count written elements
 	  tot)
@@ -888,6 +905,7 @@ FORMS should produce the binary coding of element in VAR."
 	(message "Coding %d%% done" (/ (* 100 done) tot)))
       (sgml-code-sexp (sgml-dtd-parameters dtd))
       (sgml-code-sexp (sgml-dtd-entities dtd))
+      (sgml-code-sexp (sgml-dtd-shortmaps dtd))
       (set-buffer cb))))
 
 ;;;; Save DTD

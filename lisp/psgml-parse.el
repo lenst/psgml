@@ -33,10 +33,12 @@
 (eval-and-compile
   (autoload 'sgml-make-primitive-content-token "psgml-dtd")
   (autoload 'sgml-check-doctype-body "psgml-dtd")
-  (autoload 'sgml-check-name-group "psgml-dtd")
+  (autoload 'sgml-do-usemap-element  "psgml-dtd")
   )
 
 ;;;; Variables
+
+;;; Hooks
 
 (defvar sgml-close-element-hook nil
   "The hook run by `sgml-close-element'.
@@ -55,16 +57,14 @@ of the entity into the current buffer at point and return t.  If the
 system identifier is not handled the function should return nil.")
 
 ;;; Internal variables
-;;; See also parser state
+
+(defconst sgml-pcdata-token (intern "#PCDATA"))
 
 (defvar sgml-computed-map nil
   "Internal representation of entity search map.")
 
 (defvar sgml-split-level nil
   "Used by sgml-split-element")
-
-(defvar sgml-current-element-name nil
-  "Name of current element for mode line display.")
 
 (defvar sgml-last-element nil
   "Used to keep information about position in element structure between
@@ -92,8 +92,26 @@ commands.")
 (defvar sgml-suppress-warning nil
   "Set to t to suppress warnings.")
 
+;;; Variables active during parsing
+
 (defvar sgml-goal 0
   "Point in buffer to parse up to.")
+
+(defvar sgml-dtd-info nil
+  "Holds the `sgml-dtd' structure describing the current DTD.")
+
+(defvar sgml-current-state nil
+  "Current state in content model or model type if CDATA, RCDATA or ANY.")
+
+(defvar sgml-current-shortmap nil
+  "The current active short reference map.")
+
+(defvar sgml-current-tree nil
+  "Current parse tree node, identifies open element.")
+
+(defvar sgml-previous-tree nil
+  "Previous tree node in current tree.
+This is nil if no previous node.")
 
 (defvar sgml-close-element-trap nil
   "Can be nil for no trap, an element or t for any element.
@@ -115,6 +133,7 @@ sgml	- SGML declaration
 start-tag
 entity  - general entity reference
 param   - parameter reference
+shortref- short reference
 mdecl   - markup declaration
 ")
 
@@ -129,11 +148,16 @@ Only valid after `sgml-parse-to'.")
 (defvar sgml-markup-start nil
   "Start point of markup beeing parsed.")
 
-(defconst sgml-pcdata-token (intern "#PCDATA"))
 
 ;; Vars used in *param* buffers
+
 (defvar sgml-previous-buffer nil)
+
 (defvar sgml-parameter-name nil)
+
+(defvar sgml-current-eref nil
+  "This is the entity reference used to enter current entity.
+If this is nil, then current entity is main buffer.")
 
 
 ;; For loading DTD
@@ -162,6 +186,9 @@ Only valid after `sgml-parse-to'.")
 (defvar sgml-loaded-dtd nil
   "File name corresponding to current DTD.")
 (make-variable-buffer-local 'sgml-loaded-dtd)
+
+(defvar sgml-current-element-name nil
+  "Name of current element for mode line display.")
 
 
 ;;;; Build parser syntax table
@@ -627,11 +654,8 @@ If ATTSPEC is nil, nil is returned."
   (entities				; ALIST
    (sgml-make-entity-table))
   (shortmaps				; ALIST
-   nil))
+   (sgml-make-shortref-table)))
 
-
-(defvar sgml-dtd-info nil
-  "Holds the `sgml-dtd' structure describing the current DTD.")
 
 
 ;;;; Element type objects
@@ -667,6 +691,8 @@ If ATTSPEC is nil, nil is returned."
  attlist				; List of defined attributes
  includes				; List of included elements
  excludes				; List of excluded elements
+ shortmap				; Associated shortref map
+					; nil if none and 'empty if #empty
  )
 
 
@@ -855,7 +881,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
     (set-buffer buffer)
     (goto-char (point-min))
     (setq temp (sgml-read-sexp))	; file-version
-    (cond ((equal temp '(sgml-saved-dtd-version 3))
+    (cond ((equal temp '(sgml-saved-dtd-version 4))
 	   (setq sgml-single-octet-threshold sgml-max-single-octet-number))
 	  (t
 	   (error "Unknown file format for saved DTD: %s" temp)))
@@ -873,6 +899,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	  (sgml-read-element (aref sgml-read-token-vector i)))
     (setf (sgml-dtd-parameters dtd) (sgml-read-sexp))
     (setf (sgml-dtd-entities dtd) (sgml-read-sexp))
+    (setf (sgml-dtd-shortmaps dtd) (sgml-read-sexp))
     (set-buffer cb)
     dtd))
 
@@ -1215,10 +1242,6 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-strict-epos-p (epos)
   (consp epos))
 
-(defvar sgml-current-eref nil
-  "This is the entity reference used to enter current entity.
-If this is nil, then current entity is main buffer.")
-
 (defun sgml-epos (pos)
   "Convert a buffer position POS into a epos."
   (if sgml-current-eref
@@ -1301,7 +1324,7 @@ If this is nil, then current entity is main buffer.")
 	    (:constructor sgml-make-tree
 			  (eltype stag-epos stag-len  parent level
 				  excludes includes pstate net-enabled
-				  conref)))
+				  conref &optional shortmap pshortmap)))
   eltype				; element object
   ;;start					; start point in buffer
   ;;end					; end point in buffer
@@ -1319,6 +1342,8 @@ If this is nil, then current entity is main buffer.")
   net-enabled				; if NET enabled (t this element,
 					;  other non-nil, some parent)
   conref				; if conref attribute used
+  shortmap				; shortmap at start of element
+  pshortmap				; parents shortmap
 )
 
 
@@ -1407,13 +1432,14 @@ If this is nil, then current entity is main buffer.")
 
 (defun sgml-element-stag-end (element)
   "Position after start-tag of ELEMENT."
-  (if (sgml-strict-epos-p (sgml-tree-stag-epos element))
-      ;; Can't return actual end of start tag, because start tag is buried
-      ;; in an entity
-      (sgml-element-start element)
-    ;; start-tag is in buffer, stag-epos is then a buffer position
-    (+ (sgml-tree-stag-epos element)
-       (sgml-tree-stag-len element))))
+  (let ((epos (sgml-tree-stag-epos element))
+	(len (sgml-tree-stag-len element)))
+    (cond ((sgml-bpos-p epos)
+	   (+ epos len))
+	  ((zerop len)
+	   (sgml-epos-promote epos))
+	  (t
+	   (sgml-epos-latest epos)))))
 
 (defun sgml-element-empty (element)
   "True if ELEMENT is empty."
@@ -1437,32 +1463,43 @@ If this is nil, then current entity is main buffer.")
 ;;;; Mode-line DTD and element indicator 
 
 (defun sgml-set-live-element-indicator ()
-  (when (and (not (input-pending-p))
-	     (eq major-mode 'sgml-mode)
-	     sgml-live-element-indicator)
-    (let* ((post-command-hook nil)
-	   deactivate-mark
-	   (sgml-suppress-warning t)
-	   (elname (condition-case err
-		       (sgml-element-name
-			(if (memq this-command sgml-users-of-last-element)
-			    sgml-last-element
-			  (sgml-parse-to-here)))
-		     (error "*error*")))
-	   (newname (prin1-to-string elname)))
-      (unless (equal newname sgml-current-element-name)
-	(setq sgml-current-element-name newname)
-	(force-mode-line-update))))
-  (sit-for 1)
-  (when (and (not (input-pending-p))
-	     (eq major-mode 'sgml-mode)
-	     sgml-set-face)
-    (let* ((post-command-hook nil)
-	   deactivate-mark
-	   (sgml-suppress-warning t))
-      (condition-case err
-	  (save-excursion (sgml-parse-to (window-end)))
-	(error "*error*")))))
+  ;;*** Bad name for this function.  Now it does some other things too.
+  ;;*** Perhaps this should be a minormode
+  (when (and (eq major-mode 'sgml-mode)
+	     (not (eq this-command 'keyboard-quit))	     )
+    ;; Don't let point be inside an invisible region
+    (when (and (get-text-property (point) 'invisible)
+	       (get-text-property (1- (point)) 'invisible))
+      (if (memq this-command '(backward-char previous-line))
+	  (goto-char (or (previous-single-property-change (point) 'invisible)
+			 (point-max)))
+	(goto-char (or (next-single-property-change (point) 'invisible)
+		       (point-max)))))
+    (sit-for 0 100)
+    (when (and (not (input-pending-p))
+	       sgml-live-element-indicator)
+      (let* ((post-command-hook nil)
+	     deactivate-mark
+	     (sgml-suppress-warning t)
+	     (elname (condition-case nil
+			 (sgml-element-name
+			  (if (memq this-command sgml-users-of-last-element)
+			      sgml-last-element
+			    (sgml-parse-to-here)))
+		       (error "*error*")))
+	     (newname (prin1-to-string elname)))
+	(unless (equal newname sgml-current-element-name)
+	  (setq sgml-current-element-name newname)
+	  (force-mode-line-update))))
+    (sit-for 0 100)
+    (when (and (not (input-pending-p))
+	       sgml-set-face)
+      (let* ((post-command-hook nil)
+	     deactivate-mark
+	     (sgml-suppress-warning t))
+	(condition-case err
+	    (save-excursion (sgml-parse-to (window-end)))
+	  (error "*error*"))))))
 
 (defun sgml-set-active-dtd-indicator ()
   (add-hook 'post-command-hook 'sgml-set-live-element-indicator)
@@ -1489,16 +1526,6 @@ ends at point."
 	    (:constructor sgml-make-pstate (dtd top-tree)))
   dtd
   top-tree)
-
-(defvar sgml-current-state nil
-  "Current state in content model or model type if CDATA, RCDATA or ANY.")
-
-(defvar sgml-current-tree nil
-  "Current parse tree node, identifies open element.")
-
-(defvar sgml-previous-tree nil
-  "Previous tree node in current tree.
-This is nil if no previous node.")
 
 (defsubst sgml-excludes ()
   (sgml-tree-excludes sgml-current-tree))
@@ -1542,16 +1569,19 @@ or from after TREE if WHERE is after."
 	 (sgml-element-empty tree)))
     (cond ((and (eq where 'start)
 		(not empty))
-	   (setq sgml-current-state
-		 (sgml-element-model sgml-current-tree)
+	   (setq sgml-current-state (sgml-element-model sgml-current-tree)
+		 sgml-current-shortmap (sgml-tree-shortmap sgml-current-tree)
 		 sgml-previous-tree nil)
-	   (setq sgml-markup-type (if (not (zerop (sgml-tree-stag-len tree)))
+	   (setq sgml-markup-type (if (and
+				       (not (zerop (sgml-tree-stag-len tree)))
+				       (sgml-bpos-p (sgml-tree-stag-epos tree)))
 				      'start-tag)
 		 sgml-markup-start (sgml-element-start sgml-current-tree))
 	   (goto-char (+ sgml-markup-start
 			 (sgml-tree-stag-len sgml-current-tree))))
 	  (t
 	   (setq sgml-current-state (sgml-tree-pstate sgml-current-tree)
+		 sgml-current-shortmap (sgml-tree-pshortmap sgml-current-tree)
 		 sgml-previous-tree sgml-current-tree)
 	   (goto-char (sgml-tree-end sgml-current-tree))
 	   (setq sgml-markup-type (if empty 'start-tag 'end-tag)
@@ -1585,7 +1615,15 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	(t "")))
 
 (defun sgml-open-element (eltype conref before-tag after-tag)
-  (let* ((nt (sgml-make-tree
+  (let* ((emap (sgml-eltype-shortmap eltype))
+	 (newmap (if emap
+		     (if (eq 'empty emap)
+			 nil
+		       (sgml-lookup-shortref-map
+			(sgml-dtd-shortmaps sgml-dtd-info)
+			emap))
+		   sgml-current-shortmap))
+	 (nt (sgml-make-tree
 	      eltype
 	      (sgml-epos before-tag)	; stag-epos
 	      (- after-tag before-tag)	; stag-len
@@ -1595,7 +1633,9 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	      (append (sgml-eltype-includes eltype) (sgml-includes))
 	      sgml-current-state
 	      (if (sgml-tree-net-enabled sgml-current-tree) 1)
-	      conref)))
+	      conref
+	      newmap
+	      sgml-current-shortmap)))
 ;; (let ((u (sgml-tree-content sgml-current-tree)))
 ;;      (cond ((and u (> before-tag (sgml-element-start u)))
 ;;	     (while (and (sgml-tree-next u)
@@ -1615,6 +1655,7 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
     (setf (sgml-tree-next sgml-current-tree) nil)
     ;; Set new state
     (setq sgml-current-state (sgml-eltype-model eltype)
+	  sgml-current-shortmap newmap
 	  sgml-current-tree nt
 	  sgml-previous-tree nil)
     (assert sgml-current-state)
@@ -1647,6 +1688,7 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	(t
 	 (setq sgml-previous-tree sgml-current-tree
 	       sgml-current-state (sgml-tree-pstate sgml-current-tree)
+	       sgml-current-shortmap (sgml-tree-pshortmap sgml-current-tree)
 	       sgml-current-tree (sgml-tree-parent sgml-current-tree))
 	 (assert sgml-current-state))))
 
@@ -1880,6 +1922,8 @@ remove it if it is showing."
       ;; Some combinations
       "MS-START" "<!["			; MDO DSO
       "MS-END"   "]]>"			; MSC MDC
+      ;; Pseudo
+      "NULL"  ""
       )))
 
 
@@ -2025,6 +2069,10 @@ in any of them."
   (cond ((not (sgml-parse-char char))
 	 (sgml-parse-error "Expecting %c" char))))
 
+(defun sgml-parse-RE ()
+  (or (sgml-parse-char ?\n)
+      (sgml-parse-char ?\r)))
+
 (defmacro sgml-startnm-char (c)
   (` (eq ?w (char-syntax (, c)))))
 
@@ -2048,8 +2096,13 @@ in any of them."
 (defun sgml-is-start-tag ()
   (sgml-is-delim "STAGO" gi))
 
-(defun sgml-parse-s ()
-  (/= 0 (skip-chars-forward " \t\n\r")))
+(defun sgml-parse-s (&optional shortmap)
+  (if shortmap
+      (or (/= 0 (skip-chars-forward " "))
+	  (/= 0 (skip-chars-forward "\t"))
+	  (sgml-parse-char ?\n)
+	  (sgml-parse-char ?\r))
+    (/= 0 (skip-chars-forward " \t\n\r"))))
 
 (defun sgml-parse-processing-instruction ()
   (if (sgml-parse-delim "PIO")
@@ -2233,6 +2286,134 @@ a RNI must be followed by NAME."
 	(sgml-parse-char ?/))))
 
 
+;;;; Shortref maps
+
+(eval-and-compile
+  (defconst sgml-shortref-list
+    '(
+      "\t"				;&#TAB
+      "\n"				;&#RE;
+      "\001"				;&#RS;
+      "\001B"
+      "\001\n"
+      "\001B\n"
+      "B\n"
+      " "				;&#SPACE;
+      "BB"
+      "\""				;&#34;
+      "#"
+      "%"
+      "'"
+      "("
+      ")"
+      "*"
+      "+"
+      ","
+      "-"
+      "--"
+      ":"
+      ";"
+      "="
+      "@"
+      "["
+      "]"
+      "^"
+      "_"
+      "{"
+      "|"
+      "}"
+      "~")))
+
+(defun sgml-shortref-index (string)
+  (let ((pos (member string sgml-shortref-list))
+        (len (length sgml-shortref-list)))
+    (and pos (- len (length pos))) ))
+
+(defun sgml-make-shortmap (pairs)
+  "Create a shortreference map from PAIRS.
+Where PAIRS is a list of (delim . ename)."
+  (let ((map
+	 (make-vector (1+ (length sgml-shortref-list))
+		      nil)))
+    (loop for p in pairs 
+	  for delim = (car p)
+	  for name = (cdr p)
+	  do (aset map
+		   (or (sgml-shortref-index delim)
+		       (sgml-error "Illegal short reference delimiter %s"
+				   delim))
+		   name))
+    ;; Compute a suitable string for skip-chars-forward that
+    ;; can be used to skip over pcdata
+    (aset map
+	  (eval-when-compile (length sgml-shortref-list))
+	  (if (some (function (lambda (i) (aref map i)))
+	      (eval-when-compile
+		(mapcar (function sgml-shortref-index)
+			'("\001B\n" "B\n" " " "BB"))
+		))
+	      "^<]/& \n\t\"#%'()*+,\\-:;+@[]\\^_{|}~"
+	    "^<]/&\n\t\"#%'()*+,\\-:;+@[]\\^_{|}~"))
+    map))
+
+(defun sgml-shortmap-skipstring (map)
+  (aref map (eval-when-compile (length sgml-shortref-list))))
+
+(defconst sgml-shortref-oneassq
+  (loop for d in sgml-shortref-list
+	for c = (aref d 0)
+	when (and (= 1 (length d))
+		  (/= 1 c) (/= 10 c))
+	collect (cons c (sgml-shortref-index d))))
+
+(defun sgml-parse-B ()
+  (/= 0 (skip-chars-forward " \t")))
+
+(defun sgml-deref-shortmap (map &optional nobol)
+  "Identify shortref delimiter at point and return entity name.
+Also move point.  Return nil, either if no shortref or undefined."
+
+  (macrolet
+      ((delim (x) (` (aref map (, (sgml-shortref-index x))))))
+    (let ((i 0))
+      (while (numberp i)
+	(setq i
+	      (cond
+	       ((and (bolp) (zerop i)) ; Either "\001" "\001B"
+					; "\001\n" "\001B\n"
+		(cond ((sgml-parse-B)	; "\001B"
+		       (if (eolp)
+			   (delim "\001B\n")
+			 (delim "\001B")))
+		      ((sgml-parse-RE) (delim "\001\n"))
+		      ((delim "\001"))
+		      (t 1)))
+	       ((cond ((sgml-parse-char ?\t) (setq i (delim "\t")) t)
+		      ((sgml-parse-char ? )  (setq i (delim " "))  t))
+		(cond ((sgml-parse-B) (setq i (delim "BB"))))
+		(cond ((sgml-parse-char ?\n) 
+		       (delim "B\n"))
+		      (t i)))
+	       ((sgml-parse-RE) (delim "\n"))
+	       ((sgml-parse-chars ?- ?-) (delim "--"))
+	       ;; The other one character delimiters
+	       ((setq i (assq (following-char) sgml-shortref-oneassq))
+		(when i (forward-char 1))
+		(aref map (cdr i))))))
+      i)))
+
+;;; Table of shortref maps
+
+(defun sgml-make-shortref-table ()
+  (list nil))
+
+(defun sgml-add-shortref-map (table name map)
+  (nconc table (list (cons name map))))
+
+(defun sgml-lookup-shortref-map (table name)
+  (cdr (assoc name (cdr table))))
+
+
 ;;;; Parse markup declarations
 
 (defun sgml-skip-until-dsc ()
@@ -2306,11 +2487,16 @@ Assumes starts with point inside a markup declaration."
     (sgml-skip-ps)
     (cond
      ((sgml-is-delim "MDC")
-      (sgml-debug "USEMAP %s" (if mapname mapname "#EMPTY")))
+      (sgml-debug "USEMAP %s" (if mapname mapname "#EMPTY"))
+      (setq sgml-current-shortmap
+	    (if mapname
+		(or (sgml-lookup-shortref-map
+		     (sgml-dtd-shortmaps sgml-dtd-info)
+		     mapname)
+		    (sgml-error "Undefined shortref map %s" mapname)))))
      (t
       ;; Should be handled by psgml-dtd
-      (setq associated (sgml-check-name-group))))))
-
+      (sgml-do-usemap-element mapname)))))
 
 (defconst sgml-markup-declaration-table
   '(("sgml"     . sgml-do-sgml-declaration)
@@ -2508,7 +2694,6 @@ or if nil, until end of buffer."
     (when bigparse
       (sgml-message ""))))
 
-
 (defun sgml-pcdata-move ()
   "Moify parser state to reflect parsed data."
   (let (new-state)
@@ -2521,44 +2706,60 @@ or if nil, until end of buffer."
 	  nil)
 	 ((sgml-do-implied "data character"))))))
 
+(defun sgml-parse-pcdata ()
+  (/= 0
+      (if sgml-current-shortmap
+	  (skip-chars-forward (sgml-shortmap-skipstring sgml-current-shortmap))
+	(skip-chars-forward "^<]/&"))))
+
 (defsubst sgml-do-pcdata ()
   ;; Parse pcdata
   (sgml-pcdata-move)
   (forward-char 1)
-  ;;(sgml-parse-pcdata) ***
-  (skip-chars-forward "^<]/&"))
+  (sgml-parse-pcdata)
+  (sgml-set-markup-type nil))
 
 (defun sgml-parser-loop ()
-  (while (and (eq sgml-current-tree sgml-top-tree)
-	      (or (< (point) sgml-goal) sgml-current-eref)
-	      (progn (setq sgml-markup-start (point)
-			   sgml-markup-type nil)
-		     (or (sgml-parse-s)
-			 (sgml-parse-markup-declaration 'prolog)
-			 (sgml-parse-processing-instruction)))))
-  (while (or (< (point) sgml-goal) sgml-current-eref)
-    (assert sgml-current-tree)
-    (setq sgml-markup-start (point)
-	  sgml-markup-type nil)
-    (cond
-     ((eobp) (sgml-pop-entity))
-     ((or (sgml-parse-delim "ETAGO" gi)
-	  (sgml-is-enabled-net))
-      (sgml-do-end-tag))
-     ((and (or (eq sgml-current-state sgml-cdata)
-	       (eq sgml-current-state sgml-rcdata)))
-      (sgml-skip-cdata))
-     ((and (not (sgml-current-mixed-p))
-	   (sgml-parse-s)))
-     ((sgml-parse-delim "STAGO" gi)
-      (sgml-do-start-tag))
-     ((sgml-parse-general-entity-ref))
-     ((sgml-parse-markup-declaration nil))
-     ((sgml-parse-delim "MS-END")	; end of marked section
-      (sgml-set-markup-type 'ms-end))
-     ((sgml-parse-processing-instruction))
-     (t
-      (sgml-do-pcdata)))))
+  (let (tem)
+    (while (and (eq sgml-current-tree sgml-top-tree)
+		(or (< (point) sgml-goal) sgml-current-eref)
+		(progn (setq sgml-markup-start (point)
+			     sgml-markup-type nil)
+		       (or (sgml-parse-s)
+			   (sgml-parse-markup-declaration 'prolog)
+			   (sgml-parse-processing-instruction)))))
+    (while (or (< (point) sgml-goal) sgml-current-eref)
+      (assert sgml-current-tree)
+      (setq sgml-markup-start (point)
+	    sgml-markup-type nil)
+      (cond
+       ((eobp) (sgml-pop-entity))
+       ((or (sgml-parse-delim "ETAGO" gi)
+	    (sgml-is-enabled-net))
+	(sgml-do-end-tag))
+       ((and (or (eq sgml-current-state sgml-cdata)
+		 (eq sgml-current-state sgml-rcdata)))
+	(sgml-skip-cdata))
+       ((and sgml-current-shortmap
+	     (or (setq tem (sgml-deref-shortmap sgml-current-shortmap))
+		 ;; Restore position, to consider the delim for S+ or data
+		 (progn (goto-char sgml-markup-start)
+			nil)))
+	(sgml-set-markup-type 'shortref)
+	(sgml-push-to-entity
+	 (sgml-lookup-entity tem (sgml-dtd-entities sgml-dtd-info))
+	 sgml-markup-start))
+       ((and (not (sgml-current-mixed-p))
+	     (sgml-parse-s sgml-current-shortmap)))
+       ((sgml-parse-delim "STAGO" gi)
+	(sgml-do-start-tag))
+       ((sgml-parse-general-entity-ref))
+       ((sgml-parse-markup-declaration nil))
+       ((sgml-parse-delim "MS-END")	; end of marked section
+	(sgml-set-markup-type 'ms-end))
+       ((sgml-parse-processing-instruction))
+       (t
+	(sgml-do-pcdata))))))
 
 (defun sgml-do-start-tag ()    
   ;; Assume point after STAGO
