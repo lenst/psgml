@@ -223,6 +223,9 @@ a list using attlist TO."
   "Remove tags from current element."
   (interactive "*")
   (let ((el (sgml-find-element-of (point))))
+    (when (or (sgml-strict-epos-p (sgml-element-stag-epos el))
+	      (sgml-strict-epos-p (sgml-element-etag-epos el)))
+      (error "Current element has some tag inside an entity reference"))
     (goto-char (sgml-element-etag-start el))
     (delete-char (sgml-element-etag-len el))
     (goto-char (sgml-element-start el))
@@ -352,7 +355,9 @@ is determined."
       (back-to-indentation)
       (unless (or col element)
 	;; Determine element
-	(setq element (sgml-find-element-of (point))))
+	(setq element (if (eobp)
+			  (sgml-find-context-of (point))
+			(sgml-find-element-of (point)))))
       (when (eq element sgml-top-tree)	; not in a element at all
 	(setq element nil)		; forget element
 	(goto-char here)		; insert normal tab insted
@@ -801,6 +806,21 @@ of then current element."
 	(sgml-message
 	 "Repeat the command to split the containing %s element"
 	 (sgml-element-name u)))))
+
+;;; David Megginson's custom menus for keys
+
+(defun sgml-custom-dtd (doctype)
+  "Insert a DTD declaration from the sgml-custom-dtd alist."
+  (interactive
+   (list (completing-read "Insert DTD: " sgml-custom-dtd nil t)))
+  (apply 'sgml-doctype-insert (cdr (assoc doctype sgml-custom-dtd))))
+
+(defun sgml-custom-markup (markup)
+  "Insert markup from the sgml-custom-markup alist."
+  (interactive
+   (list (completing-read "Insert Markup: " sgml-custom-markup nil t)))
+  (sgml-insert-markup (cadr (assoc markup sgml-custom-markup))))
+
 
 ;;;; SGML mode: Menu inserting
 
@@ -1283,21 +1303,23 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 
 ;;;; SGML mode: Hiding tags/attributes
 
+(defconst sgml-tag-regexp
+  "</?[A-Za-z][---A-Za-z0-9.]*\\(\\([^'\">]\\|'[^']*'\\|\"[^\"]*\"\\)*\\)>?")
+
 (defun sgml-operate-on-tags (action &optional attr-p)
   (let ((buffer-modified-p (buffer-modified-p))
 	(inhibit-read-only t)
 	(buffer-read-only nil)
 	(before-change-function nil)
 	(markup-index			; match-data index in tag regexp
-	 (if attr-p 1 0)))
+	 (if attr-p 1 0))
+	(tagcount			; number tags to give them uniq
+					; invisible properties
+	 1))
     (unwind-protect
 	(save-excursion
 	  (goto-char (point-min))
-	  (while (re-search-forward
-		  ;;"</?[A-Za-z][---A-Za-z0-9.]*\\(\\([^'\">]*\\|'[^']*'\\|\"[^\"]\"\\)*\\)>"
-		  "</?[A-Za-z][---A-Za-z0-9.]*\\(\\([^'\">]\\|'[^']*'\\|\"[^\"]*\"\\)*\\)>?"
-		  ;;"</?[A-Za-z][---A-Za-z0-9.]*\\([^>]*\\)>"
-		  nil t)
+	  (while (re-search-forward sgml-tag-regexp nil t)
 	    (cond
 	     ((eq action 'hide)
 	      (let ((tag (downcase
@@ -1306,37 +1328,81 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 		(if (or attr-p (not (member tag sgml-exposed-tags)))
 		    (add-text-properties
 		     (match-beginning markup-index) (match-end markup-index)
-		     '(invisible t rear-nonsticky (invisible face))))))
+		     (list 'invisible tagcount
+			   'rear-nonsticky '(invisible face))))))
 	     ((eq action 'show)		; ignore markup-index
 	      (remove-text-properties (match-beginning 0) (match-end 0)
 				      '(invisible nil)))
-	     (t (error "Invalid action: %s" action)))))
+	     (t (error "Invalid action: %s" action)))
+	    (incf tagcount)))
       (set-buffer-modified-p buffer-modified-p))))
 
 (defun sgml-hide-tags ()
+  "Hide all tags in buffer."
   (interactive)
   (sgml-operate-on-tags 'hide))
 
 (defun sgml-show-tags ()
+  "Show hidden tags in buffer."
   (interactive)
   (sgml-operate-on-tags 'show))
 
 (defun sgml-hide-attributes ()
+  "Hide all attribute specifications in the buffer."
   (interactive)
   (sgml-operate-on-tags 'hide 'attributes))
 
 (defun sgml-show-attributes ()
+  "Show all attribute specifications in the buffer."
   (interactive)
   (sgml-operate-on-tags 'show 'attributes))
 
 
 ;;;; SGML mode: Normalize (and misc manipulations)
 
-(defun sgml-normalize (&optional element)
+(defun sgml-expand-shortref-to-text (entity)
+  (let (before-change-function)
+    (cond ((sgml-entity-data-p entity)
+	   (sgml-expand-shortref-to-entity entity))
+	  (t
+	   (delete-region sgml-markup-start (point))
+	   (sgml-entity-insert-text entity)
+	   ;; now parse the entity text
+	   (goto-char sgml-markup-start)))))
+
+(defun sgml-expand-shortref-to-entity (entity)
+  (let ((end (point))
+	(re-found nil)
+	before-change-function)
+    (goto-char sgml-markup-start)
+    (setq re-found (search-forward "\n" end t))
+    (delete-region sgml-markup-start end)	   
+    (insert "&" (sgml-entity-name entity)
+	    (if re-found "\n" ";"))
+    (goto-char sgml-markup-start)))
+
+(defun sgml-expand-all-shortrefs (to-entity)
+  "Expand all short references in the buffer.
+Short references to text entities are expanded to the replacement text
+of the entity other short references are expanded into general entity
+references.  If argument, TO-ENTITY, is non-nil, or if called
+interactive with numeric prefix argument, all short references are
+replaced by generaly entity references."
+  (interactive "*P")
+  (sgml-reparse-buffer
+   (if to-entity
+       (function sgml-expand-shortref-to-entity)
+     (function sgml-expand-shortref-to-text))))
+
+(defun sgml-normalize (to-entity &optional element)
   "Normalize buffer by filling in omitted tags and expanding empty tags.
-A  optional argument ELEMENT can be the element to normalize
-insted of the whole buffer."
-  (interactive "*")
+Argument TO-ENTITY controls how short references are expanded as with
+`sgml-expand-all-shortrefs'.  An optional argument ELEMENT can be the
+element to normalize insted of the whole buffer, if used no short
+references will be expanded."
+  (interactive "*P")
+  (unless element
+    (sgml-expand-all-shortrefs to-entity))
   (let ((only-one (not (null element))))
     (setq element (or element (sgml-top-element)))
     (goto-char (sgml-element-end element)) 
