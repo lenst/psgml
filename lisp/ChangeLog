@@ -1,3 +1,8 @@
+2003-02-12  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-setup-doctype): add Predefined Entities
+	for XML.
+
 2003-01-24  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-parse.el (sgml-do-move): undo wrong optimization, fix

@@ -1,4 +1,16 @@
-TODO      [Time-stamp: "2002-04-18 22:40:51 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2003-01-24 18:58:48 lenst"]           -*- outline -*- 
+
+
+* parse prolog and parent document
+
+Perhaps sgml-parse-prolog() should test whether
+sgml-parent-document is non-nil, and if so, it should parse the
+prolog of the parent document instead.  With the current
+behaviour, it is that obvious commands that use the parsed DTD
+(like inserting new elements) will not work either when there is
+only a dummy DTD available, nor will they update the parse to the
+correct DTD.  Just a suggestion.
+
 
 
 * Rewrite sgml-popup-multi-menu

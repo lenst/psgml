@@ -751,16 +751,16 @@ after the first tag inserted."
                         collect `(,gi (sgml-change-element-name ,gi))))))
       (sgml-popup-multi-menu
        event "Start Tag"
-       (list* change-menu
-             `("Misc"
-               ("Edit attributes" (sgml-edit-attributes))
-               ("Normalize" (sgml-normalize-element))
-               ("Fill" (sgml-fill-element
-                        (sgml-find-context-of (point))))
-               ("Splice" (sgml-untag-element))
-               ("Fold"   (sgml-fold-element)))
-             `("--" "--")
-             attrib-menu)))))
+       (list* `("Misc"
+                ("Edit attributes" (sgml-edit-attributes))
+                ("Normalize" (sgml-normalize-element))
+                ("Fill" (sgml-fill-element
+                         (sgml-find-context-of (point))))
+                ("Splice" (sgml-untag-element))
+                ("Fold"   (sgml-fold-element)))
+              change-menu
+              ;;`("--" "--")
+              attrib-menu)))))
 
 
 
