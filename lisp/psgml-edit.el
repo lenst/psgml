@@ -563,6 +563,8 @@ after the first tag inserted."
   (interactive 
    (list
     (completing-read "Tag: " (sgml-completion-table) nil t "<" )))
+  (sgml-find-context-of (point))
+  (assert (null sgml-markup-type))
   ;; Fix white-space before tag
   (unless (sgml-element-data-p (sgml-parse-to-here))
     (skip-chars-backward " \t")
@@ -673,6 +675,8 @@ AVL should be a assoc list mapping symbols to strings."
 
 (defun sgml-completion-table (&optional avoid-tags-in-cdata)
   (sgml-parse-to-here)
+  (when sgml-markup-type
+    (error "No tags allowed"))
   (cond ((or (sgml-model-group-p sgml-current-state)
 	     (eq sgml-current-state sgml-any))
 	 (append
@@ -876,6 +880,7 @@ tag inserted."
   (let (tab
 	(title (capitalize (symbol-name type))))
     (cond
+     (sgml-markup-type)
      ((eq type 'element)
       (setq tab
 	    (mapcar (function symbol-name)
