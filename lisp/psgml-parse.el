@@ -1714,13 +1714,12 @@ or if nil, until end of buffer."
   (setq sgml-markup-type 'start-tag)
   (let* ((gi
 	  (if (eq ?> (following-char))	; empty start tag
-	      (if t ;sgml-omittag ; if omittag use current open element
-		  ;; *** if not omittag how does it work??
+	      (if sgml-omittag ; if omittag use current open element
 		  (if (eq sgml-current-tree sgml-top-tree)
 		      sgml-document-element ; or document element if
 					; no element is open
 		    (sgml-element-name sgml-current-tree))
-		(sgml-last-closed-element))
+		(sgml-element-name (sgml-last-closed-element)))
 	    (sgml-check-name)))
 	 temp net-enabled)
     (unless (sgml-parse-char ?>)	; optimize common case
@@ -1749,9 +1748,29 @@ or if nil, until end of buffer."
     (when net-enabled
       (setf (sgml-tree-net-enabled sgml-current-tree) t))))
 
-;(defun sgml-last-closed-element ()
-;  "Return the GI of the last closed element."
-;  (let ((u sgml-current-tree))))
+(defun sgml-last-closed-element ()
+  "Return the GI of the last closed element."
+  (let* ((u sgml-current-tree)		; enclosing element
+	 (c (sgml-tree-content u))	; content element
+	 (found nil))			; found element
+    (while (not found)
+      (cond ((or (null c)	
+		 (null (sgml-tree-end c))
+		 (< (point) (sgml-tree-end c)))
+	     ;; No element before point in enclosing element, go up a level
+	     (setq u (sgml-tree-parent u))
+	     (setq c (sgml-tree-content u))
+	     (when (eq u sgml-top-tree)
+	       (sgml-error "No previously closed element")))
+	    ((and (sgml-tree-next c)
+		  (sgml-tree-end (sgml-tree-next c))
+		  (< (sgml-tree-end (sgml-tree-next c)) (point)))
+	     ;; Perhaps next element
+	     (setq c (sgml-tree-next c)))
+	    (t				; last closed element must be c
+	     (setq found c))))
+    found))
+
 
 (defun sgml-parse-end-tag ()
   "Assume point after </ or at / in a NET"
@@ -2029,7 +2048,7 @@ With implied tags this is ambigous."
 
 (defun sgml-kill-element ()
   "Kill the element following the cursor."
-  (interactive)
+  (interactive "*")
   (let ((element (sgml-find-element-after (point))))
     (goto-char (sgml-element-start element))
     (kill-region (sgml-element-start element)
@@ -2037,7 +2056,7 @@ With implied tags this is ambigous."
 
 (defun sgml-transpose-element ()
   "Interchange element before point with element after point, leave point after."
-  (interactive)
+  (interactive "*")
   (let ((pre (sgml-find-previous-element (point)))
 	(next (sgml-find-element-after (point)))
 	s1 s2 m2)
@@ -2065,7 +2084,7 @@ With implied tags this is ambigous."
 
 (defun sgml-change-element-name (gi)
   "Replace the name (generic identifyer) of the current element with a new name."
-  (interactive
+  (interactive "*"
    (list
     (let ((el (sgml-find-element-of (point))))
       (goto-char (sgml-element-start el))
@@ -2295,7 +2314,7 @@ is determined."
 
 (defun sgml-insert-end-tag ()
   "Insert end tag for the current open element."
-  (interactive)
+  (interactive "*")
   (sgml-parse-to-here)
   (cond
    ((eq sgml-current-tree sgml-top-tree)
@@ -2321,7 +2340,7 @@ corresponding end tag. If sgml-leave-point-after-insert is t, the point
 is left after the inserted tag(s), unless the element has som required
 content.  If sgml-leave-point-after-insert is nil the point is left
 after the first tag inserted."
-  (interactive)
+  (interactive "*")
   (sgml-tags-menu nil t))
 
 (defun sgml-tags-menu (event &optional nomenu)
@@ -2331,7 +2350,7 @@ corresponding end tag. If sgml-leave-point-after-insert is t, the point
 is left after the inserted tag(s), unless the element has som required
 content.  If sgml-leave-point-after-insert is nil the point is left
 after the first tag inserted."
-  (interactive "e")
+  (interactive "*e")
   (let ((end (sgml-mouse-region)))
     (sgml-ask-and-insert-tags event nomenu (point) end)))
 
@@ -2434,7 +2453,7 @@ after the first tag inserted."
       (insert (sgml-start-tag-of element)))))
 
 (defun sgml-entities-menu (event)
-  (interactive "e")
+  (interactive "*e")
   (sgml-need-dtd)
   (let ((menu (mapcar (function (lambda (x) (cons x x)))
 		      sgml-buffer-entities))
@@ -2833,7 +2852,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
   "Normalize buffer by filling in omitted tags and expanding empty tags.
 A  optional argument ELEMENT can be the element to normalize
 insted of the whole buffer."
-  (interactive)
+  (interactive "*")
   (let ((only-one (not (null element))))
     (setq element (or element (sgml-top-element)))
     (goto-char (sgml-element-end element)) 
@@ -2846,7 +2865,7 @@ insted of the whole buffer."
   (sgml-element-content (sgml-find-context-of (point-min))))
 
 (defun sgml-normalize-element ()
-  (interactive)
+  (interactive "*"
   (sgml-normalize (sgml-find-element-of (point))))
 
 (defun sgml-normalize-content (element only-first)
@@ -2939,7 +2958,8 @@ If it is something else complete with ispell-complete-word."
 	     (setq tab (sgml-current-list-of-endable-elements))))
 	  ((eq c ?!)
 	   (setq tab '("entity" "element" "attlist" "doctype"
-		       "notation" "sgml")))
+		       "notation" "sgml" "usemap" "uselink" "shortref"
+		       "linktype" "link" "idlink")))
 	  (t
 	   (goto-char here)
 	   (ispell-complete-word)))
@@ -3005,7 +3025,7 @@ If it is something else complete with ispell-complete-word."
 		   . sgml-normalize-trims)
 		  ("Minimize attributes"
 		   . sgml-minimize-attributes)
-		  ;;("Omittag" . sgml-omittag)
+		  ("OMITTAG" . sgml-omittag)
 		  ;;("Debug" . sgml-debug)
 		  ))
        (indents '(("None" . nil) ("0" . 0) ("1" . 1) ("2" . 2) ("3" . 3)
