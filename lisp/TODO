@@ -1,4 +1,12 @@
-TODO      [Time-stamp: "2002-02-13 10:25:53 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2002-04-18 22:40:51 lenst"]           -*- outline -*- 
+
+
+* Rewrite sgml-popup-multi-menu
+
+Should also split the menu if larger than sgml-max-menu-size.
+Construct the menu as a keymap.
+
+What about XEmacs?
 
 
 * Cosider removing sgml-balanced-tag-edit
