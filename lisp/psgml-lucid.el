@@ -176,23 +176,23 @@
 ;;;; Emulate text properties
 
 
-(set-face-underline-p (make-face 'underline) t) 
+;;(set-face-underline-p (make-face 'underline) t) 
 
 
-(defun add-text-properties (start end props)
-  ;; First truncate existing extents
-  (let ((e (extent-at start)))
-    (when e
-      (set-extent-endpoints e (extent-start-position e) start)))
-  (when props
-  (let ((e (make-extent start end)))
-    (when (getf props 'read-only)
-      (set-extent-attribute e 'write-protected))
-    (when (getf props 'category)
-      (set-extent-face e (find-face 'underline))
-      (set-extent-data e (getf props 'category))))
-    )
-)
+;;(defun add-text-properties (start end props)
+;;  ;; First truncate existing extents
+;;  (let ((e (extent-at start)))
+;;    (when e
+;;      (set-extent-endpoints e (extent-start-position e) start)))
+;;  (when props
+;;  (let ((e (make-extent start end)))
+;;    (when (getf props 'read-only)
+;;      (set-extent-attribute e 'write-protected))
+;;    (when (getf props 'category)
+;;      (set-extent-face e (find-face 'underline))
+;;      (set-extent-data e (getf props 'category))))
+;;    )
+;;)
 
 
 
