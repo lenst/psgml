@@ -1,7 +1,7 @@
 ;;;; psgml.el --- SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1993 Lennart Staflin
+;; Copyright (C) 1993, 1994 Lennart Staflin
 ;; Copyright (C) 1992 Free Software Foundation, Inc.
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
@@ -926,15 +926,17 @@ This uses the selective display feature."
 	  nil
 	  t nil)
 
-(autoload 'sgml-fill-element "xtra"
+(autoload 'sgml-fill-element "psgml-parse"
 	  nil
 	  t nil)
-(autoload 'sgml-normalize "xtra"
+(autoload 'sgml-normalize "psgml-parse"
 	  "Normalize buffer by filling in omitted tags and expanding empty tags."
 	  t nil)
-(autoload 'sgml-what-element "xtra"
+(autoload 'sgml-what-element "psgml-parse"
 	  nil
 	  t nil)
+
+(autoload 'sgml-complete "psgml-parse" nil t nil)
 
 (provide 'psgml)
 (provide 'sgml-mode)
