@@ -1,11 +1,5 @@
-TODO      [Time-stamp: "2001-12-16 07:13:49 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2002-01-29 16:14:12 lenst"]           -*- outline -*- 
 
-* before-change-functions
-
-Introduced in Emacs 19.23.
-Should PSGML still support earlier versions?
-Need to change the setup of these variables if so.
-    
 
 * Restore window config after edit-attr
 
@@ -44,7 +38,9 @@ current element.
 
 * sgml-do-data - needs a better docstring
 
-* Set-faces har andra variabler vettiga default.?
+* Set-faces has other variables sensible defaults
+
+sgml-auto-activate-dtd
 
 * Fix documentation of sgml-display-char-list-filename
 
@@ -58,7 +54,10 @@ Should perhaps respect sgml-parent-document
 speciellt om det är nästan samma som topelementet i instansen men
 skiljer sig i case.
 
-* Byt sgml-throw-on-warning till en handler
+* Change sgml-throw-on-warning to be a handler
+
+I.e. instead of throwing call a handler hook.
+The handler can then do the throw if that is desirable.
 
 * Kanske sgml--add-before-p borde användas allmänt
 
