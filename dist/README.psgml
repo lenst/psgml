@@ -1,24 +1,27 @@
-This is the READ ME file for psgml.el version 1.2.4.       -*- text -*-
+This is the READ ME file for psgml.el version 1.2.5.       -*- text -*-
 
-This is a stable release of PSGML. Release 1.2.4 fixes some bugs:
-  - saving and loading parsed DTD when Emacs is not in unibyte mode,
-  - error in sgml-update-display (triggerd mostly on XEmacs)
-  - bogus "XML forbids data-entity references" when
-  sgml-warn-about-undefined-elements is t.
+This is a stable release of PSGML. Release 1.2.5 fixes some bugs:
+  - no longer hardcodes the validation command in XML mode, new
+  variable sgml-xml-validate-command.
+  - sgml-edit-attributes no longer write protects the "#DEFAULT" text.
+  - more multibyte fixes
+  - explicitly creates C-c C-f and C-c C-u as prefix keys
 
 
-PSGML is a major mode for editing SGML and XML documents.  It works with
-GNU Emacs 19.34, 20.3 and later or with XEmacs 19.9 and later.  PSGML
-contains a simple SGML parser and can work with any DTD.  Functions
-provided includes menus and commands for inserting tags with only the
-contextually valid tags, identification of structural errors, editing of
-attribute values in a separate window with information about types and
-defaults, and structure based editing.
+PSGML is a major mode for editing SGML and XML documents. It works
+with GNU Emacs 19.34, 20.7, 21.1, 21.2. This version has not been
+tested with XEmacs.
+
+PSGML contains a simple SGML parser and can work with any DTD.
+Functions provided includes menus and commands for inserting tags with
+only the contextually valid tags, identification of structural errors,
+editing of attribute values in a separate window with information
+about types and defaults, and structure based editing.
 
 To install PSGML you first need to uncompress and unpack the source
 archive.  This is done with the `gunzip' and `tar' commands.
 
-     gunzip psgml-1.2.4.tar.gz; tar xf psgml-1.2.4.tar
+     gunzip psgml-1.2.5.tar.gz; tar xf psgml-1.2.5.tar
 
 This should create a subdirectory to the current directory with the
 source code. This directory contains a `configure' command (see the file

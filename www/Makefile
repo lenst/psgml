@@ -5,8 +5,9 @@ dest2 = lyshome:/lysator/www/www-pages/html/projects
 destmisc = $(dest)/about_psgml
 
 about_psgml.html: about_psgml.sgml Makefile
-	osgmlnorm -d about_psgml.sgml   > about_psgml.html  \
-		|| rm -f about_psgml.html
+	osgmlnorm -c ~/lib/sgml/catalog -d about_psgml.sgml   > about_psgml.html
+
+##		|| rm -f about_psgml.html
 
 all: $(generated_html)
 

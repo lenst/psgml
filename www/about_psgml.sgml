@@ -1,5 +1,5 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
-<!ENTITY last.ed  'Time-stamp: "2001-12-16 13:15:46 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "2002-04-19 11:59:05 lenst"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
@@ -25,6 +25,7 @@
 <!ENTITY psgml1.2.2 "psgml-1.2.2.tar.gz">
 <!ENTITY psgml1.2.3 "psgml-1.2.3.tar.gz">
 <!ENTITY psgml1.2.4 "psgml-1.2.4.tar.gz">
+<!ENTITY psgml1.2.5 "psgml-1.2.5.tar.gz">
 <!ENTITY ftp-dir    "&psgml.dir;">
 
 <!ENTITY newdoc.url "&base.url;/psgml.html">
@@ -100,6 +101,10 @@ HR.divider { width: 50%; align: center; }
 
    <DIV> <h2><A NAME="UPDATE">Update</A></h2>
     <DL>
+     <dt>2002-04-19</dt>
+     <dd><p>Bugfix release 1.2.5. <a
+        href="&base.url;/&psgml1.2.5;">Download.</a></p></dd>
+
      <dt>2001-12-16</dt>
      <dd><p>Bugfix release 1.2.4. <a
         href="&base.url;/&psgml1.2.4;">Download.</a></p></dd>
@@ -192,11 +197,18 @@ HR.divider { width: 50%; align: center; }
        <th>ftp</th>
       </tr>
       <tr>
+       <td>1.2.5</td>
+       <td>stable</td>
+       <td>bugfixes</td>
+       <td><a href="&base.url;/&psgml1.2.5;">http</a></td>
+       <td>-</td>
+      </tr>
+      <tr>
        <td>1.2.4</td>
        <td>stable</td>
        <td>bugfixes</td>
        <td><a href="&base.url;/&psgml1.2.4;">http</a></td>
-       <td>-</td>
+       <td><a href="&psgml.dir;&psgml1.2.4;">ftp</a></td>
       </tr>
       <tr>
        <td>1.2.3</td>
