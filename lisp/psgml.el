@@ -76,6 +76,10 @@
 
 ;;;; Variables
 
+(defvar sgml-mode-abbrev-table nil
+  "Abbrev table in use in sgml-mode.")
+(define-abbrev-table 'sgml-mode-abbrev-table ())
+
 (defvar sgml-running-lucid (string-match "Lucid" emacs-version))
 
 ;;; User settable options:
@@ -366,11 +370,12 @@ Example:
 
 (defvar sgml-validate-command
   "sgmls -s %s %s"
-  "*The command to validate an SGML document.
-This is a `format' control string that may contain one or two `%s'
-conversion specifications: the first will be replaced by
-`sgml-declaration'; the second will be replaced by the current buffer's 
-file name.")
+  "*The shell command to validate an SGML document.
+This is a `format' control string that should contain two `%s'
+conversion specifications: the first will be replaced by the value of
+`sgml-declaration' \(or the empty string, if nil\); the second will be
+replaced by the current buffer's file name \(or the empty string, if
+nil\).")
 
 (defvar sgml-validate-error-regexps
   '(("\\(error\\|warning\\) at \\([^,]+\\), line \\([0-9]+\\)" 2 3))
@@ -798,7 +803,7 @@ All bindings:
 "
   (interactive)
   (kill-all-local-variables)
-  (setq local-abbrev-table text-mode-abbrev-table)
+  (setq local-abbrev-table sgml-mode-abbrev-table)
   (use-local-map sgml-mode-map)
   (setq mode-name "SGML")
   (setq major-mode 'sgml-mode)
