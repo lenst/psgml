@@ -203,6 +203,10 @@ catalogs.")
   "Previous tree node in current tree.
 This is nil if no previous node.")
 
+(defvar sgml-last-buffer nil
+  "Buffer where last parse was ended. Used for restarting parser at the
+point where it left of.")
+
 (defvar sgml-markup-type nil
 "Contains the type of markup parsed last.
 The value is a symbol:
@@ -321,8 +325,23 @@ to point to the next scratch buffer.")
        (set-syntax-table (if sgml-xml-p xml-parser-syntax sgml-parser-syntax))
        (unwind-protect
 	   (progn (,@ body))
+         (setq sgml-last-buffer (current-buffer))
          (set-buffer cb)
 	 (set-syntax-table normal-syntax-table)))))
+
+(defmacro sgml-with-parser-syntax-ro (&rest body)
+  ;; Should only be used for parsing ....
+  (` (let ((normal-syntax-table (syntax-table))
+           (cb (current-buffer))
+           (buffer-modified (buffer-modified-p)))
+       (set-syntax-table (if sgml-xml-p xml-parser-syntax sgml-parser-syntax))
+       (unwind-protect
+	   (progn (,@ body))
+         (setq sgml-last-buffer (current-buffer))
+         (set-buffer cb)
+	 (set-syntax-table normal-syntax-table)
+         (set-buffer-modified-p buffer-modified)
+         (sgml-debug "Restoring buffer mod: %s" buffer-modified)))))
 
 
 ;;;; State machine
@@ -2555,6 +2574,12 @@ overrides the entity type in entity look up."
 	 (set-buffer sgml-previous-buffer)
 	 t)))
 
+(defun sgml-mainbuf-point ()
+  "Value of point in main buffer"
+  (if sgml-current-eref
+      (sgml-eref-end sgml-current-eref)
+    (point)))
+
 (defun sgml-goto-epos (epos)
   "Goto a position in an entity given by EPOS."
   (assert epos)
@@ -2632,6 +2657,18 @@ overrides the entity type in entity look up."
 	   (sgml-epos-promote epos))
 	  (t
 	   (sgml-epos-after epos)))))
+
+
+(defun sgml-max-pos-in-tree (tree)
+  (let ((epos (sgml-tree-etag-epos tree)))
+    (while (not epos)
+      (let ((children (sgml-tree-content tree)))
+        (if children
+            (while children
+              (setq tree children
+                    children (sgml-tree-next children)))
+          (setq epos (sgml-tree-stag-epos tree)))))
+    (sgml-epos-after epos)))
 
 
 ;;;; (text) Element view of parse tree
@@ -2765,14 +2802,9 @@ overrides the entity type in entity look up."
 	       (sit-for 0))
       (let ((deactivate-mark nil))
 	(sgml-need-dtd)
-	(let ((start
-	       (save-excursion (sgml-find-start-point (point))
-			       (sgml-pop-all-entities)
-			       (point)))
-	      (eol-pos
-	       (save-excursion (end-of-line 1) (point))))
-	  (let ((quiet (< (- (point) start) 500)))
-	    ;;(message "Should parse %s to %s => %s" start (point) quiet)
+	(let ((eol-pos (save-excursion (end-of-line 1) (point))))
+	  (let ((quiet (< (- (point) (sgml-max-pos-in-tree sgml-current-tree))
+                          500)))
 	    (when (if quiet
 		      t
 		    (setq sgml-current-element-name "?")
@@ -3292,6 +3324,7 @@ remove it if it is showing."
   (unless (= sgml-lazy-time (second (current-time)))
     (apply 'message args)
     (setq sgml-lazy-time (second (current-time)))))
+
 
 ;;;; Shortref maps
 
@@ -3849,21 +3882,18 @@ VALUE is a string.  Returns nil or an attdecl."
   (sgml-set-global)
   (setq	sgml-dtd-info nil)
   (goto-char (point-min))
-  (let ((buffer-modified (buffer-modified-p)))
-    (unwind-protect
-        (sgml-with-parser-syntax
-         (while (progn (setq sgml-markup-start (point))
-                       (or (sgml-parse-s)
-                           (sgml-parse-processing-instruction)
-                           (and (sgml-parse-markup-declaration 'prolog)
-                                (null sgml-dtd-info)))))
-         (unless sgml-dtd-info		; Set up a default doctype
-           (let ((docname (or sgml-default-doctype-name
-                              (if (sgml-parse-delim "STAGO" gi)
-                                  (sgml-parse-name)))))
-             (when docname
-               (sgml-setup-doctype docname '(nil))))))        
-      (set-buffer-modified-p buffer-modified)))
+  (sgml-with-parser-syntax-ro
+   (while (progn (setq sgml-markup-start (point))
+                 (or (sgml-parse-s)
+                     (sgml-parse-processing-instruction)
+                     (and (sgml-parse-markup-declaration 'prolog)
+                          (null sgml-dtd-info)))))
+   (unless sgml-dtd-info		; Set up a default doctype
+     (let ((docname (or sgml-default-doctype-name
+                        (if (sgml-parse-delim "STAGO" gi)
+                            (sgml-parse-name)))))
+       (when docname
+         (sgml-setup-doctype docname '(nil))))))
   (unless sgml-dtd-info
     (error "No document type defined by prolog"))
   (sgml-message "Parsing prolog...done"))
@@ -3898,20 +3928,24 @@ If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
 	     (current-buffer))
     (setq before-change-function 'sgml-note-change-at)
     (setq after-change-function 'sgml-set-face-after-change))
-  (sgml-with-parser-syntax
-   (sgml-find-start-point (min sgml-goal (point-max)))
-   (sgml-parse-continue sgml-goal extra-cond
-                        (or quiet (< (- sgml-goal (point)) 10000)))))
+  (sgml-with-parser-syntax-ro
+   (sgml-goto-start-point (min sgml-goal (point-max)))
+   (setq quiet (or quiet (< (- sgml-goal (sgml-mainbuf-point)) 500)))
+  (unless quiet
+    (sgml-message "Parsing..."))
+   (sgml-parser-loop extra-cond)
+  (unless quiet
+    (sgml-message ""))))
 
 (defun sgml-parse-continue (sgml-goal &optional extra-cond quiet)
   "Parse until (at least) SGML-GOAL."
   (assert sgml-current-tree)
   (unless quiet
     (sgml-message "Parsing..."))
-  (let ((buffer-modified (buffer-modified-p)))
-    (unwind-protect
-        (sgml-with-parser-syntax (sgml-parser-loop extra-cond))
-      (set-buffer-modified-p buffer-modified)))
+  (sgml-debug "Parse continue")
+  (sgml-with-parser-syntax-ro
+   (set-buffer sgml-last-buffer)
+   (sgml-parser-loop extra-cond))
   (unless quiet
     (sgml-message "")))
 
@@ -4029,6 +4063,7 @@ pointing to start of short ref and point pointing to the end."
        ((sgml-parse-processing-instruction))
        (t
 	(sgml-do-pcdata))))))
+
 
 (defun sgml-handle-shortref (name)
   (sgml-set-markup-type 'shortref)
@@ -4154,7 +4189,7 @@ pointing to start of short ref and point pointing to the end."
 	   (> goal (sgml-tree-stag-epos tree))
 	 (>= goal (sgml-epos-after (sgml-tree-stag-epos tree))))))
 
-(defun sgml-find-start-point (goal)
+(defun sgml-goto-start-point (goal)
   (let ((u sgml-top-tree))
     (while
 	(cond
