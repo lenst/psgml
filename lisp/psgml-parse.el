@@ -3629,7 +3629,7 @@ VALUE is a string.  Returns nil or an attdecl."
   (setq sgml-dtd-info (sgml-pstate-dtd sgml-buffer-parse-state)
 	sgml-top-tree (sgml-pstate-top-tree sgml-buffer-parse-state))
   (sgml-set-global)
-  ;;*** what is sgml-current-tree now?
+  (setq sgml-current-tree sgml-top-tree)
   (while (stringp (cadr modifier))	; Loop thru the context elements
     (let ((et (sgml-lookup-eltype (car modifier))))
       (sgml-open-element et nil (point-min) (point-min))
