@@ -866,7 +866,7 @@ as that may change."
 (define-key sgml-mode-map "\C-c\C-p" 'sgml-load-doctype)
 (define-key sgml-mode-map "\C-c\C-q" 'sgml-fill-element)
 (define-key sgml-mode-map "\C-c\C-r" 'sgml-tag-region)
-(define-key sgml-mode-map "\C-c\C-s" 'sgml-unfold-line)
+(define-key sgml-mode-map "\C-c\C-s" 'sgml-show-structure)
 ;(define-key sgml-mode-map "\C-c\C-t" 'sgml-list-valid-tags)
 (define-key sgml-mode-map "\C-c\C-t" 'sgml-show-current-element-type)
 (define-key sgml-mode-map "\C-c\C-u\C-a" 'sgml-unfold-all)
@@ -1497,6 +1497,8 @@ and move to the line in the SGML document that caused it."
 (autoload 'sgml-load-dtd "psgml-parse" "Load a saved DTD from FILE." t)
 (autoload 'sgml-show-or-clear-log "psgml-parse" "Show the *SGML LOG* buffer if it is not showing, or clear and
 remove it if it is showing." t)
+(autoload 'sgml-load-doctype "psgml-parse" "Load the documents DTD.
+Either from parent document or by parsing the document prolog." t)
 (autoload 'sgml-parse-prolog "psgml-parse" "Parse the document prolog to learn the DTD." t)
 (autoload 'sgml-beginning-of-element "psgml-edit" "Move to after the start-tag of the current element.
 If the start-tag is implied, move to the start of the element." t)
@@ -1557,12 +1559,19 @@ after the first tag inserted." t)
 (autoload 'sgml-element-menu "psgml-edit" "Pop up a menu with valid elements and insert choice.
 If sgml-leave-point-after-insert is nil the point is left after the first
 tag inserted." t)
+(autoload 'sgml-add-element-menu "psgml-edit" nil t)
 (autoload 'sgml-start-tag-menu "psgml-edit" "Pop up a menu with valid start-tags and insert choice." t)
 (autoload 'sgml-end-tag-menu "psgml-edit" "Pop up a menu with valid end-tags and insert choice." t)
 (autoload 'sgml-tag-region-menu "psgml-edit" "Pop up a menu with valid elements and tag current region with the choice." t)
 (autoload 'sgml-entities-menu "psgml-edit" nil t)
 (autoload 'sgml-attrib-menu "psgml-edit" "Pop up a menu of the attributes of the current element
 \(or the element with start-tag before point)." t)
+(autoload 'sgml-right-menu "psgml-edit" "Pop up a menu with valid tags and insert the choosen tag.
+If the variable sgml-balanced-tag-edit is t, also inserts the
+corresponding end tag. If sgml-leave-point-after-insert is t, the point
+is left after the inserted tag(s), unless the element has som required
+content.  If sgml-leave-point-after-insert is nil the point is left
+after the first tag inserted." t)
 (autoload 'sgml-fill-element "psgml-edit" "Fill biggest enclosing element with mixed content.
 If current element has pure element content, recursively fill the
 subelements." t)
@@ -1595,6 +1604,8 @@ If called with a numeric argument, convert a character reference back
 to a normal character.  If called from a program, set optional
 argument INVERT to non-nil." t)
 (autoload 'sgml-expand-entity-reference "psgml-edit" "Insert the text of the entity referenced at point." t)
+(autoload 'sgml-trim-and-leave-element "psgml-edit" "Remove blanks at end of current element and move point to after element." t)
+(autoload 'sgml-edit-external-entity "psgml-edit" "Open	a new window and display the external entity at the point." t)
 (autoload 'sgml-complete "psgml-edit" "Complete the word/tag/entity before point.
 If it is a tag (starts with < or </) complete with valid tags.
 If it is an entity (starts with &) complete with declared entities.
@@ -1606,6 +1617,8 @@ If it is something else complete with ispell-complete-word." t)
 (autoload 'sgml-add-element-to-element "psgml-edit" "Add an element of type GI to the current element.
 The element will be added at the last legal position if FIRST is `nil',
 otherwise it will be added at the first legal position." t)
+(autoload 'sgml-show-current-element-type "psgml-edit" "Show information about the current element and its type." t)
+(autoload 'sgml-show-structure "psgml-edit" "Show the document structure in a separate buffer." t)
 (autoload 'sgml-save-dtd "psgml-dtd" "Save the parsed dtd on FILE." t)
 (autoload 'sgml-list-elements "psgml-info" "List the elements and their attributes in the current DTD." t)
 (autoload 'sgml-list-attributes "psgml-info" "List the attributes and in which elements they occur." t)
@@ -1614,7 +1627,7 @@ otherwise it will be added at the first legal position." t)
 (autoload 'sgml-list-occur-in-elements "psgml-info" "List all element types and where it can occur." t)
 (autoload 'sgml-describe-entity "psgml-info" "Describe the properties of an entity as declared in the current DTD." t)
 (autoload 'sgml-describe-element-type "psgml-info" "Describe the properties of an element type as declared in the current DTD." t)
-(autoload 'sgml-general-dtd-info "psgml-info" "Display information about the current DTD." t)
+(autoload 'sgml-describe-dtd "psgml-info" "Display information about the current DTD." t)
 (autoload 'sgml-charent-to-display-char "psgml-charent" "Replace character entities with their display character equivalents" t)
 (autoload 'sgml-display-char-to-charent "psgml-charent" "Replace displayable characters with their character entity equivalents" t)
 
