@@ -1597,41 +1597,48 @@ in any of them."
         (sgml-skip-cs)))
 
 (defun sgml-do-processing-instruction (in-declaration)
-  (let ((start (point)))
-    (when (and (eq ?P (following-char))
-	       (looking-at "PSGML +\\(\\sw+\\) *"))
-      (sgml--pi-psgml-handler in-declaration))
+  (let ((start (point))
+        (psgml-pi (and (eq ?P (following-char))
+                       (looking-at "PSGML +\\(\\sw+\\) *"))))
     (if sgml-xml-p
 	(sgml-skip-upto "XML-PIC")
       (sgml-skip-upto "PIC"))
-    (when sgml-pi-function
-      (funcall sgml-pi-function
-	       (buffer-substring-no-properties start (point)))))
-  (if sgml-xml-p
-      (sgml-check-delim "XML-PIC")
-    (sgml-check-delim "PIC"))
+    (let ((end (point)))
+      (if sgml-xml-p
+          (sgml-check-delim "XML-PIC")
+        (sgml-check-delim "PIC"))
+      (let ((next (point)))
+        (cond (psgml-pi
+               (goto-char start)
+               (sgml--pi-psgml-handler in-declaration end))
+              (sgml-pi-function
+               (funcall sgml-pi-function
+                        (buffer-substring-no-properties start end))))
+        (goto-char next))))
   (unless in-declaration
     (sgml-set-markup-type 'pi))
   t)
 
 
-(defun sgml--pi-psgml-handler (in-declaration)
+(defun sgml--pi-psgml-handler (in-declaration end)
   (when (or in-declaration
             sgml-psgml-pi-enable-outside-dtd)
-    (let* ((command (downcase (match-string 1)))
-           (flag-command (assoc command
-                                '(("nofill"      . nofill)
-                                  ("breakafter"  . break-after-stag)
-                                  ("breakbefore" . break-before-stag)
-                                  ("structure"   . structure)))))
-      (goto-char (match-end 0))
-      (cond (flag-command
-             (sgml-parse-set-appflag (cdr flag-command)))
-            ((equal command "element")
+    (save-restriction
+      (narrow-to-region (point) end)
+      (let* ((command (downcase (match-string 1)))
+             (flag-command (assoc command
+                                  '(("nofill"      . nofill)
+                                    ("breakafter"  . break-after-stag)
+                                    ("breakbefore" . break-before-stag)
+                                    ("structure"   . structure)))))
+        (goto-char (match-end 0))
+        (cond (flag-command
+               (sgml-parse-set-appflag (cdr flag-command)))
+              ((equal command "element")
                (sgml--pi-element-handler))
-            (t
-             (sgml-log-warning "Unknown processing instruction for PSGML: %s"
-                               command))))))
+              (t
+               (sgml-log-warning "Unknown processing instruction for PSGML: %s"
+                                 command)))))))
 
 
 (defun sgml--pi-element-handler ()
