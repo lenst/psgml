@@ -1,4 +1,4 @@
-;;;; psgml-api.el --- Extra API functions for PSGML
+;;; psgml-api.el --- Extra API functions for PSGML
 ;; $Id$
 
 ;; Copyright (C) 1994 Lennart Staflin
@@ -20,12 +20,12 @@
 ;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 
-;;;; Commentary:
+;;; Commentary:
 
 ;; Provides some extra functions for the API to PSGML.
 
 
-;;;; Code:
+;;; Code:
 
 (provide 'psgml-api)
 (require 'psgml)
@@ -63,7 +63,8 @@ leaves the element with no start-tag some elements may be ignored."
 
 ;;;; Map content
 
-(defun sgml-map-content (element element-fun &optional data-fun pi-fun)
+(defun sgml-map-content (element element-fun
+				 &optional data-fun pi-fun entity-fun)
   "Map content of ELEMENT, calling ELEMENT-FUN for every element.
 Also calling DATA-FUN, if non-nil, with data in content."
   (sgml-pop-all-entities)
@@ -73,17 +74,18 @@ Also calling DATA-FUN, if non-nil, with data in content."
     (sgml-set-parse-state element 'start)
     (when (eobp) (sgml-pop-entity))
     (when (eolp) (forward-char 1))
-    (sgml-parse-data (point-max) data-fun pi-fun)
+    (sgml-parse-data (point-max) data-fun pi-fun entity-fun)
     (let ((c (sgml-tree-content element)))
       (while c
 	(sgml-pop-all-entities)
 	(funcall element-fun c)
 	(sgml-set-parse-state c 'after)
-	(sgml-parse-data (point-max) data-fun pi-fun)
+	(sgml-parse-data (point-max) data-fun pi-fun entity-fun)
 	(setq c (sgml-tree-next c)))))
   (sgml-pop-all-entities))
 
-(defun sgml-parse-data (sgml-goal sgml-data-function sgml-pi-function)
+(defun sgml-parse-data (sgml-goal sgml-data-function sgml-pi-function
+				  sgml-entity-function)
   (let ((sgml-throw-on-element-change 'el-done))
     (catch sgml-throw-on-element-change
       (sgml-with-parser-syntax
