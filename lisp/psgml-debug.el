@@ -1,5 +1,5 @@
 ;;;;\filename dump.el
-;;;\Last edited: Sat Oct 29 02:46:23 1994 by lenst@lysita (Lennart Staflin)
+;;;\Last edited: Fri Nov 25 18:30:01 1994 by lenst@dell (Lennart Staflin)
 ;;;\RCS $Id$
 ;;;\author {Lennart Staflin}
 ;;;\maketitle
@@ -95,22 +95,26 @@
 
 
 (defun sgml-dp-element (el)
-  (princ (format "Element %s %s %s%s:\n"
-		 (sgml-eltype-name el)
-		 (if (sgml-eltype-stag-optional el) "O" "-")
-		 (if (sgml-eltype-etag-optional el) "O" "-")
-		 (if (sgml-eltype-mixed el) " mixed" "")))
   (cond
-   ((sgml-model-group-p (sgml-eltype-model el))
-    (sgml-dp-model (sgml-eltype-model el)))
+   ((sgml-eltype-defined el)
+    (princ (format "Element %s %s %s%s:\n"
+		   (sgml-eltype-name el)
+		   (if (sgml-eltype-stag-optional el) "O" "-")
+		   (if (sgml-eltype-etag-optional el) "O" "-")
+		   (if (sgml-eltype-mixed el) " mixed" "")))
+    (cond
+     ((sgml-model-group-p (sgml-eltype-model el))
+      (sgml-dp-model (sgml-eltype-model el)))
+     (t
+      (prin1 (sgml-eltype-model el))
+      (terpri)))
+    (princ (format "Exeptions: +%S -%S\n"
+		   (sgml-eltype-includes el)
+		   (sgml-eltype-excludes el)))
+    (princ (format "Attlist: %S\n" (sgml-eltype-attlist el)))
+    (princ (format "Plist: %S\n" (symbol-plist el))))
    (t
-    (prin1 (sgml-eltype-model el))
-    (terpri)))
-  (princ (format "Exeptions: +%S -%S\n"
-		 (sgml-eltype-includes el)
-		 (sgml-eltype-excludes el)))
-  (princ (format "Attlist: %S\n" (sgml-eltype-attlist el)))
-  (princ (format "Plist: %S\n" (symbol-plist el)))
+    (princ (format "Undefined element %s\n" (sgml-eltype-name el)))))
   (terpri))
 
 
@@ -144,7 +148,8 @@
   (interactive)
   (with-output-to-temp-buffer "*autoload*"
     (loop
-     for file in '("psgml-parse" "psgml-edit" "psgml-dtd")
+     for file in '("psgml-parse" "psgml-edit" "psgml-dtd"
+		   "psgml-info" "psgml-charent")
      do
      (set-buffer (find-file-noselect (concat file ".el")))
      (goto-char (point-min))

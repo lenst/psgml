@@ -61,7 +61,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "1.0a4"
+(defconst psgml-version "1.0a5"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -201,6 +201,9 @@ If nil, the point will be placed before the inserted tag(s).")
 
 (defvar sgml-warn-about-undefined-elements t
   "*If non-nil, print a warning when a tag for an undefined element is found.")
+
+(defvar sgml-warn-about-undefined-entities t
+  "*If non-nil, print a warning when an undefined entity is found.")
 
 (defvar sgml-ignore-undefined-elements nil
   "*If non-nil, recover from an undefined element by ignoring the tag.
@@ -406,6 +409,7 @@ See `compilation-error-regexp-alist'.")
     sgml-omittag-transparent
     sgml-leave-point-after-insert
     sgml-warn-about-undefined-elements
+    sgml-warn-about-undefined-entities
     sgml-ignore-undefined-elements
     sgml-markup-faces
     sgml-validate-command
@@ -700,7 +704,9 @@ actually only the state that persists between commands.")
   (when (eq major-mode 'sgml-mode)
     (when (and (null sgml-buffer-parse-state)
 	       sgml-auto-activate-dtd
-	       (null sgml-auto-activate-dtd-tried))
+	       (null sgml-auto-activate-dtd-tried)
+	       (not (zerop (buffer-size)))
+	       (looking-at ".*<"))
       (setq sgml-auto-activate-dtd-tried t)
       (sgml-need-dtd))
     (when sgml-buffer-parse-state
@@ -1027,6 +1033,7 @@ and move to the line in the SGML document that caused it."
 (autoload 'sgml-load-dtd "psgml-parse" "Load a saved DTD from FILE." t)
 (autoload 'sgml-show-or-clear-log "psgml-parse" "Show the *SGML LOG* buffer if it is not showing, or clear and
 remove it if it is showing." t)
+(autoload 'sgml-parse-prolog "psgml-parse" "Parse the document prolog to learn the DTD." t)
 (autoload 'sgml-beginning-of-element "psgml-edit" "Move to after the start-tag of the current element.
 If the start-tag is implied, move to the start of the element." t)
 (autoload 'sgml-end-of-element "psgml-edit" "Move to before the end-tag of the current element." t)
@@ -1133,8 +1140,16 @@ declaration names.
 If it is something else complete with ispell-complete-word." t)
 (autoload 'sgml-file-options-menu "psgml-edit" nil t)
 (autoload 'sgml-user-options-menu "psgml-edit" nil t)
-(autoload 'sgml-parse-prolog "psgml-dtd" "Parse the document prolog to learn the DTD." t)
 (autoload 'sgml-save-dtd "psgml-dtd" "Save the parsed dtd on FILE." t)
+(autoload 'sgml-list-elements "psgml-info" "List the elements and their attributes in the current DTD." t)
+(autoload 'sgml-list-attributes "psgml-info" "List the attributes and in which elements they occur." t)
+(autoload 'sgml-list-terminals "psgml-info" "List the elements that can have data in their content." t)
+(autoload 'sgml-list-content-elements "psgml-info" "List all element types and the element types that can occur in its content." t)
+(autoload 'sgml-list-occur-in-elements "psgml-info" "List all element types and where it can occur." t)
+(autoload 'sgml-describe-entity "psgml-info" nil t)
+(autoload 'sgml-describe-element-type "psgml-info" nil t)
+(autoload 'sgml-charent-to-display-char "psgml-charent" "Replace character entities with their display character equivalents" t)
+(autoload 'sgml-display-char-to-charent "psgml-charent" "Replace displayable characters with their character entity equivalents" t)
 
 
 
