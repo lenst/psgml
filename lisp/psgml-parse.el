@@ -1443,6 +1443,11 @@ remove it if it is showing."
        (eq ?/ (char-after (1+ (point))))
        (sgml-startnm-char (char-after (+ 2 (point))))))
 
+(defun sgml-is-enabled-net ()		;*** inline
+  (and sgml-shorttag
+       (sgml-tree-net-enabled sgml-current-tree)
+       (eq ?/ (following-char))))
+
 (defsubst sgml-is-start-tag ()
   (and (eq ?< (following-char))
        (or (sgml-startnm-char (char-after (1+ (point))))
@@ -1580,8 +1585,9 @@ a RNI must be followed by NAME."
 	   value))))
 
 (defun sgml-skip-cdata ()
-  (while (progn (skip-chars-forward "^<")
-		(not (sgml-is-end-tag)))
+  (while (progn (skip-chars-forward "^</")
+		(not (or (sgml-is-end-tag)
+			 (sgml-is-enabled-net))))
     (forward-char 1)))
 
 (defun sgml-skip-doctype ()
@@ -1829,7 +1835,8 @@ or if nil, until end of buffer."
      ((and (not (sgml-current-mixed-p)) 	(sgml-skip-s)))
      ((and (or (eq sgml-current-state sgml-cdata)
 	       (eq sgml-current-state sgml-rcdata))
-	   (not (sgml-is-end-tag)))
+	   (not (or (sgml-is-end-tag)
+		    (sgml-is-enabled-net))))
       (sgml-skip-cdata))
      ((sgml-parse-char ?<)		; Markup?
       (cond
@@ -2707,7 +2714,7 @@ AVL should be a assoc list mapping symbols to strings."
   (let ((quote ""))
 	(cond ((and (not sgml-always-quote-attributes)
 		    sgml-shorttag
-		    (string-match "^[.A-Za-z0-9---]+$" value))
+		    (string-match "\\`[.A-Za-z0-9---]+\\'" value))
 	       ) ; no need to quote
 	      ((not (string-match "\"" value)) ; can use "" quotes
 	       (setq quote "\""))
@@ -3117,7 +3124,8 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 				(sgml-attdecl-declared-value (car al))))
 	    asl))
 	 (while (progn (beginning-of-line 2)
-		       (not (get-text-property (point) 'read-only)))))
+		       (or (eolp)
+			   (not (get-text-property (point) 'read-only))))))
 					; was (eq t)
        (forward-line 1)
        (setq al (cdr al)))
@@ -3262,9 +3270,10 @@ elements with omitted end-tags."
   (let ((asl (sgml-element-attribute-specification-list element)))
     (save-excursion
       (delete-char (sgml-tree-stag-len element))    
-      (insert "<" (symbol-name (sgml-element-name element)))
-      (sgml-insert-attributes asl (sgml-element-attlist element))
-      (insert ">"))))
+      (save-excursion
+	(insert "<" (symbol-name (sgml-element-name element)))
+	(sgml-insert-attributes asl (sgml-element-attlist element))
+	(insert ">")))))
 
 (defun sgml-normalize-end-tag (element)
   (unless (sgml-element-empty element)
@@ -3273,7 +3282,7 @@ elements with omitted end-tags."
 	     sgml-normalize-trims)
 	(skip-chars-backward " \t\n\r"))
     (delete-char (sgml-tree-etag-len element))
-    (insert (sgml-end-tag-of element))))
+    (save-excursion (insert (sgml-end-tag-of element)))))
 
 
 ;;;; SGML mode: TAB completion
@@ -3281,7 +3290,9 @@ elements with omitted end-tags."
 (defun sgml-complete ()
   "Complete the word/tag/entity before point.
 If it is a tag (starts with < or </) complete with valid tags.
-If it is a entity (starts with &) complete with declared entities.
+If it is an entity (starts with &) complete with declared entities.
+If it is a markup declaration (starts with <!) complete with markup 
+declaration names.
 If it is something else complete with ispell-complete-word."
   (interactive)
   (let ((tab nil)
