@@ -62,7 +62,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "0.4a3"
+(defconst psgml-version "0.4a4"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -97,7 +97,10 @@ pi	- processing instruction
 sgml	- SGML declaration
 start-tag")
 
-(defvar sgml-buggy-subst-char-in-region t
+(defvar sgml-buggy-subst-char-in-region 
+  (or (not (boundp 'emacs-minor-version))
+      (not (natnump emacs-minor-version))
+      (< emacs-minor-version 23))
   "*If non-nil, work around a bug in subst-char-in-region.
 The bug sets the buffer modified.  If this is set, folding commands
 will be slower.")
@@ -134,7 +137,7 @@ transient-mark-mode must be on for the region to be tagged.")
 when adding end tag.")
 
 (defvar sgml-omittag t
-  "*Determines interpretation of empty start tag.
+  "*Set to non-nil, if you use OMITTAG YES.
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-omittag)
 
@@ -176,7 +179,7 @@ and legal tags beyond omitable end tags.")
 If nil, the point will be placed before the inserted tag(s).")
 
 (defvar sgml-warn-about-undefined-elements t
-  "*If non-nil, print a warning when a tag for a undefined element is found.")
+  "*If non-nil, print a warning when a tag for an undefined element is found.")
 
 (defvar sgml-indent-step 2
   "*How much to increment indent for every element level.
@@ -192,7 +195,7 @@ Setting this variable automatically makes it local to the current buffer.")
 
 (defvar sgml-system-path
   '("." "~/sgml")
-  "*List of directors used to look for system identifiers.")
+  "*List of directories used to look for system identifiers.")
 
 (defvar sgml-public-map
   '("/usr/local/lib/sgml/%o/%c/%d")
@@ -279,9 +282,14 @@ Example:
 The file name of current buffer file name will be appended to this,
 separated by a space.")
 
+(defvar sgml-validate-error-regexps
+  '(("\\(error\\|warning\\) at \\([^,]+\\), line \\([0-9]+\\)" 2 3))
+  "Alist of regexps to recognize error messages from sgml-validate.")
+
 (defvar sgml-declaration nil
   "*If this is a string this will be inserted before the file name when 
 running the sgml-validate-command.")
+(put 'sgml-declaration 'sgml-type 'string)
 
 (defvar sgml-mode-hook nil
   "A hook or list of hooks to be run when entering sgml-mode")
@@ -387,7 +395,9 @@ running the sgml-validate-command.")
 	(bv (buffer-local-variables)))
     (loop for var in sgml-user-options
 	  do
-	  (when (assq var bv)
+	  (when (and (assq var bv)
+		     (or (not (eq var 'sgml-default-dtd-file))
+			 (stringp sgml-default-dtd-file)))
 	    (sgml-set-local-variable var (symbol-value var))))
     ;;(when sgml-default-dtd-file (sgml-set-local-variable 'sgml-default-dtd-file sgml-default-dtd-file))
     ))
@@ -491,6 +501,7 @@ running the sgml-validate-command.")
 (define-key sgml-mode-map "/"     'sgml-slash)
 (define-key sgml-mode-map "\C-c#"    'sgml-make-character-reference)
 (define-key sgml-mode-map "\C-c-"    'sgml-untag-element)
+(define-key sgml-mode-map "\C-c+"    'sgml-insert-attribute)
 (define-key sgml-mode-map "\C-c/"    'sgml-insert-end-tag)
 (define-key sgml-mode-map "\C-c<"    'sgml-insert-tag)
 (define-key sgml-mode-map "\C-c="    'sgml-change-element-name)
@@ -842,7 +853,7 @@ and move to the line in the SGML document that caused it."
       (save-some-buffers nil nil))
   (compile-internal command "No more errors" "SGML validation"
 		    nil
-		   '(("error at \\([^,]+\\), line \\([0-9]+\\)" 1 2))))
+		    sgml-validate-error-regexps))
 
 
 
