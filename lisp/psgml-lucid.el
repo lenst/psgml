@@ -63,7 +63,7 @@
     (popup-menu menu)
     (cadr
      (catch 'popup-done
-       (while t
+       (while (popup-menu-up-p)
 	 (setq event (next-command-event event))
 	 (cond ((and (menu-event-p event)
 		     (eq 'quote (car-safe (event-object event))))
@@ -84,8 +84,6 @@
   (add-menu nil (car sgml-sgml-menu) (cdr sgml-sgml-menu) "Help")
   (add-menu nil (car sgml-markup-menu) (cdr sgml-markup-menu) "Help")
   (add-menu nil (car sgml-fold-menu) (cdr sgml-fold-menu) "Help")
-;;  (add-menu nil (car sgml-tags-menu) (cdr sgml-tags-menu) "Help")
-;;  (add-menu nil (car sgml-entities-menu) (cdr sgml-entities-menu) "Help")
   (add-menu nil (car sgml-dtd-menu) (cdr sgml-dtd-menu) "Help"))
 
 (defvar sgml-markup-menu
@@ -126,16 +124,6 @@
     ["Expand" sgml-expand-element t]
     ))
 
-(defvar sgml-entities-menu
-  '("Entities"
-    ["Show entities" (sgml-entities-menu last-command-event) t]
-    ))
-
-(defvar sgml-tags-menu
-  '("Tags"
-    ["Show valid tags" (sgml-tags-menu last-command-event) t]
-    ))
-
 (defvar sgml-sgml-menu
   '("SGML"
     ["Next data field"  sgml-next-data-field t]
@@ -143,7 +131,7 @@
     ["Show context" sgml-show-context t]
     ["What element" sgml-what-element t]
     ["Next trouble spot" sgml-next-trouble-spot t]
-    ["Edit attributes" sgml-edit-attributes nil]
+    ["Edit attributes" sgml-edit-attributes t]
     ["Change element name" sgml-change-element-name t]
     ["Show valid tags" sgml-list-valid-tags t]
     ["Show/hide warning log" sgml-show-or-clear-log t]
@@ -151,6 +139,7 @@
     ["Fill element" sgml-fill-element t]
     ["Options" sgml-options-menu t]
     ["Save options" sgml-save-options t]
+    ["Submit bug report" sgml-submit-bug-report t]
     ))
 
 (defun sgml-build-custom-menus ()
