@@ -1034,10 +1034,10 @@ attribute-value from the mini-buffer and inserts the attribute value
 pair.
 @end table
 
-@kindex S-@key{mouse-1}
+@kindex S-@key{mouse-3}
 A menu is also available directly with a mouse button click in the
 buffer.  In GNU Emacs it is the first mouse button combined with shift
-(@kbd{S-@key{mouse-1}}).  In Lucid Emacs it is bound to the third mouse
+(@kbd{S-@key{mouse-3}}).  In Lucid Emacs it is bound to the third mouse
 button.  The mouse button click will pop-up a menu of valid tags or a
 menu of attributes if the point is in a start-tag.  The attributes menu
 works as the ``Insert attribute'' menu from the menu-bar.  The tags list
