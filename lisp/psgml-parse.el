@@ -3899,7 +3899,7 @@ VALUE is a string.  Returns nil or an attdecl."
 	(sgml-warn-about-undefined-entities
 	 (if sgml-xml-p
 	     nil
-	   sgml-warn-about-undefined-entities)))
+             sgml-warn-about-undefined-entities)))
     (sgml-with-parser-syntax-ro
      (while (progn (setq sgml-markup-start (point))
 		   (or (sgml-parse-s)
@@ -3914,12 +3914,16 @@ VALUE is a string.  Returns nil or an attdecl."
 	   (sgml-setup-doctype docname '(nil)))))))
   ;; Unless we have a DTD, the element types vector will only contain
   ;; one element type after removing zeroes..
+  ;; FIXME: this is too ugly.
+  ;; Would it not be better to count the element types than to rely on
+  ;; some properties of OBLISTs.
   (set (make-local-variable 'sgml-dtd-less)
-       (= 1 (length (delq 0 (append (sgml-dtd-eltypes sgml-dtd-info)
-				    '())))))
+       (or (null sgml-dtd-info)
+           (= 1 (length (delq 0 (append (sgml-dtd-eltypes sgml-dtd-info)
+                                        '()))))))
   (when (and sgml-xml-p sgml-dtd-less)
-      (set (make-local-variable 'sgml-warn-about-undefined-elements) nil)
-      (set (make-local-variable 'sgml-warn-about-undefined-entities) nil))
+    (set (make-local-variable 'sgml-warn-about-undefined-elements) nil)
+    (set (make-local-variable 'sgml-warn-about-undefined-entities) nil))
   (unless sgml-dtd-info
     (error "No document type defined by prolog"))
   (sgml-message "Parsing prolog...done"))

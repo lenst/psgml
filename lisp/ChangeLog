@@ -1,3 +1,8 @@
+2002-09-19  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-parse.el (sgml-parse-prolog): Check if sgml-dtd-info is
+	nil before trying to use it.
+
 2002-08-13  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-edit-attrib-abort): new command
@@ -38,7 +43,7 @@
 	
 2002-04-25  Lennart Staflin  <lenst@lysator.liu.se>
 
-	fixing merge of Dave Loves patch.
+	fixing merge of Dave Love's patch.
 	
 2002-02-08  Dave Love  <fx@gnu.org>
 	[Merging from 1.2.4 branch /lenst]
