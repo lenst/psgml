@@ -305,8 +305,8 @@ If this is nil, then current entity is main buffer.")
 
 ;; set of moves: list of moves
 
-(defsubst sgml-add-move-to-set (token node set)
-  (cons (cons token node) set))
+(defmacro sgml-add-move-to-set (token node set)
+  (`(cons (cons (, token) (, node)) (, set))))
 
 (defmacro sgml-moves-lookup (token set)
   (` (assq (, token) (, set))))
@@ -325,8 +325,8 @@ If this is nil, then current entity is main buffer.")
 (defmacro sgml-state-reqs (s)
   (` (cddr (, s))))
 
-(defsubst sgml-state-final-p (s)
-  (null (sgml-state-reqs s)))
+(defmacro sgml-state-final-p (s)
+  (`(null (sgml-state-reqs (, s)))))
 
 ;; adding moves
 ;; *** Should these functions check for ambiguity?
@@ -695,8 +695,14 @@ If ATTSPEC is nil, nil is returned."
   "Return a token for the element type"
   et)
 
+(define-compiler-macro sgml-eltype-token (et)
+  et)
+
 (defun sgml-token-eltype (token)
   "Return the element type corresponding to TOKEN."
+  token)
+
+(define-compiler-macro sgml-token-eltype (token)
   token)
 
 (defmacro sgml-prop-fields (&rest names)
@@ -2217,7 +2223,7 @@ in any of them."
 (defmacro sgml-general-case (string)  (`(downcase (, string))))
 (defmacro sgml-entity-case (string)   string)
 
-(defsubst sgml-parse-name (&optional entity-name)
+(defun sgml-parse-name (&optional entity-name)
   (if (sgml-startnm-char-next)
       (let ((name (buffer-substring (point)
 				    (progn (skip-syntax-forward "w_")
@@ -2225,6 +2231,23 @@ in any of them."
 	(if entity-name
 	    (sgml-entity-case name)
 	  (sgml-general-case name)))))
+
+(define-compiler-macro sgml-parse-name (&whole form &optional entity-name)
+  (cond
+   ((eq entity-name nil)
+    '(if (sgml-startnm-char-next)
+	 (sgml-general-case
+	  (buffer-substring (point)
+			    (progn (skip-syntax-forward "w_")
+				   (point))))))
+   ((eq entity-name t)
+    '(if (sgml-startnm-char-next)
+	 (sgml-entity-case
+	  (buffer-substring (point)
+			    (progn (skip-syntax-forward "w_")
+				   (point))))))
+   (t
+    form)))
 
 (defun sgml-check-name (&optional entity-name)
   (or (sgml-parse-name entity-name)
@@ -2279,11 +2302,14 @@ in any of them."
 	   (sgml-push-to-entity ent sgml-markup-start)))
     t))
 
-(defun sgml-parse-parameter-entity-ref ()
+(defsubst sgml-parse-parameter-entity-ref ()
   "Parse and push to a parameter entity, return nil if no ref here."
   ;;(setq sgml-markup-start (point))
   (if (sgml-parse-delim "PERO" nmstart)
-      (let* ((name (sgml-parse-name t))
+      (sgml-do-parameter-entity-ref)))
+
+(defun sgml-do-parameter-entity-ref ()
+  (let* ((name (sgml-parse-name t))
 	     (ent (sgml-lookup-entity name
 				      (sgml-dtd-parameters sgml-dtd-info))))
 	(or (sgml-parse-delim "REFC")
@@ -2294,7 +2320,7 @@ in any of them."
 	      (t
 	       (sgml-log-warning
 		"Undefined parameter entity %s" name)))
-	t)))
+	t))
 
 (defun sgml-parse-comment ()
   (if (sgml-parse-delim "COM")
@@ -2307,7 +2333,7 @@ in any of them."
   (while (or (sgml-parse-s)
 	     (sgml-parse-comment))))
 
-(defun sgml-skip-ps ()
+(defsubst sgml-skip-ps ()
   "Move point forward stopping before a char that isn't a parameter separator."
   (while
       (or (sgml-parse-s)
@@ -2315,7 +2341,7 @@ in any of them."
 	  (sgml-parse-parameter-entity-ref)
 	  (sgml-parse-comment))))
 
-(defun sgml-parse-ds ()
+(defsubst sgml-parse-ds ()
 ;71  ds   = 5 s | EE | 60+ parameter entity reference
 ;         | 91 comment declaration
 ;         | 44 processing instruction
@@ -2891,7 +2917,10 @@ pointing to start of short ref and point pointing to the end."
        ((eobp) (sgml-pop-entity))
        ((and (or (eq sgml-current-state sgml-cdata)
 		 (eq sgml-current-state sgml-rcdata)))
-	(sgml-skip-cdata))
+	(if (or (sgml-parse-delim "ETAGO" gi)
+		(sgml-is-enabled-net))
+	    (sgml-do-end-tag)
+	  (sgml-skip-cdata)))
        ((and sgml-current-shortmap
 	     (or (setq tem (sgml-deref-shortmap sgml-current-shortmap
 						(eq (point)
