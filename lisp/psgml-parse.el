@@ -134,17 +134,17 @@ Tested by sgml-close-element to see if the parse should be ended.")
 
 (let ((i 0))
   (while (< i 256)
-    (modify-syntax-entry i "-" sgml-parser-syntax)
+    (modify-syntax-entry i " " sgml-parser-syntax)
     (setq i (1+ i))))
 
-(mapconcat (lambda (c)
-	     (modify-syntax-entry c "w" sgml-parser-syntax))
+(mapconcat (function (lambda (c)
+	     (modify-syntax-entry c "w" sgml-parser-syntax)))
 	   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrtsuvwxyz" "")
-(mapconcat (lambda (c)
-	     (modify-syntax-entry c "_" sgml-parser-syntax))
+(mapconcat (function (lambda (c)
+		       (modify-syntax-entry c "_" sgml-parser-syntax)))
 	   "-.0123456789" "")
-(mapconcat (lambda (c)
-	     (modify-syntax-entry c "." sgml-parser-syntax))
+(mapconcat (function (lambda (c)
+		       (modify-syntax-entry c "." sgml-parser-syntax)))
 	   "</>&%#[]" ".")
 
 ;;(progn (set-syntax-table sgml-parser-syntax) (describe-syntax))
@@ -340,8 +340,7 @@ If this is not possible, but all DFAS are final, move by TOKEN in NEXT."
 	  (allfinal (sgml-get-move next token)))))
 
 (defsubst sgml-tokens-of-moves (moves)
-  (mapcar (lambda (m)
-	    (sgml-move-token m))
+  (mapcar (function (lambda (m) (sgml-move-token m)))
 	  moves))
 
 (defun sgml-required-tokens (state)
@@ -1138,11 +1137,11 @@ remove it if it is showing."
 	 (char-to-string c))))
 
 (defun sgml-transliterate-file (string)
-  (mapconcat (lambda (c)
-	       (char-to-string
-		(or (cdr-safe (assq c sgml-public-transliterations))
-		    c)))
-	   string ""))
+  (mapconcat (function (lambda (c)
+			 (char-to-string
+			  (or (cdr-safe (assq c sgml-public-transliterations))
+			      c))))
+	     string ""))
 
 (defun sgml-pub-expand (s parts)
   (loop for i from 0 to (1- (length s))
@@ -1981,7 +1980,7 @@ Returns parse tree; error if no element after POS."
   (cond ((and sgml-buffer-element-map
 	      (not (eq sgml-current-state sgml-any)))
 	 (let ((tab
-		(mapcar (lambda (x) (cons (symbol-name x) nil))
+		(mapcar (function (lambda (x) (cons (symbol-name x) nil)))
 			(sgml-current-list-of-valid-elements))))
 	   (cond ((null tab)
 		  (error "No element valid at this point"))
@@ -2310,13 +2309,15 @@ is determined."
   (sgml-parse-to-here)
   (cond ((or (sgml-model-group-p sgml-current-state)
 	     (eq sgml-current-state sgml-any))
-	 (mapcar (lambda (x) (cons x x)) (sgml-current-list-of-valid-tags)))
+	 (mapcar (function (lambda (x) (cons x x)))
+		 (sgml-current-list-of-valid-tags)))
 	(t
 	 (sgml-message "%s" sgml-current-state)
 	 nil)))
 
 (defun sgml-name-of (tag)
   "Name of tag"
+  (and (listp tag) (setq tag (car tag)))
   (substring tag
 	     (if (eq (aref tag 1) ?/) 2 1)
 	     -1))
@@ -2360,23 +2361,8 @@ is left after the inserted tag(s), unless the element has som required
 content.  If sgml-leave-point-after-insert is nil the point is left
 after the first tag inserted."
   (interactive "e")
-  (or event (setq event (list '(0 0) (selected-frame))))
-  (let (start end)
-    (cond				;*** can I use sgml-mouse-region ?
-     ((and (or sgml-tag-region-if-active
-	       transient-mark-mode)
-	   mark-active)
-      (setq start (region-beginning)
-	    end (region-end)))
-     ((and mouse-secondary-overlay
-	   (eq (current-buffer)
-	       (overlay-buffer mouse-secondary-overlay)))
-      (setq start (overlay-start mouse-secondary-overlay)
-	    end (overlay-end mouse-secondary-overlay))
-      (delete-overlay mouse-secondary-overlay)))
-    (when start
-      (goto-char start))
-    (sgml-ask-and-insert-tags event nomenu start end)))
+  (let ((end (sgml-mouse-region)))
+    (sgml-ask-and-insert-tags event nomenu (point) end)))
 
 (defun sgml-ask-and-insert-tags (event &optional nomenu start end)
   (let* ((tab (sgml-completion-table))
@@ -2479,8 +2465,7 @@ after the first tag inserted."
 (defun sgml-entities-menu (event)
   (interactive "e")
   (sgml-need-dtd)
-  (let ((menu (mapcar (lambda (x)
-			(cons x x))
+  (let ((menu (mapcar (function (lambda (x) (cons x x)))
 		      sgml-buffer-entities))
 	choice)
     (unless menu
@@ -2925,6 +2910,10 @@ elements with omitted end tags."
 ;;;; SGML mode: TAB completion
 
 (defun sgml-complete ()
+  "Complete the word/tag/entity before point.
+If it is a tag (starts with < or </) complete with valid tags.
+If it is a entity (starts with &) complete with declared entities.
+If it is something else complete with ispell-complete-word."
   (interactive)
   (let ((tab nil)
 	(pattern nil)
@@ -2951,12 +2940,11 @@ elements with omitted end tags."
 	  (t
 	   (goto-char here)
 	   (ispell-complete-word)))
-    (message "Tab=%s" tab)
     (when tab
       (setq tab (mapcar
-		 (lambda (x)
-		   (cons (if (symbolp x) (symbol-name x) x)
-			 nil))
+		 (function (lambda (x)
+			     (cons (if (symbolp x) (symbol-name x) x)
+				   nil)))
 		 tab))
       (let ((completion (try-completion pattern tab)))
 	(cond ((null completion)
@@ -3022,44 +3010,46 @@ elements with omitted end tags."
        (maxlen 1)
        menu1 menu2
        chooice)
-    (mapcar (lambda (entry)
-	      (setq maxlen (max maxlen (length (car entry)))))
+    (mapcar (function (lambda (entry)
+			(setq maxlen (max maxlen (length (car entry))))))
 	    options)
     (setq menu1
 	  (cons
 	   "-- Options --"
 	   (mapcar
-	    (lambda (entry)
-	      (cons (concat (car entry)
-			    (make-string (- maxlen (length (car entry))) ? )
-			    "  "
-			    (if (eval (cdr entry)) "v/" ""))
-		    (cdr entry)))
+	    (function
+	     (lambda (entry)
+	       (cons (concat (car entry)
+			     (make-string (- maxlen (length (car entry))) ? )
+			     "  "
+			     (if (eval (cdr entry)) "v/" ""))
+		     (cdr entry))))
 	    options)))
     (setq menu2
 	  (cons
 	   "-- Indent step --"
 	   (mapcar
-	    (lambda (entry)
-	      (cons (format "%-6s%s"
-			    (car entry)
-			    (if (eq sgml-indent-step (cdr entry))
-				"v/" ""))
-		    (cons 'sgml-indent-step (cdr entry))))
+	    (function
+	     (lambda (entry)
+	       (cons (format "%-6s%s"
+			     (car entry)
+			     (if (eq sgml-indent-step (cdr entry))
+				 "v/" ""))
+		     (cons 'sgml-indent-step (cdr entry)))))
 	    indents)))
     (setq chooice (x-popup-menu event (list "hepp" menu1 menu2)))
     (let (var val)
-    (cond
-     ((consp chooice)
-      (setq var (car chooice)
-	    val (cdr chooice)))
-     (chooice
-      (setq var chooice
-	    val (not (symbol-value var)))))
-    (when var
-      (make-local-variable var)
-      (set var val)
-      (message "%s set to %s" var val)))))
+      (cond
+       ((consp chooice)
+	(setq var (car chooice)
+	      val (cdr chooice)))
+       (chooice
+	(setq var chooice
+	      val (not (symbol-value var)))))
+      (when var
+	(make-local-variable var)
+	(set var val)
+	(message "%s set to %s" var val)))))
 
 ;;;; Debugging
 
@@ -3110,4 +3100,4 @@ elements with omitted end tags."
 
 
 (provide 'psgml-parse)
-;;; psgml-parse.el end here
+;;; psgml-parse.el ends here
