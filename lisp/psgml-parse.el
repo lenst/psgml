@@ -1562,7 +1562,7 @@ in any of them."
 
 (defun sgml-general-case (string)
   (if sgml-current-namecase-general
-      (downcase string)
+      (upcase string)
     string))
 
 (defmacro sgml-entity-case (string)   string)
@@ -3497,14 +3497,14 @@ Assumes starts with point inside a markup declaration."
       (push (sgml-check-name)
 	    status))
     (cond
-     ((member "ignore" status)
+     ((member "IGNORE" status)
       (sgml-skip-marked-section)
       (sgml-set-markup-type 'ignored))
-     ((or (member "cdata" status)
-	  (member "rcdata" status))
+     ((or (member "CDATA" status)
+	  (member "RCDATA" status))
       (when sgml-signal-data-function
 	(funcall sgml-signal-data-function))
-      (let ((type (if (member "cdata" status) sgml-cdata sgml-rcdata)))
+      (let ((type (if (member "CDATA" status) sgml-cdata sgml-rcdata)))
 	(sgml-do-data type t)
       (sgml-set-markup-type type)))
      (t
@@ -3576,11 +3576,11 @@ dtd or `ignore' if the declaration is to be ignored."
       (let* ((tok (sgml-parse-nametoken))
 	     (rut (assoc (sgml-check-case tok) sgml-markup-declaration-table)))
 	(when (and (not (memq option '(prolog ignore)))
-		   (member tok '("sgml" "doctype")))
+		   (member tok '("SGML" "DOCTYPE")))
 	  (sgml-error "%s declaration is only valid in prolog" tok))
 	(when (and (not (memq option '(dtd ignore)))
-		   (member tok '("element" "entity" "attlist" "notation" 
-				 "shortref")))
+		   (member tok '("ELEMENT" "ENTITY" "ATTLIST" "NOTATION" 
+				 "SHORTREF")))
 	  (sgml-error "%s declaration is only valid in doctype" tok))
 	(cond ((eq option 'ignore)
 	       (sgml-skip-upto-mdc))
