@@ -50,29 +50,44 @@ into several panes.")
 	      (vector (car ent)
 		      (list 'setq 'value (list 'quote (cdr ent)))
 		      t)))
+  (cond ((> (length entries) sgml-max-menu-size)
+	 (setq entries
+	       (loop for i from 1 while entries collect
+		     (let ((submenu
+			    (subseq entries 0 (min (length entries)
+						   sgml-max-menu-size))))
+		       (setq entries (nthcdr sgml-max-menu-size
+					     entries))
+		       (cons
+			(format "%s '%s'-'%s'"
+				title
+				(sgml-range-indicator (aref (car submenu) 0))
+				(sgml-range-indicator
+				 (aref (car (last submenu)) 0)))
+			submenu))))))
+  (sgml-lucid-get-popup-value (cons title entries)))
+
+
+(defun sgml-range-indicator (string)
+  (substring string
+	     0
+	     (min (length string) sgml-range-indicator-max-length)))
+
+
+(defun sgml-lucid-get-popup-value (menudesc)
   (let ((value nil)
-	(event nil)
-	(menudesc
-	 (cons
-	  title
-	  (if (> sgml-max-menu-size (length entries))
-	      entries
-	    (let* ((n (1+ (/ (1- (length entries)) sgml-max-menu-size)))
-		   (l (1+ (/ (1- (length entries)) n))))
-	      (loop for i from 1 while entries collect
-		    (prog1 (cons
-			    (format "%s %d" title i)
-			    (subseq entries 0 (min l (length entries))))
-		      (setq entries (nthcdr l entries)))))))))
+	(event nil))
     (popup-menu menudesc)
     (while (popup-menu-up-p)
       (setq event (next-command-event event))
-      (cond ((and (menu-event-p event)
-		  (or (eq (event-object event) 'abort)
-		      (eq (event-object event) 'menu-no-selection-hook)))
-	     (signal 'quit nil))
-	    ((menu-event-p event)
-	     (eval (event-object event)))
+      (cond ((menu-event-p event)
+	     (cond
+	      ((eq (event-object event) 'abort)
+	       (signal 'quit nil))
+	      ((eq (event-object event) 'menu-no-selection-hook)
+	       nil)
+	      (t
+	       (eval (event-object event)))))
 	    ((button-release-event-p event) ; don't beep twice
 	     nil)
 	    (t
@@ -80,53 +95,19 @@ into several panes.")
 	     (message "please make a choice from the menu."))))
     value))
 
-(defun sgml-fix-x-menu (menudesc)
-  "Take a menu for x-popup-menu and return a lucid menu."
-  (cons (car menudesc)			; title
-	(mapcar (function
-		 (lambda (item)
-		   ;; item is (string . value) or string
-		   (if (stringp item)
-		       item
-		     (vector (car item)
-			     (list 'quote (cdr item))
-			     t))))
-		(cdr menudesc))))
-
-
-(defun x-popup-menu (pos menudesc)
-  "My hacked up function to do a blocking popup menu..."
-  (let ((echo-keystrokes 0)
-	event menu)
-    (cond
-     ((stringp (car menudesc))		; deck of meues
-      (setq menu (if (null (cddr menudesc)) ; only one menu
-		     (sgml-fix-x-menu (cadr menudesc))
-		   (cons (car menudesc)
-			 (mapcar (function sgml-fix-x-menu)
-				 (cdr menudesc))))))
-     ((listp (car menudesc))		; deck of keymaps
-      (error "NIY"))
-     (t					; keymap
-      (error "NIY")))
-    (popup-menu menu)
-    (cadr
-     (catch 'popup-done
-       (while (popup-menu-up-p)
-	 (setq event (next-command-event event))
-	 (cond ((and (menu-event-p event)
-		     (eq 'quote (car-safe (event-object event))))
-		(throw 'popup-done (event-object event)))
-	       ((and (menu-event-p event)
-		     (or (eq (event-object event) 'abort)
-			 (eq (event-object event) 'menu-no-selection-hook)))
-		(signal 'quit nil))
-	       ((button-release-event-p event) ; don't beep twice
-		nil)
-	       (t
-		(beep)
-		(message "please make a choice from the menu."))))))))
-
+(defun sgml-popup-multi-menu (pos title menudesc)
+  "Display a popup menu.
+MENUS is a list of menus on the form (TITLE ITEM1 ITEM2 ...).
+ITEM should have to form (STRING EXPR) or STRING.  The EXPR gets evaluated
+if the item is selected."
+  (popup-menu
+   (cons title
+	 (loop for menu in menudesc collect
+	       (cons (car menu)		; title
+		     (loop for item in (cdr menu) collect
+			   (if (stringp item)
+			       item
+			     (vector (car item) (cadr item) t))))))))
 
 
 ;;;; Lucid menu bar

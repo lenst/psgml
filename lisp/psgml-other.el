@@ -51,6 +51,7 @@ into several panes.")
   '("DTD"
     ["Parse DTD"  sgml-parse-prolog t]
     ("Info"
+     ["General DTD info"	sgml-general-dtd-info           t]
      ["Describe element type"	sgml-describe-element-type	t]
      ["Describe entity"		sgml-describe-entity		t]
      ["List elements" 		sgml-list-elements 		t]
@@ -301,10 +302,10 @@ into several panes.")
 
 ;;;; Pop Up Menus
 
-(defvar sgml-range-indicator-max-length 9)
-
 (defun sgml-popup-menu (event title entries)
-  "Display a popup menu."
+  "Display a popup menu.
+ENTRIES is a list where every element has the form (STRING . VALUE) or
+STRING."
   (x-popup-menu
    event
    (let ((menus (list (cons title entries))))
@@ -319,7 +320,7 @@ into several panes.")
 			  (setq entries (nthcdr sgml-max-menu-size
 						entries))
 			  (cons
-			   (format "%s '%s-%s'"
+			   (format "%s '%s'-'%s'"
 				   title
 				   (sgml-range-indicator (caar submenu))
 				   (sgml-range-indicator (caar (last submenu))))
@@ -330,6 +331,15 @@ into several panes.")
   (substring string
 	     0
 	     (min (length string) sgml-range-indicator-max-length)))
+
+(defun sgml-popup-multi-menu (event title menus)
+  "Display a popup menu.
+MENUS is a list of menus on the form (TITLE ITEM1 ITEM2 ...).
+ITEM should have to form (STRING EXPR) or STRING.  The EXPR gets evaluated
+if the item is selected."
+  (eval (car (x-popup-menu event (cons title menus)))))
+
+
 
 ;;;; Build Custom Menus
 
@@ -411,30 +421,32 @@ The entries are added last in keymap and a blank line precede it."
 	o)
     (while current
       (cond ((and (null o)
-		  (eq type (overlay-get (car current) 'type)))
+		  (eq type (overlay-get (car current) 'sgml-type)))
 	     (setq o (car current)))
-	    ((overlay-get (car current) 'type)
+	    ((overlay-get (car current) 'sgml-type)
 	     (delete-overlay (car current))))
       (setq current (cdr current)))
     (while (< (setq pos (next-overlay-change pos))
 	      end)
       (setq current (overlays-at pos))
       (while current
-	(when (overlay-get (car current) 'type)
+	(when (overlay-get (car current) 'sgml-type)
 	  (delete-overlay (car current)))
 	(setq current (cdr current))))
     (cond (o
-	   (move-overlay o start end))
+	   (move-overlay o start end)
+	   (if (null (overlay-get o 'face))
+	       (overlay-put o 'face face)))
 	  (face
 	   (setq o (make-overlay start end))
-	   (overlay-put o 'type type)
+	   (overlay-put o 'sgml-type type)
 	   (overlay-put o 'face face)))))
 
 (defun sgml-set-face-after-change (start end &optional pre-len)
   (when sgml-set-face
     (loop for o in (overlays-at start)
 	  do (cond
-	      ((not (overlay-get o 'type)))
+	      ((not (overlay-get o 'sgml-type)))
 	      ((= start (overlay-start o))
 	       (move-overlay o end (overlay-end o)))))))
 
@@ -443,7 +455,7 @@ The entries are added last in keymap and a blank line precede it."
 (defun sgml-clear-faces ()
   (interactive)
   (loop for o being the overlays
-	if (overlay-get o 'type)
+	if (overlay-get o 'sgml-type)
 	do (delete-overlay o)))
 
 

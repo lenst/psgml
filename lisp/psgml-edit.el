@@ -432,21 +432,24 @@ is determined."
   (sgml-parse-to-here)
   (let ((model (sgml-element-model sgml-current-tree)))
     (with-output-to-temp-buffer "*Tags*"
-      (princ (format "Current element: %s\n"
-		     (sgml-element-name sgml-current-tree)))
-      (cond ((or (sgml-current-mixed-p)
-		 (eq model sgml-any))
-	     (princ "Current element has mixed content")
-	     (when (eq model sgml-any)
-	       (princ " [ANY]"))
-	     (terpri))
-	    ((sgml-model-group-p model)
-	     (princ "Current element has element content\n"))
-	    (t
-	     (princ (format "Current element has declared content: %s\n"
-			    model))))
+      (princ (format "Current element: %s  %s\n"
+		     (sgml-element-name sgml-current-tree)
+		     (if (sgml-eltype-defined
+			  (sgml-element-eltype sgml-current-tree))
+			 ""
+		       "[UNDEFINED]")))
+      (princ (format "Element content: %s  %s\n"
+		     (cond ((or (sgml-current-mixed-p) (eq model sgml-any))
+			    "mixed")
+			   ((sgml-model-group-p model)
+			    "element")
+			   (t
+			    model))
+		     (if (eq model sgml-any)
+			 "[ANY]" "")))
+      
       (cond ((sgml-final-p sgml-current-state)
-	     (princ "Valid end-tags: ")
+	     (princ "Valid end-tags : ")
 	     (loop for e in (sgml-current-list-of-endable-eltypes)
 		   do (princ (sgml-end-tag-of e)) (princ " "))
 	     (terpri))
@@ -845,37 +848,46 @@ after the first tag inserted."
     (cond
      ((eq sgml-markup-type 'start-tag)
       (sgml-attrib-menu event))
-     (end
-      (sgml-tag-region (sgml-menu-ask event 'element) (point) end))
-     (sgml-balanced-tag-edit
-      (sgml-insert-element (sgml-menu-ask event 'element)))
      (t
-      (sgml-insert-tag (sgml-menu-ask event 'tags))))))
+      (let ((what
+	     (sgml-menu-ask event (if (or end sgml-balanced-tag-edit)
+				  'element 'tags))))
+	(cond
+	 ((null what))
+	 (end
+	  (sgml-tag-region what (point) end))
+	 (sgml-balanced-tag-edit
+	  (sgml-insert-element what))
+	 (t
+	  (sgml-insert-tag what))))))))
 
 (defun sgml-element-menu (event)
   "Pop up a menu with valid elements and insert choice.
 If sgml-leave-point-after-insert is nil the point is left after the first 
 tag inserted."
   (interactive "*e")
-  (sgml-insert-element (sgml-menu-ask event 'element)))
+  (let ((what (sgml-menu-ask event 'element)))
+    (and what (sgml-insert-element what))))
 
 (defun sgml-start-tag-menu (event)
   "Pop up a menu with valid start-tags and insert choice."
   (interactive "*e")
-  (sgml-insert-tag (sgml-menu-ask event 'start-tag)))
+  (let ((what (sgml-menu-ask event 'start-tag)))
+    (and what (sgml-insert-tag what))))
 
 (defun sgml-end-tag-menu (event)
   "Pop up a menu with valid end-tags and insert choice."
   (interactive "*e")
-  (sgml-insert-tag (sgml-menu-ask event 'end-tag)))
+  (let ((what (sgml-menu-ask event 'end-tag)))
+    (and what (sgml-insert-tag what))))
 
 (defun sgml-tag-region-menu (event)
   "Pop up a menu with valid elements and tag current region with the choice."
   (interactive "*e")
-  (sgml-tag-region (sgml-menu-ask event 'element)
-		   (region-beginning)
-		   (region-end)))
-
+  (let ((what (sgml-menu-ask event 'element)))
+    (and what (sgml-tag-region what
+			       (region-beginning)
+			       (region-end)))))
 
 (defun sgml-menu-ask (event type)
   (sgml-parse-to-here)
@@ -904,7 +916,7 @@ tag inserted."
 		      title
 		      (mapcar (function (lambda (x) (cons x x)))
 			      tab))
-     (signal 'quit nil))))
+     (message nil))))
 
 (defun sgml-entities-menu (event)
   (interactive "*e")
@@ -954,42 +966,38 @@ buffers local variables list."
 	 tokens menu other)
     (or attlist
 	(error "No non-fixed attributes for element"))
-    (loop for attdecl in attlist
-	  do (setq tokens
-		   (or (sgml-declared-value-token-group
-			(sgml-attdecl-declared-value attdecl))
-		       (sgml-declared-value-notation
-			(sgml-attdecl-declared-value attdecl))))
-	  (cond
-	   (tokens
-	    (push (cons
-		   (sgml-attdecl-name attdecl)
-		   (nconc
-		    (loop for val in tokens collect			  
-			  (cons val (cons (sgml-attdecl-name attdecl)
-					  val)))
-		    (if (sgml-default-value-type-p
-			 'implied (sgml-attdecl-default-value attdecl))
-			(list ""
-			      (list "#IMPLIED" (sgml-attdecl-name attdecl))))))
-		  menu))
-	   (t;; No tokens
-	    (push (cons (sgml-attdecl-name attdecl)
-			(cons (sgml-attdecl-name attdecl) t))
-		  other))))
-    (setq menu (cons "Attributes"
-		     (nconc menu
-			    (if other
-				(list (cons "Other Attributes" other))))))
-    (let ((result (x-popup-menu event menu)))
-      (and result
-	   (sgml-insert-attribute
-	    (car result)
-	    (if (eq t (cdr result))
-		(sgml-read-attribute-value
-		 (sgml-lookup-attdecl (car result) attlist)
-		 (sgml-element-attval el (car result)))
-	      (cdr result)))))))
+    (setq menu
+	  (loop for attdecl in attlist
+		for name = (sgml-attdecl-name attdecl)
+		for defval = (sgml-attdecl-default-value attdecl)
+		for tokens = (or (sgml-declared-value-token-group
+				  (sgml-attdecl-declared-value attdecl))
+				 (sgml-declared-value-notation
+				  (sgml-attdecl-declared-value attdecl)))
+		collect
+		(cons
+		 (sgml-attdecl-name attdecl)
+		 (nconc
+		  (if tokens
+		      (loop for val in tokens collect
+			    (list val
+				  (list 'sgml-insert-attribute name val)))
+		    (list
+		     (list "Set attribute value"
+			   (list 'sgml-insert-attribute
+				 (sgml-attdecl-name attdecl) 
+				 (list 'sgml-read-attribute-value
+				       (list 'quote attdecl)
+				       (sgml-element-attval el name))))))
+		  (if (sgml-default-value-type-p 'required defval)
+		      nil
+		    (list "--"
+			  (list (if (sgml-default-value-type-p nil defval)
+				    (format "Default: %s"
+					    (sgml-default-value-attval defval))
+				  "#IMPLIED")
+				(list 'sgml-insert-attribute name nil))))))))
+    (sgml-popup-multi-menu event "Attributes" menu)))
 
 ;;;; SGML mode: Fill 
 
