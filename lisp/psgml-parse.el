@@ -1,7 +1,7 @@
 ;;;; psgml-parse.el --- Parser for SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1994 Lennart Staflin
+;; Copyright (C) 1994, 1995 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Acknowledgment:
@@ -715,6 +715,23 @@ If ATTSPEC is nil, nil is returned."
 (defconst sgml-any 'ANY)
 
 
+;;;; External identifier
+;; extid = (pubid? sysid?)
+;; *** extend to include default-directory
+;; Representation as (pubid . sysid)
+;; where pubid = nil | string
+;;       sysid = nil | string
+
+(defun sgml-make-extid (pubid sysid)
+  (cons pubid sysid))
+
+(defun sgml-extid-pubid (extid)
+  (car extid))
+
+(defun sgml-extid-sysid (extid)
+  (cdr extid))
+
+
 ;;;; DTD 
 
 ;; DTD = (doctype, eltypes, parameters, entities, shortmaps,
@@ -746,6 +763,8 @@ If ATTSPEC is nil, nil is returned."
   (dependencies				; LIST
    nil)
   (merged				; (file . DTD)
+   nil)
+  (undef-entities			; LIST of entity names
    nil))
 
 
@@ -1587,9 +1606,11 @@ in any of them."
 	     t)))
 
 (defun sgml-skip-cs ()
-  "Skip over the separator used in the catalog."
+  "Skip over the separator used in the catalog.
+Return true if not at the end of the buffer."
   (while (or (sgml-parse-s)
-	     (sgml-parse-comment))))
+	     (sgml-parse-comment)))
+  (not (eobp)))
 
 (defsubst sgml-skip-ps ()
   "Move point forward stopping before a char that isn't a parameter separator."
@@ -1687,12 +1708,16 @@ a RNI must be followed by NAME."
      (token
       (sgml-skip-ps)
       (cond ((member token '("public" "system"))
-	     (cons
-	      (if (string-equal token "public")
-		  (or (sgml-parse-minimum-literal) ; the public id
-		      (sgml-parse-error "Public identifier expected")))	;
-	      (progn (sgml-skip-ps)
-		     (sgml-parse-literal)))) ; the system id
+	     (let* ((pubid		; the public id
+		     (if (string-equal token "public")
+			 (or (sgml-parse-minimum-literal)
+			     (sgml-parse-error "Public identifier expected"))))
+		    (sysid		; the system id
+		     (progn (sgml-skip-ps)
+			    (sgml-parse-literal))))
+	       (when sysid		;*** also avoid special sysids
+		 (setq sysid (expand-file-name sysid)))
+	       (sgml-make-extid pubid sysid)))
 	    (t
 	     (goto-char p)
 	     nil))))))
@@ -1722,6 +1747,9 @@ a RNI must be followed by NAME."
   "True if ENTITY is a data entity, that is not a text entity."
   (not (eq (sgml-entity-type entity) 'text)))
 
+(defun sgml-entity-marked-undefined-p (entity)
+  (cdddr entity))
+
 (defun sgml-entity-insert-text (entity &optional ptype)
   "Insert the text of ENTITY.
 PTYPE can be 'param if this is a parameter entity."
@@ -1730,10 +1758,13 @@ PTYPE can be 'param if this is a parameter entity."
      ((stringp text)
       (insert text))
      (t
-      (sgml-insert-external-entity text
+      (unless (sgml-insert-external-entity text
 				   (or ptype
 				       (sgml-entity-type entity))
-				   (sgml-entity-name entity))))))
+				   (sgml-entity-name entity))
+	;; Mark entity as not found
+	(setcdr (cddr entity) t)	;***
+	)))))
 
 (defun sgml-entity-file (entity &optional ptype)
   (sgml-external-file (sgml-entity-text entity)
@@ -1812,28 +1843,46 @@ repreaentation of the catalog."
   "Look up the public identifier/entity name in catalogs.
 FILES is a list of catalogs to use. PUBID is the public identifier
 \(if any). TYPE is the entity type and NAME is the entity name."
-  (loop for f in files thereis
-	(let ((cat (sgml-cache-catalog f 'sgml-catalog-assoc
-				       (function sgml-parse-catalog-buffer))))
-	  (or
-	   ;; Giv PUBLIC entries priority over ENTITY and DOCTYPE
-	   (loop for (key from to) in cat
-		 thereis (and (eq 'public key)       pubid
-			      (string= pubid from)  (file-readable-p to)
-			      to))
-	   (loop for (key from to) in cat thereis
-		 (and (or (and (eq 'entity key)
-			       name (not (eq type 'dtd))
-			       (string= name from))
-			  (and (eq 'doctype key)
-			       (eq type 'dtd)
-			       (string= name from)))
-		      (file-readable-p to)
-		      to))))))
+  (cond ((eq type 'param)
+	 (setq name (format "%%%s" name)
+	       type 'entity))
+	((eq type 'dtd)
+	 (setq type 'doctype)))
+  
+  (loop
+   for f in files thereis
+   (let ((cat (sgml-cache-catalog f 'sgml-catalog-assoc
+				  (function sgml-parse-catalog-buffer))))
+     (or
+      ;; Giv PUBLIC entries priority over ENTITY and DOCTYPE
+      (if pubid
+	  (loop for (key cname file) in cat
+		thereis (and (eq 'public key)
+			     (string= pubid cname)
+			     (file-readable-p file)
+			     file)))
+      (loop for (key cname file) in cat
+	    thereis (and (eq type key)
+			 (or (null cname)
+			     (string= name cname))
+			 (file-readable-p file)
+			 file))))))
+
+(defun sgml-search-catalog (func filter)
+  (loop
+   for files in (list sgml-local-catalogs sgml-catalog-files)
+   thereis
+   (loop for file in files thereis
+	 (loop for entry in (sgml-cache-catalog
+			     file 'sgml-catalog-assoc
+			     (function sgml-parse-catalog-buffer))
+	       when (or (null filter)
+			(memq (car entry) filter))
+	       thereis (funcall func entry)))))
 
 (defun sgml-path-lookup (extid type name)
-  (let* ((pubid (car extid))
-	 (sysid (cdr extid))
+  (let* ((pubid (sgml-extid-pubid extid))
+	 (sysid (sgml-extid-sysid extid))
 	 (subst (list '(?% ?%))))
     (when pubid
       (nconc subst (list (cons ?p (sgml-transliterate-file pubid)))
@@ -1859,11 +1908,14 @@ FILES is a list of catalogs to use. PUBID is the public identifier
 Optional argument TYPE should be the type of entity and NAME should be
 the entity name."
   ;; extid is (pubid . sysid)
-  (let ((pubid (car extid)))
+  (let ((pubid (sgml-extid-pubid extid)))
     (when pubid (setq pubid (sgml-canonize-pubid pubid)))
-    (or (sgml-lookup-sysid-as-file (cdr extid))
+    (or (if sgml-system-identifiers-are-preferred
+	    (sgml-lookup-sysid-as-file (sgml-extid-sysid extid)))
 	(sgml-catalog-lookup sgml-current-localcat pubid type name)
 	(sgml-catalog-lookup sgml-catalog-files pubid type name)
+	(if (not sgml-system-identifiers-are-preferred)
+	    (sgml-lookup-sysid-as-file (sgml-extid-sysid extid)))
 	(sgml-path-lookup extid type name))))
 
 (defun sgml-lookup-sysid-as-file (sysid)
@@ -1876,10 +1928,10 @@ the entity name."
 (defun sgml-insert-external-entity (extid &optional type name)
   "Insert the contents of an external entity at point.
 EXTID is the external identifier of the entity. Optional arguments TYPE
-is the entity type and NAME is the entity name, used to find the entity."
-  ;; extid is (pubid . sysid)
-  (let* ((pubid (car extid))
-	 (sysid (cdr extid)))
+is the entity type and NAME is the entity name, used to find the entity.
+Returns nil if entity is not found."
+  (let* ((pubid (sgml-extid-pubid extid))
+	 (sysid (sgml-extid-sysid extid)))
     (or (if sysid
 	    (loop for fn in sgml-sysid-resolve-functions
 		  thereis (funcall fn sysid)))
@@ -1890,39 +1942,39 @@ is the entity type and NAME is the entity name, used to find the entity."
 	  (when pubid
 	    (sgml-log-warning "  Public identifier %s" pubid))
 	  (when sysid
-	    (sgml-log-warning "  System identfier %s" sysid))))))
+	    (sgml-log-warning "  System identfier %s" sysid))
+	  nil))))
 
 
 ;; Parse a buffer full of catalogue entries.
 (defun sgml-parse-catalog-buffer ()
   "Parse all entries in a catalogue."
-  (let (type name sysid map)
-    (while (progn (sgml-skip-cs)
-		  (setq type (sgml-parse-nametoken)))
-      (setq type (intern (downcase type)))
-      (sgml-skip-cs)
-      (cond
-					; Public identifier.
-       ((eq type 'public)
-	(setq name (sgml-canonize-pubid (sgml-check-minimum-literal))))
-					; Entity reference.
-       ((eq type 'entity)
-	(if (sgml-parse-char ?%)
-	    (setq type 'pentity))
-	(setq name (sgml-check-name t)))
-					; Document type.
-       ((eq type 'doctype)
-	(setq name (sgml-check-name)))
-					; Oops!
-       (t
-	(error "Error in catalog file: \"%s\" should be \"PUBLIC\", \"ENTITY\", or \"DOCTYPE\"." type)))
-       
-      (sgml-skip-cs)
-      (setq sysid (expand-file-name (sgml-check-cat-literal)))
-      (setq map (nconc map (list (list type name sysid)))))
-    map))
+  (loop
+   while (sgml-skip-cs)
+   for type = (downcase (sgml-check-cat-literal))
+   for class = (cdr (assoc type '(("public" . public) ("dtddecl" . public)
+				  ("entity" . name)   ("linktype" . name)
+				  ("doctype" . name)  ("sgmldecl" . noname)
+				  ("document" . noname))))
+   when (not (null class))
+   collect
+   (let* ((name
+	   (cond ((eq class 'public)
+		  (sgml-skip-cs)
+		  (sgml-canonize-pubid (sgml-check-minimum-literal)))
+		 ((string= type "doctype")
+		  (sgml-general-case (sgml-check-cat-literal)))
+		 ((eq class 'name)
+		  (sgml-entity-case (sgml-check-cat-literal)))))
+	  (file
+	   (expand-file-name (sgml-check-cat-literal))))
+     (list (intern type) name file))))
+
 
 (defun sgml-check-cat-literal ()
+  "Read the next catalog token.
+Skips any leading spaces/comments."
+  (sgml-skip-cs)
   (or (sgml-parse-literal)
       (buffer-substring (point)
 			(progn (skip-chars-forward "^ \r\n\t")
@@ -1999,6 +2051,28 @@ is the entity type and NAME is the entity name, used to find the entity."
 	    (numberp res))
 	(substring string (match-beginning n)
 		   (match-end n)))))
+
+;;;; Files for SGML declaration and DOCTYPE declaration
+
+(defun sgml-declaration ()
+  (or sgml-declaration
+      (if sgml-doctype
+	  (sgml-in-file-eval sgml-doctype
+			     '(sgml-declaration)))
+      (if sgml-parent-document
+	  (sgml-in-file-eval (car sgml-parent-document)
+			     '(sgml-declaration)))
+      ;; *** check for sgmldecl comment
+      (sgml-external-file nil 'sgmldecl)
+      )
+  )
+
+(defun sgml-in-file-eval (file expr)
+  (let ((cb (current-buffer)))
+    (set-buffer (find-file-noselect file))
+    (prog1 (eval expr)
+      (set-buffer cb))))
+
 
 ;;;; Entity references and positions
 
@@ -2226,6 +2300,7 @@ overrides the entity type in entity look up."
 	    0))
     (cond
      ((stringp entity)			; a file name
+      (setq default-directory (file-name-directory entity))
       (save-excursion (insert-file-contents entity)))
      ((and sgml-parsing-dtd
 	   (consp (sgml-entity-text entity))) ; external id?
@@ -2239,6 +2314,7 @@ overrides the entity type in entity look up."
 	 (file
 	  ;; fifth arg not available in early v19
 	  (erase-buffer)
+	  (setq default-directory (file-name-directory file))
 	  (insert-file-contents file nil nil nil)
 	  (goto-char (point-min))
 	  (push file (sgml-dtd-dependencies sgml-dtd-info)))
@@ -3373,30 +3449,69 @@ VALUE is a string.  Returns nil or an attdecl."
     (setq sgml-auto-fill-inhibit-function (function sgml-in-prolog-p))
     (if sgml-default-dtd-file
 	(sgml-load-dtd sgml-default-dtd-file)
-      (let ((buf (and sgml-parent-document
-		      (find-file-noselect (if (consp sgml-parent-document)
-					      (car sgml-parent-document)
-					    sgml-parent-document)))))
-	(if (or (null buf) (eq buf (current-buffer)))
-	    (save-excursion (sgml-parse-prolog))
-	  ;; get DTD from parent document
-	  (let (dtd)
-	    (save-excursion
-	      (set-buffer buf)
-	      (sgml-need-dtd)
-	      (setq dtd (sgml-pstate-dtd sgml-buffer-parse-state)))
-	    (when (consp sgml-parent-document)
-	      (setq dtd (copy-sgml-dtd dtd))
-	      (let ((doctypename (second sgml-parent-document)))
-		(setf (sgml-dtd-doctype dtd)
-		      (sgml-general-case
-		       (if (symbolp doctypename)
-			   (symbol-name doctypename)
-			  doctypename)))))
-	    (sgml-set-initial-state dtd))))))
+      (sgml-load-doctype)))
   (setq sgml-dtd-info (sgml-pstate-dtd sgml-buffer-parse-state)
 	sgml-top-tree (sgml-pstate-top-tree sgml-buffer-parse-state))
   (sgml-set-global))
+
+
+(defun sgml-load-doctype ()
+  (cond
+   ;; Case of doctype in another file
+   ((or sgml-parent-document sgml-doctype)
+    (let ((dtd
+	   (save-excursion		; get DTD from parent document
+	     (set-buffer (find-file-noselect
+			  (if (consp sgml-parent-document)
+			      (car sgml-parent-document)
+			    (or sgml-doctype sgml-parent-document))))
+	     (sgml-need-dtd)
+	     (sgml-pstate-dtd sgml-buffer-parse-state))))
+      (sgml-set-initial-state dtd)
+      (when (consp sgml-parent-document) ; modify DTD for child documents
+	(sgml-modify-dtd (cdr sgml-parent-document)))))
+   
+   ;; The doctype declaration should be in the current buffer
+   (t
+    (save-excursion (sgml-parse-prolog)))))
+
+
+(defun sgml-modify-dtd (modifier)
+  (setq sgml-dtd-info (sgml-pstate-dtd sgml-buffer-parse-state)
+	sgml-top-tree (sgml-pstate-top-tree sgml-buffer-parse-state))
+  (sgml-set-global)
+
+  (while (stringp (cadr modifier))	; Loop thru the context elements
+    (let ((et (sgml-lookup-eltype (car modifier))))
+      (sgml-open-element et nil (point-min) (point-min))
+      (setq modifier (cdr modifier))))
+
+  (unless (stringp (car modifier))
+    (error "wrong format of sgml-parent-document"))
+
+  (let* ((doctypename (car modifier))
+	 (et (sgml-lookup-eltype
+	      (sgml-general-case (if (symbolp doctypename)
+				     (symbol-name doctypename)
+				   doctypename)))))
+    
+    (setq sgml-current-state
+	  (sgml-make-primitive-content-token et))
+
+    (when (consp (cadr modifier))	; There are "seen" elements
+      (sgml-open-element et nil (point-min) (point-min))
+      (loop for seenel in (cadr modifier)
+	    do (setq sgml-current-state
+		     (sgml-get-move sgml-current-state
+				    (sgml-lookup-eltype seenel))))))
+  
+  (let ((top (sgml-pstate-top-tree sgml-buffer-parse-state)))
+    (setf (sgml-tree-includes top) (sgml-includes))
+    (setf (sgml-tree-excludes top) (sgml-excludes))
+    (setf (sgml-tree-shortmap top) sgml-current-shortmap)
+    (setf (sgml-eltype-model (sgml-tree-eltype top))
+	  sgml-current-state)))
+
 
 (defun sgml-set-global ()
   (setq sgml-current-omittag sgml-omittag
