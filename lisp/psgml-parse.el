@@ -177,9 +177,6 @@ If this is nil, then current entity is main buffer.")
 
 ;; Buffer local variables 
 
-(defvar sgml-buffer-parse-state nil)
-(make-variable-buffer-local 'sgml-buffer-parse-state)
-
 (defvar sgml-document-element nil)
 (make-variable-buffer-local 'sgml-document-element)
 
@@ -1460,17 +1457,14 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	    (sgml-element-gi element)
 	    (sgml-element-context-string (sgml-tree-parent element)))))
 
-;;;; Mode-line DTD and element indicator 
+;;;; Display and Mode-line
 
-(defun sgml-set-live-element-indicator ()
-  ;;*** Bad name for this function.  Now it does some other things too.
-  ;;*** Perhaps this should be a minormode
-  (when (and (eq major-mode 'sgml-mode)
-	     (not (eq this-command 'keyboard-quit))	     )
+(defun sgml-update-display ()
+  (when (not (eq this-command 'keyboard-quit))
     ;; Don't let point be inside an invisible region
     (when (and (get-text-property (point) 'invisible)
 	       (get-text-property (1- (point)) 'invisible))
-      (if (memq this-command '(backward-char previous-line))
+      (if (memq this-command '(backward-char previous-line backward-word))
 	  (goto-char (or (previous-single-property-change (point) 'invisible)
 			 (point-max)))
 	(goto-char (or (next-single-property-change (point) 'invisible)
@@ -1502,7 +1496,6 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	  (error "*error*"))))))
 
 (defun sgml-set-active-dtd-indicator ()
-  (add-hook 'post-command-hook 'sgml-set-live-element-indicator)
   (set (make-local-variable 'sgml-active-dtd-indicator)
        (list (format " [%s" (or sgml-document-element "ANY"))
 	     '(sgml-live-element-indicator ("/" sgml-current-element-name))
@@ -1572,10 +1565,10 @@ or from after TREE if WHERE is after."
 	   (setq sgml-current-state (sgml-element-model sgml-current-tree)
 		 sgml-current-shortmap (sgml-tree-shortmap sgml-current-tree)
 		 sgml-previous-tree nil)
-	   (setq sgml-markup-type (if (and
-				       (not (zerop (sgml-tree-stag-len tree)))
-				       (sgml-bpos-p (sgml-tree-stag-epos tree)))
-				      'start-tag)
+	   (setq sgml-markup-type
+		 (if (and (not (zerop (sgml-tree-stag-len tree)))
+			  (sgml-bpos-p (sgml-tree-stag-epos tree)))
+		     'start-tag)
 		 sgml-markup-start (sgml-element-start sgml-current-tree))
 	   (goto-char (+ sgml-markup-start
 			 (sgml-tree-stag-len sgml-current-tree))))
@@ -2324,10 +2317,11 @@ a RNI must be followed by NAME."
       "}"
       "~")))
 
-(defun sgml-shortref-index (string)
-  (let ((pos (member string sgml-shortref-list))
-        (len (length sgml-shortref-list)))
-    (and pos (- len (length pos))) ))
+(eval-and-compile
+  (defun sgml-shortref-index (string)
+    (let ((pos (member string sgml-shortref-list))
+	  (len (length sgml-shortref-list)))
+      (and pos (- len (length pos))) )))
 
 (defun sgml-make-shortmap (pairs)
   "Create a shortreference map from PAIRS.
@@ -2347,11 +2341,9 @@ Where PAIRS is a list of (delim . ename)."
     ;; can be used to skip over pcdata
     (aset map
 	  (eval-when-compile (length sgml-shortref-list))
-	  (if (some (function (lambda (i) (aref map i)))
-	      (eval-when-compile
-		(mapcar (function sgml-shortref-index)
-			'("\001B\n" "B\n" " " "BB"))
-		))
+	  (if (some (function
+		     (lambda (r) (aref map (sgml-shortref-index r))))
+		    '("\001B\n" "B\n" " " "BB"))
 	      "^<]/& \n\t\"#%'()*+,\\-:;+@[]\\^_{|}~"
 	    "^<]/&\n\t\"#%'()*+,\\-:;+@[]\\^_{|}~"))
     map))
