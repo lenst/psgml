@@ -1451,7 +1451,7 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 ;;;; SGML mode: Hiding tags/attributes
 
 (defconst sgml-tag-regexp
-  "\\(</?>\\|</?[_A-Za-z][---_:A-Za-z0-9.]*\\(\\([^'\"></]\\|'[^']*'\\|\"[^\"]*\"\\)*\\)>?\\)")
+  "\\(</?>\\|</?[_A-Za-z][---_:A-Za-z0-9.]*\\(\\([^'\"></]\\|'[^']*'\\|\"[^\"]*\"\\)*\\)/?>?\\)")
 
 (defun sgml-operate-on-tags (action &optional attr-p)
   (let ((buffer-modified-p (buffer-modified-p))
