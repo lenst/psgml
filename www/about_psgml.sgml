@@ -1,5 +1,5 @@
 <!DOCTYPE HTML  PUBLIC "-//W3C//DTD HTML 4.0//EN"  [
-<!ENTITY last.ed  'Time-stamp: "2002-12-14 12:57:36 lenst"'>
+<!ENTITY last.ed  'Time-stamp: "2004-11-02 11:34:17 lenst"'>
 <!ENTITY rcs.id "$Id$">
 
 <!ENTITY % HTML.Deprecated "IGNORE">
@@ -20,7 +20,7 @@
 <!ENTITY psgml.dir "&ftp.url;pub/sgml/">
 <!ENTITY alpha.dir "&psgml.dir;ALPHA/">
 <!ENTITY psgml1.0.3 "&psgml.dir;psgml-1.0.3.tar.gz">
-<!ENTITY psgml1.2.0 "&psgml.dir;psgml-1.2.0.tar.gz">
+<!ENTITY psgml1.2.0 "psgml-1.2.0.tar.gz">
 <!ENTITY psgml1.2.1 "psgml-1.2.1.tar.gz">
 <!ENTITY psgml1.2.2 "psgml-1.2.2.tar.gz">
 <!ENTITY psgml1.2.3 "psgml-1.2.3.tar.gz">
@@ -36,7 +36,7 @@
 <!ENTITY SGML   "<acronym>SGML</acronym>" >
 <!ENTITY XML    "<acronym>XML</acronym>" >
 
-<?PSGML NOFILL body div pre>
+<?PSGML NOFILL body div pre >
 ]>
 
 <HTML>
@@ -250,7 +250,7 @@ HR.divider { width: 50%; align: center; }
        <td>beta</td>
        <td>XML support</td>
        <td><a href="&base.url;/&psgml1.2.0;">http</a></td>
-       <td><a href="&psgml1.2.0;">ftp</a></td>
+       <td><a href="&psgml.dir;&psgml1.2.0;">ftp</a></td>
       </tr>
       <tr>
        <td>1.0.3</td>
