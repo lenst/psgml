@@ -1,7 +1,7 @@
-This is the READ ME file for psgml.el version 1.2.2.       -*- text -*-
+This is the READ ME file for psgml.el version 1.2.3.       -*- text -*-
 
-This is a BETA release of PSGML. Release 1.2.2 fixes a number of bugs
-in 1.2.1.
+This is a stable release of PSGML. Release 1.2.3 fixes an
+incompatibility with Emacs 21.1.
 
 
 PSGML is a major mode for editing SGML and XML documents.  It works with
@@ -15,7 +15,7 @@ defaults, and structure based editing.
 To install PSGML you first need to uncompress and unpack the source
 archive.  This is done with the `gunzip' and `tar' commands.
 
-     gunzip psgml-1.2.2.tar.gz; tar xf psgml-1.2.2.tar
+     gunzip psgml-1.2.3.tar.gz; tar xf psgml-1.2.3.tar
 
 This should create a subdirectory to the current directory with the
 source code. This directory contains a `configure' command (see the file
@@ -49,4 +49,3 @@ The info file `psgml.info' is created from the texinfo file
 `psgml.texi'.  The texinfo file can also be used to create a hard copy
 of the documentation.  To do this you need the TeX program and a copy of
 `texinfo.tex'.
-
