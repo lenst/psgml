@@ -2734,16 +2734,19 @@ Where the latter represents end-tags."
 	(cond
 	 ;; Test if accepted in state
 	 ((or (eq state sgml-any)
-	      (and (not (memq token (sgml-excludes)))
+	      (and (sgml-model-group-p state)
+		   (not (memq token (sgml-excludes)))
 		   (or (memq token (sgml-includes))
 		       (sgml-get-move state token))))
 	  nil)
 	 ;; Test if end tag implied
-	 ((and (sgml-final-p state)
-	       (not (eq tree sgml-top-tree)))
+	 ((or (eq state sgml-empty)	   
+	      (and (sgml-final-p state)
+		   (not (eq tree sgml-top-tree))))
+	  (unless (eq state sgml-empty)	; not realy implied
+	    (push t imps))
 	  (setq state (sgml-tree-pstate tree)
 		tree (sgml-fake-close-element tree))
-	  (push t imps)
 	  t)
 	 ;; Test if start-tag can be implied
 	 ((and (setq temp (sgml-required-tokens state))
