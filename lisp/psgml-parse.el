@@ -3917,11 +3917,6 @@ Optional argument EXTRA-COND should be a function.  This function is
 called in the parser loop, and the loop is exited if the function returns t.
 If third argument QUIT is non-nil, no \"Parsing...\" message will be displayed."
   (sgml-need-dtd)
-  (unless before-change-function
-    (message "WARN: before-change-function has been lost, restoring (%s)"
-	     (current-buffer))
-    (setq before-change-function 'sgml-note-change-at)
-    (setq after-change-function 'sgml-set-face-after-change))
   (sgml-with-parser-syntax-ro
    (sgml-goto-start-point (min sgml-goal (point-max)))
    (setq quiet (or quiet (< (- sgml-goal (sgml-mainbuf-point)) 500)))
