@@ -763,36 +763,36 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 			   tem
 			   t
 			   (file-name-nondirectory tem)))))
-  (setq file (expand-file-name file))
-  (let ((cb (current-buffer))
-	(tem nil)
-	(doctype nil)
-	(l (buffer-list)))
-    ;; Search loaded buffer for a already loaded DTD
-    (while (and l (null tem))
-      (set-buffer (car l))
-      (if (equal sgml-loaded-dtd file)
-	  (setq tem (current-buffer)))
-      (setq l (cdr l)))
-    (cond
-     (tem				; loaded DTD found
-      (sgml-set-global))
-     (t					; load DTD from file
+  (let ((real-file (expand-file-name file)))
+    (let ((cb (current-buffer))
+	  (tem nil)
+	  (doctype nil)
+	  (l (buffer-list)))
+      ;; Search loaded buffer for a already loaded DTD
+      (while (and l (null tem))
+	(set-buffer (car l))
+	(if (equal sgml-loaded-dtd real-file)
+	    (setq tem (current-buffer)))
+	(setq l (cdr l)))
+      (cond
+       (tem				; loaded DTD found
+	(sgml-set-global))
+       (t				; load DTD from file
+	(set-buffer cb)
+	(setq tem (generate-new-buffer " *saveddtd*"))
+	(unwind-protect
+	    (progn
+	      (message "Loading DTD from %s..." file)
+	      (set-buffer tem)
+	      (insert-file-contents real-file)
+	      (set-buffer cb)
+	      (sgml-read-dtd tem)
+	      (message "Loading DTD from %s...done" file))
+	  (kill-buffer tem))))
       (set-buffer cb)
-      (setq tem (generate-new-buffer " *saveddtd*"))
-      (unwind-protect
-	  (progn
-	    (message "Loading DTD from %s..." file)
-	    (set-buffer tem)
-	    (insert-file-contents file)
-	    (set-buffer cb)
-	    (sgml-read-dtd tem)
-	    (message "Loading DTD from %s...done" file))
-	(kill-buffer tem))))
-    (set-buffer cb)
-    (sgml-set-local)
-    (setq sgml-default-dtd-file file)
-    (setq sgml-loaded-dtd file)))
+      (sgml-set-local)
+      (setq sgml-default-dtd-file file)
+      (setq sgml-loaded-dtd real-file))))
 
 ;;;; Parse tree
 
@@ -800,7 +800,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	    (:type vector)
 	    (:constructor sgml-make-tree
 			  (element start stag-len  parent level
-				   excludes includes pstate mixed)))
+				   excludes includes pstate mixed
+				   net-enabled)))
   element				; element object
   start					; start point in buffer
   end					; end point in buffer
@@ -814,7 +815,8 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   next					; next sibling tree
   content				; child trees
   mixed					; cache for mixed flag in element
-  net-enabled				; if NET enabled
+  net-enabled				; if NET enabled (t this element,
+					;  other non-nil, some parent)
 )
 
 ;;;; (text) Element view of parse tree
@@ -917,11 +919,16 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (setq sgml-document-element (and (sgml-model-group-p model)
 				   (sgml-move-token
 				    (car (sgml-state-reqs model)))))
+  (set (make-local-variable 'sgml-active-dtd-indicator)
+       (format " [%s]" 
+	       (if (eq model sgml-any)
+		   "ANY"
+		 sgml-document-element)))
   (setq sgml-top-tree
 	(sgml-make-tree
 	 (make-element :name "Document (no element)"
 		       :model model)
-	 0 0 nil 0 nil nil nil nil)))
+	 0 0 nil 0 nil nil nil nil nil)))
 
 
 (eval-and-compile
@@ -930,10 +937,6 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-set-doctype-element (element-name)
   (sgml-set-doctype
    (sgml-make-primitive-content-token element-name)))
-
-(defun sgml-reset-parse-state ()
-  (setf (sgml-tree-content sgml-top-tree) nil) ; do I need this?
-  (sgml-set-parse-state sgml-top-tree 'start))
 
 (defun sgml-set-parse-state (tree where)
   "Set parse state from TREE, either from start of TREE if WHERE is start
@@ -990,7 +993,7 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
 	      (append (element-excludes el) (sgml-excludes))
 	      (append (element-includes el) (sgml-includes))
 	      sgml-current-state (element-mixed el)
-	      )))
+	      (if (sgml-tree-net-enabled sgml-current-tree) 1))))
     (cond ((null (sgml-tree-content sgml-current-tree))
 	   (setf (sgml-tree-content sgml-current-tree) nt))
 	  (t
@@ -1006,7 +1009,6 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
     (when (sgml-element-empty sgml-current-tree)
       (sgml-close-element after-tag after-tag))))
 
-
 (defun sgml-fake-open-element (tree el)
   (sgml-make-tree
    el 0 0 
@@ -1014,7 +1016,8 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
    0
    (append (element-excludes el) (sgml-tree-excludes tree))
    (append (element-includes el) (sgml-tree-includes tree))
-   nil nil))
+   nil nil
+   nil))
 
 (defun sgml-close-element (before-tag after-tag)
   (when (or (eq sgml-close-element-trap t)
@@ -1115,31 +1118,6 @@ The type can be CDATA, RCDATA, ANY, #PCDATA or none."
       (setq state (sgml-tree-pstate tree)
 	    tree (sgml-tree-parent tree)))
     elems))
-
-(defun sgml-stags-of-names (names)
-  (mapcar (function sgml-start-tag-of) names))
-
-(defun sgml-current-list-of-valid-tags ()
-  (let* ((elems (sgml-current-list-of-valid-elements))
-	 (tags (sgml-stags-of-names elems))
-	 (etags nil)
-	 (tree sgml-current-tree)
-	 (state sgml-current-state))
-    (if sgml-balanced-tag-edit
-	tags
-      (while
-	  (and (sgml-final-p state)
-	       (not (eq tree sgml-top-tree))
-	       (progn
-		 (setq etags
-		       (nconc etags
-			      (list (sgml-end-tag-of
-				     (sgml-tree-element tree)))))
-		 sgml-omittag-transparent)
-	       (sgml-element-etag-optional tree))
-	(setq state (sgml-tree-pstate tree)
-	      tree (sgml-tree-parent tree)))
-      (nconc etags tags))))
 
 ;;;; Logging of warnings
 
@@ -1226,7 +1204,7 @@ remove it if it is showing."
 
 ;;;; External identifyer resolve
 
-(defun sgml-external-file (extid)
+(defun sgml-external-file (extid &optional type name)
   ;; extid is (pubid . sysid)
   (let* ((pubid (car extid))
 	 (sysid (cdr extid))
@@ -1239,22 +1217,26 @@ remove it if it is showing."
 		 (setq file nil))
 	       (setq l (cdr l)))
 	     (unless file
-	       (sgml-error "System id %s not found" sysid))
+	       (sgml-log-warning "System id %s not found" sysid))
 	     file))
 	  (pubid
 	   (setq file (sgml-map-public pubid))
 	   (unless file
-	     (sgml-error "Public id %s; can't find file"
-		       pubid))
+	     (sgml-log-warning "Public id %s; can't find file"
+			       pubid))
 	   file)
 	  (t
-	   (sgml-error
-	    "No external file to be found: need a system identifier")))))
+	   (sgml-log-warning
+	    "No external file to be found: need a system identifier (%s %s)"
+	    (or type "")
+	    (or name ""))
+	   nil))))
 
 (defun sgml-map-public (pubid)
   (let ((pubid-parts (sgml-pubid-parts pubid))
 	(l sgml-public-map)
 	res)
+    (sgml-debug "Pub id parts = %S" pubid-parts)
     (while (and l (not res))
       (cond
        ((and (consp (car l))
@@ -1269,14 +1251,28 @@ remove it if it is showing."
       (setq l (cdr l)))
     res))
 
+(defconst sgml-formal-pubid-regexp
+  (concat
+   "^\\(+//\\|-//\\)?"			; Registered indicator
+   "\\(\\([^/]\\|/[^/]\\)+\\)"		; Owner
+   "//"
+   "\\([^ \t\n]*\\)"			; Text class
+   "[ \t\n]+"
+   "\\(\\([^/]\\|/[^/]\\)*\\)"		; Text description
+   ".*"))
+
 (defun sgml-pubid-parts (pubid)
-  (string-match
-   "^\\(+//\\|-//\\)?\\(\\([^/]\\|/[^/]\\)+\\)//\\([^ \t\n]*\\)[ \t\n]+\\(\\([^/]\\|/[^/]\\)*\\).*"
-   pubid)
-  (list
-   (cons ?o (sgml-transliterate-file (sgml-matched-string pubid 2)))
-   (cons ?c (downcase (sgml-matched-string pubid 4)))
-   (cons ?d (sgml-transliterate-file (sgml-matched-string pubid 5)))))
+  (append
+   (if (string-match sgml-formal-pubid-regexp pubid)
+       (list
+	(cons ?o (sgml-transliterate-file (sgml-matched-string pubid 2)))
+	(cons ?c (downcase (sgml-matched-string pubid 4)))
+	(cons ?d (sgml-transliterate-file (sgml-matched-string pubid 5)))
+	;; t alias for d  (%T used by sgmls)
+	(cons ?t (sgml-transliterate-file (sgml-matched-string pubid 5)))
+	))
+   (list
+    (cons ?p (sgml-transliterate-file pubid)))))
 
 (defun sgml-pub-expand-char (c parts)
   (cond ((memq (downcase c) '(?c ?o ?d))
@@ -1328,7 +1324,8 @@ remove it if it is showing."
 (defun sgml-push-to-param (param)
   (let ((cb (current-buffer))
 	(val (cdr-safe (assq param sgml-param-entities)))
-	(buf (generate-new-buffer " *param*")))
+	(buf (generate-new-buffer " *param*"))
+	file)
     (sgml-debug "Enter param %s" param)
     (set-buffer buf)
     (set-syntax-table sgml-parser-syntax)
@@ -1336,11 +1333,12 @@ remove it if it is showing."
     (setq sgml-previous-buffer cb)
     (make-local-variable 'sgml-parameter-name)
     (setq sgml-parameter-name param)
-    (cond ((consp val)			; external entity
-	   (let ((file (sgml-external-file val)))
-	     (make-local-variable 'sgml-error-context)
-	     (setq sgml-error-context file)
-	     (insert-file-contents file)))
+    (if (consp val)
+	(setq file (sgml-external-file val 'param param)))
+    (cond (file
+	   (make-local-variable 'sgml-error-context)
+	   (setq sgml-error-context file)
+	   (insert-file-contents file))
 	  ((stringp val)
 	   (insert val))
 	  (t				; sgml-warn-undefined-entity ***
@@ -1356,8 +1354,11 @@ remove it if it is showing."
     (setq sgml-previous-buffer cb)
     (make-local-variable 'sgml-error-context)
     (setq sgml-error-context file)
-    (sgml-debug "Push to file %s" file)
-    (insert-file-contents file)
+    (cond (file
+	   (sgml-debug "Push to file %s" file)
+	   (insert-file-contents file))
+	  (t
+	   (sgml-log-warning "Undefined entity")))
     (goto-char (point-min))))
 
 (defun sgml-pop-param ()
@@ -1769,8 +1770,8 @@ or if nil, until end of buffer."
 
 (defun sgml-setup-dtd ()
   (sgml-set-doctype sgml-any)		; fall back DTD
-  (cond ((and sgml-default-dtd-file
-	      (file-exists-p sgml-default-dtd-file))
+  (cond (sgml-default-dtd-file
+	 ;;(and (file-exists-p sgml-default-dtd-file))
 	 (sgml-load-dtd sgml-default-dtd-file))
 	((null sgml-parent-document)
 	 (sgml-parse-prolog))
@@ -1994,7 +1995,7 @@ or if nil, until end of buffer."
 
 (defun sgml-implied-end-tag (type start end)
   (cond ((eq sgml-current-tree sgml-top-tree)
-	 (unless (eobp)
+	 (unless (= start (point-max))
 	   (sgml-error
 	    "document ended by %s" type)))
 	((not
@@ -2456,14 +2457,36 @@ is determined."
   (interactive)
   (sgml-parse-to-here)
   (with-output-to-temp-buffer "*Tags*"
-    (when (eq sgml-current-state sgml-any)
-      (princ (sgml-current-element-content-class))
-      (terpri))
-    (let ((l (sgml-current-list-of-valid-tags)))
-      (while l
-	(princ (car l))
-	(terpri)
-	(setq l (cdr l))))))
+    (princ (format "Current element: %s\n"
+		   (sgml-element-name sgml-current-tree)))
+    (cond ((or (sgml-current-mixed-p)
+	       (eq sgml-current-state sgml-any))
+	   (princ "Current element has mixed content")
+	   (when (eq sgml-current-state sgml-any)
+	     (princ " [ANY]"))
+	   (terpri))
+	  ((sgml-model-group-p sgml-current-state)
+	   (princ "Current element has element content\n"))
+	  (t
+	   (princ (format "Current element has declared content: %s\n"
+			  sgml-current-state))))
+    (cond ((sgml-final-p sgml-current-state)
+	   (princ "Valid end-tags: ")
+	   (loop for e in (sgml-current-list-of-endable-elements)
+		 do (princ (sgml-end-tag-of e)) (princ " "))
+	   (terpri))
+	  (t
+	   (princ "Current element can not end here\n")))
+    (princ "Valid start-tags:\n")
+    (let ((sgml-omittag-transparent t)
+	  (n (/ (frame-width) 19)))
+      (loop for e in (sgml-current-list-of-valid-elements)
+	    as i from 1 do
+	    (princ (format "%-19s" (sgml-start-tag-of e)))
+	    (when (= i n)
+	      (setq i 0)
+	      (terpri))))))
+
 
 (defun sgml-show-context ()
   "Display where the cursor is in the element hierarchy."
@@ -2611,8 +2634,11 @@ AVL should be a assoc list mapping symbols to strings."
   (sgml-parse-to-here)
   (cond ((or (sgml-model-group-p sgml-current-state)
 	     (eq sgml-current-state sgml-any))
-	 (mapcar (function (lambda (x) (cons x x)))
-		 (sgml-current-list-of-valid-tags)))
+	 (append
+	  (mapcar (function (lambda (x) (cons (sgml-end-tag-of x) x)))
+		  (sgml-current-list-of-endable-elements))
+	  (mapcar (function (lambda (x) (cons (sgml-start-tag-of x) x)))
+		  (sgml-current-list-of-valid-elements))))
 	(t
 	 (sgml-message "%s" sgml-current-state)
 	 nil)))
@@ -2633,7 +2659,7 @@ AVL should be a assoc list mapping symbols to strings."
       (unless (bolp)
 	(insert "\n")))
     (when (prog1 (bolp)
-	    (insert (if (sgml-element-net-enabled sgml-current-tree)
+	    (insert (if (eq t (sgml-element-net-enabled sgml-current-tree))
 			"/"
 		      (sgml-end-tag-of sgml-current-tree))))
       (sgml-indent-line)))))
@@ -2771,9 +2797,12 @@ subelements."
   (save-excursion
     (cond
      ((sgml-element-mixed element)
-      (let ((last-pos (sgml-element-stag-end element))
+      (let (last-pos
 	    (c (sgml-element-content element))
 	    (agenda nil))		; regions to fill later
+	(goto-char (sgml-element-stag-end element))
+	(when (eolp) (forward-char 1))
+	(setq last-pos (point))
 	(while c
 	  (cond
 	   ((sgml-element-mixed c))
@@ -3124,7 +3153,7 @@ insted of the whole buffer."
 If sgml-normalize-trims is non-nil, trim off white space from ends of
 elements with omitted end-tags."
   (let ((content nil))
-    (while element
+    (while element			; Build list of content elements
       (push element content)
       (setq element (if only-first
 			nil
@@ -3135,49 +3164,31 @@ elements with omitted end-tags."
       (message "Normalizing %d%% left"
 	       (/ (* 100.0 (point)) (point-max)))
       ;; Fix the end-tag
-      (unless (sgml-element-empty element)
-	(cond
-	 ((or (sgml-tree-net-enabled element)
-	      (zerop (sgml-tree-etag-len element))
-	      (= 3 (sgml-tree-etag-len element)))
-	  (goto-char (min (point) (sgml-element-etag-start element)))
-	  (if (zerop (sgml-element-etag-len element))
-	      (if sgml-normalize-trims
-		  (skip-chars-backward " \t\n\r"))
-	    (delete-char (sgml-tree-etag-len element)))
-	  (when (not (sgml-element-data-p element))
-	    (unless (bolp) (insert "\n"))
-	    (unless (eolp)
-	      (open-line 1)))
-	  (save-excursion
-	    (insert (sgml-end-tag-of (sgml-element-name element))))
-	  (when (not (sgml-element-data-p element))
-	    (sgml-indent-line nil element)
-	    (beginning-of-line 1)))
-	 (t
-	  ;; End-Tag full, but check for unclosed end-tag
-	  (goto-char (1- (sgml-tree-end element)))
-	  (unless (looking-at ">")
-	    (skip-chars-backward " \t\n") ;*** Is this allways safe?
-	    (insert ">")))))
+      (sgml-normalize-end-tag element)
       ;; Fix tags of content
       (sgml-normalize-content (sgml-tree-content element) nil)
       ;; Fix the start-tag
-      (goto-char (min (point) (sgml-tree-start element)))
-      (cond ((or (zerop (sgml-tree-stag-len element))
-		 (= 2 (sgml-tree-stag-len element)))
-	     (save-excursion
-	       (delete-char (sgml-tree-stag-len element))
-	       (insert (sgml-start-tag-of (sgml-tree-element element)))))
-	    (t
-	     (forward-char (1- (sgml-tree-stag-len element)))
-	     (cond ((looking-at ">"))
-		   (t
-		    (when (looking-at "/")
-		      (delete-char 1))
-		    (save-excursion (insert ">"))))))      
+      (sgml-normalize-start-tag element)
       ;; Next content element
       (setq content (cdr content)))))
+
+(defun sgml-normalize-start-tag (element)
+  (goto-char (min (point) (sgml-tree-start element)))
+  (let ((asl (sgml-element-attribute-specification-list element)))
+    (save-excursion
+      (delete-char (sgml-tree-stag-len element))    
+      (insert "<" (symbol-name (sgml-element-name element)))
+      (sgml-insert-attributes asl (sgml-element-attlist element))
+      (insert ">"))))
+
+(defun sgml-normalize-end-tag (element)
+  (unless (sgml-element-empty element)
+    (goto-char (min (point) (sgml-element-etag-start element)))    
+    (if (and (zerop (sgml-element-etag-len element))
+	     sgml-normalize-trims)
+	(skip-chars-backward " \t\n\r"))
+    (delete-char (sgml-tree-etag-len element))
+    (insert (sgml-end-tag-of element))))
 
 
 ;;;; SGML mode: TAB completion
@@ -3324,11 +3335,6 @@ If it is something else complete with ispell-complete-word."
   (interactive)
   (sgml-find-start-point (point))
   (message "%s" (sgml-context-as-string)))
-
-(defun sgml-setup-buffer ()
-  (interactive)
-  (save-excursion
-    (sgml-reset-parse-state)))
 
 (defun sgml-dump (arg)
   (interactive "P")
