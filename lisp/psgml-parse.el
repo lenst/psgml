@@ -2491,12 +2491,6 @@ overrides the entity type in entity look up."
     (when (eq sgml-scratch-buffer (default-value 'sgml-scratch-buffer))
       (make-local-variable 'sgml-scratch-buffer)
       (setq sgml-scratch-buffer nil))
-    (when after-change-function		;***
-      (message "OOPS: after-change-function not NIL in scratch buffer %s: %s"
-	       (current-buffer)
-	       after-change-function)
-      (setq before-change-function nil
-	    after-change-function nil))
     (setq sgml-last-entity-buffer (current-buffer))
     (erase-buffer)
     (setq default-directory dd)
@@ -2876,10 +2870,10 @@ overrides the entity type in entity look up."
 
 (defun sgml-set-initial-state (dtd)
   "Set initial state of parsing"
-  (make-local-variable 'before-change-function)
-  (setq before-change-function 'sgml-note-change-at)
-  (make-local-variable 'after-change-function)
-  (setq after-change-function 'sgml-set-face-after-change)
+  (make-local-hook 'before-change-functions)
+  (make-local-hook 'after-change-functions)
+  (add-hook 'before-change-functions 'sgml-note-change-at nil 'local)
+  (add-hook 'after-change-functions 'sgml-set-face-after-change nil 'local)
   (sgml-set-active-dtd-indicator (sgml-dtd-doctype dtd))
   (let ((top-type			; Fake element type for the top
 					; node of the parse tree
