@@ -64,7 +64,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "0.3a4"
+(defconst psgml-version "0.3a5"
   "Version of psgml package.")
 
 (require 'cl)
