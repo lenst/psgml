@@ -82,16 +82,15 @@ Also calling DATA-FUN, if non-nil, with data in content."
 	  (funcall element-fun c)
 	  (sgml-set-parse-state c 'after)
 	  (sgml-parse-data main-buffer-max data-fun pi-fun entity-fun)
-	  (setq c (sgml-tree-next c)))))
-    )
+	  (setq c (sgml-tree-next c))))))
   (sgml-pop-all-entities))
 
 (defun sgml-parse-data (sgml-goal sgml-data-function sgml-pi-function
 				  sgml-entity-function)
   (let ((sgml-throw-on-element-change 'el-done))
     (catch sgml-throw-on-element-change
-      (sgml-with-parser-syntax
-       (sgml-parser-loop nil)))))
+      (sgml-parse-continue sgml-goal nil t))))
+
 
 ;;;; Entity management
 
