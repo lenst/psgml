@@ -70,18 +70,20 @@ Also calling DATA-FUN, if non-nil, with data in content."
   (sgml-pop-all-entities)
   (sgml-need-dtd)
   (sgml-element-end element)		; Make sure all content is parsed
-  (save-excursion
-    (sgml-set-parse-state element 'start)
-    (when (eobp) (sgml-pop-entity))
-    (when (eolp) (forward-char 1))
-    (sgml-parse-data (point-max) data-fun pi-fun entity-fun)
-    (let ((c (sgml-tree-content element)))
-      (while c
-	(sgml-pop-all-entities)
-	(funcall element-fun c)
-	(sgml-set-parse-state c 'after)
-	(sgml-parse-data (point-max) data-fun pi-fun entity-fun)
-	(setq c (sgml-tree-next c)))))
+  (let ((main-buffer-max (point-max)))
+    (save-excursion
+      (sgml-set-parse-state element 'start)
+      (when (eobp) (sgml-pop-entity))
+      (when (eolp) (forward-char 1))
+      (sgml-parse-data main-buffer-max data-fun pi-fun entity-fun)
+      (let ((c (sgml-tree-content element)))
+	(while c
+	  (sgml-pop-all-entities)
+	  (funcall element-fun c)
+	  (sgml-set-parse-state c 'after)
+	  (sgml-parse-data main-buffer-max data-fun pi-fun entity-fun)
+	  (setq c (sgml-tree-next c)))))
+    )
   (sgml-pop-all-entities))
 
 (defun sgml-parse-data (sgml-goal sgml-data-function sgml-pi-function
