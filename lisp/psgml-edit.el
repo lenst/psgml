@@ -693,7 +693,7 @@ after the first tag inserted."
 	(forward-char 1))
       (when (sgml-break-after-stag-p name)
         (sgml-insert-break))
-      (setq element (sgml-find-element-of (point)))
+      (setq element (sgml-find-context-of (point)))
       (when (not (sgml-element-empty element))
 	(when (and sgml-auto-insert-required-elements
 		   (sgml-model-group-p sgml-current-state))
