@@ -59,6 +59,11 @@ Tested by sgml-close-element to see if the parse should be ended.")
 
 
 ;; For loading DTD
+(defconst sgml-max-singel-octet-number 250)
+
+(defvar sgml-singel-octet-threshold 255
+  "Octets greater than this is the first of a two octet coding.")
+
 (defvar sgml-read-token-vector nil)	; Vector of symbols used to decode
 					; token numbers.
 (defvar sgml-read-nodes nil)		; Vector of nodes used when reading
@@ -463,11 +468,21 @@ element the value."
 	      (element-name element)
 	    element)))
 
-;;; Load a saved dtd
+;;;; Load a saved dtd
 
 (defsubst sgml-read-octet ()
   (prog1 (following-char)
     (forward-char 1)))
+
+(defun sgml-read-number ()
+  (let ((n (sgml-read-octet)))
+    (if (> n sgml-singel-octet-threshold)
+	(+ (* (- n (eval-when-compile
+		     (1+ sgml-max-singel-octet-number)))
+	      256)
+	   (sgml-read-octet)
+	   sgml-max-singel-octet-number)
+      n)))
 
 (defsubst sgml-read-peek ()
   (following-char))
@@ -480,23 +495,23 @@ element the value."
     (forward-char 1)))
 
 (defsubst sgml-read-token ()
-  (aref sgml-read-token-vector (sgml-read-octet)))
+  (aref sgml-read-token-vector (inline (sgml-read-number))))
 
 (defsubst sgml-read-node-ref ()
   (aref sgml-read-nodes (sgml-read-octet)))
 
 (defun sgml-read-model-seq ()
-  (loop repeat (sgml-read-octet) collect (sgml-read-model)))
+  (loop repeat (sgml-read-number) collect (sgml-read-model)))
 
 (defun sgml-read-token-seq ()
-  (loop repeat (sgml-read-octet) collect (sgml-read-token)))
+  (loop repeat (sgml-read-number) collect (sgml-read-token)))
 
 (defun sgml-read-moves ()
-  (loop repeat (sgml-read-octet)
+  (loop repeat (sgml-read-number)
 	collect (sgml-make-move (sgml-read-token) (sgml-read-node-ref))))
 
 (defun sgml-read-model ()
-  (let* ((n (sgml-read-octet))
+  (let* ((n (sgml-read-number))
 	 (sgml-read-nodes (make-vector n nil)))
     (loop for i below n do (aset sgml-read-nodes i (sgml-make-state)))
     (loop for e across sgml-read-nodes do
@@ -554,10 +569,16 @@ element the value."
     (set-buffer buffer)
     (goto-char (point-min))
     (setq temp (sgml-read-sexp))		; file-version
-    (assert (equal temp '(sgml-saved-dtd-version 1)))
+    (assert (equal (car temp) 'sgml-saved-dtd-version))
+    (cond ((equal temp '(sgml-saved-dtd-version 1))
+	   (setq sgml-singel-octet-threshold 255))
+	  ((equal temp '(sgml-saved-dtd-version 2))
+	   (setq sgml-singel-octet-threshold sgml-max-singel-octet-number))
+	  (t
+	   (error "Unknown file format for saved DTD: %s" temp)))
     ;; elements
     (setq sgml-read-token-vector (sgml-read-sexp))
-    (loop repeat (sgml-read-octet) do (sgml-read-element))
+    (loop repeat (sgml-read-number) do (sgml-read-element))
     (setq sgml-param-entities (sgml-read-sexp))
     (setq sgml-entities (sgml-read-sexp))
     (setq doctype (sgml-read-sexp))
