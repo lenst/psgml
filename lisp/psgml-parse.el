@@ -53,12 +53,6 @@ Tested by sgml-close-element to see if the parse should be ended.")
 
 (defconst sgml-pcdata-token (intern "#PCDATA"))
 
-;; Variables used during doctype parsing
-(defvar sgml-doctype-state nil)
-(defvar sgml-element-map nil)
-(defvar sgml-param-entities nil)
-(defvar sgml-used-pcdata nil)		; True if model group built is mixed
-
 (defvar sgml-error-context nil)		; Vars used in *param* buffers
 (defvar sgml-previous-buffer)		; "
 (defvar sgml-parameter-name)		; "
@@ -70,11 +64,20 @@ Tested by sgml-close-element to see if the parse should be ended.")
 (defvar sgml-read-nodes nil)		; Vector of nodes used when reading
 					; a finite automaton.
 
+;; Variables used during doctype parsing and loading
+(defvar sgml-doctype-state nil)
+(defvar sgml-element-map nil)
+(defvar sgml-param-entities nil)
+(defvar sgml-used-pcdata nil)		; True if model group built is mixed
+(defvar sgml-entities nil)
 
 ;; Buffer local variables 
 
 (defvar sgml-buffer-param-entities nil)
 (make-variable-buffer-local 'sgml-buffer-element-map)
+
+(defvar sgml-buffer-entities '("aumlaut" "diaresis"))
+
 
 (defvar sgml-buffer-element-map nil)
 (make-variable-buffer-local 'sgml-buffer-element-map)
@@ -543,8 +546,10 @@ element the value."
 	(cb (current-buffer))
 	temp)
     (setq sgml-buffer-element-map nil
+	  sgml-buffer-entities nil
 	  sgml-buffer-param-entities nil)
     (setq sgml-element-map nil
+	  sgml-entities nil
 	  sgml-param-entities nil)
     (set-buffer buffer)
     (goto-char (point-min))
@@ -554,9 +559,11 @@ element the value."
     (setq sgml-read-token-vector (sgml-read-sexp))
     (loop repeat (sgml-read-octet) do (sgml-read-element))
     (setq sgml-param-entities (sgml-read-sexp))
+    (setq sgml-entities (sgml-read-sexp))
     (setq doctype (sgml-read-sexp))
     (set-buffer cb)
     (setq sgml-buffer-element-map sgml-element-map
+	  sgml-buffer-entities sgml-entities
 	  sgml-buffer-param-entities sgml-param-entities)
     (sgml-set-doctype doctype)
     nil))
@@ -1798,8 +1805,7 @@ Returns a pair (start . end)."
 	(t
 	 (read-from-minibuffer prompt))))
 
-
-;;; SGML mode: structure editing
+;;;; SGML mode: structure editing
 
 (defun sgml-beginning-of-element ()
   "Move to after the start tag of the current element.
@@ -1876,6 +1882,28 @@ With implied tags this is ambigous."
     (goto-char (car r)))
   (sgml-message ""))
 
+(defun sgml-change-element-name (gi)
+  "Replace the name (generic identifyer) of the current element with a new name."
+  (interactive
+   (list
+    (let ((el (sgml-find-element-of (point))))
+      (goto-char (sgml-tree-start el))
+      (sgml-read-element-name
+       (format "Change %s to: " (element-name (sgml-tree-element el)))))))
+  (when (or (null gi)
+	    (equal gi ""))
+    (error "Illegal name"))
+  (let ((tree (sgml-find-element-of (point))))
+    (goto-char (sgml-element-end tree))
+    (delete-char (- (sgml-tree-etag-len tree)))
+    (insert (sgml-end-tag-of gi))
+    (goto-char (sgml-tree-start tree))
+    (delete-char (sgml-tree-stag-len tree))
+    (insert (sgml-start-tag-of gi))))
+
+
+;;;; SGML mode: folding
+
 (defun sgml-fold-region (beg end &optional unhide)
   "Hide (or if prefixarg unhide) region.
 If called from a program first two arguments are start and end of
@@ -1931,25 +1959,26 @@ This uses the selective display feature."
     (sgml-fold-region (point) (mark) 'unhide)
     (goto-char op)))
 
-(defun sgml-change-element-name (gi)
-  "Replace the name (generic identifyer) of the current element with a new name."
-  (interactive
-   (list
-    (let ((el (sgml-find-element-of (point))))
-      (goto-char (sgml-tree-start el))
-      (sgml-read-element-name
-       (format "Change %s to: " (element-name (sgml-tree-element el)))))))
-  (when (or (null gi)
-	    (equal gi ""))
-    (error "Illegal name"))
-  (let ((tree (sgml-find-element-of (point))))
-    (goto-char (sgml-element-end tree))
-    (delete-char (- (sgml-tree-etag-len tree)))
-    (insert (sgml-end-tag-of gi))
-    (goto-char (sgml-tree-start tree))
-    (delete-char (sgml-tree-stag-len tree))
-    (insert (sgml-start-tag-of gi))))
+(defun sgml-unfold-element ()
+  "Show all hidden lines in current element."
+  (interactive)
+  (let* ((node (sgml-find-element-of (point))))
+    (sgml-fold-region (sgml-tree-start node)
+		      (sgml-element-end node)
+		      'unfold)))
 
+(defun sgml-expand-element ()
+  "As sgml-fold-subelement, but unfold first."
+  (interactive)
+  (sgml-unfold-element)
+  (sgml-fold-subelement))
+
+(defun sgml-unfold-all ()
+  "Show all hidden lines in buffer."
+  (interactive)
+  (sgml-fold-region (point-min)
+		    (point-max)
+		    'unfold))
 
 ;;;; SGML mode: indentation and movement
 
@@ -2103,7 +2132,7 @@ after the first tag inserted."
 (defun sgml-ask-and-insert-tags (event &optional nomenu start end)
   (let* ((tab (sgml-completion-table))
 	 (data (sgml-current-element-contains-data))
-	 (menu (cons "Tags" tab))
+	 
 	 tag				; tag to insert
 	 element			; the element of the inserted tag
 	 )
@@ -2114,7 +2143,8 @@ after the first tag inserted."
 	  (nomenu
 	   (setq tag (completing-read "Tag: " tab nil t "<" )))
 	  (t
-	   (setq tag (x-popup-menu event (list "hepp" menu)))))
+	   (setq tag (x-popup-menu event
+				   (sgml-split-menu "Tags" tab)))))
     (unless tag
       (error "Menu abort"))
     (cond
@@ -2191,6 +2221,32 @@ after the first tag inserted."
       (goto-char start)
       (insert (sgml-start-tag-of element)))))
 
+(defun sgml-entities-menu (event)
+  (interactive "e")
+  (let ((menu (mapcar (lambda (x)
+			(cons x x))
+		      sgml-buffer-entities))
+	choice)
+    (unless menu
+      (error "No entities defined"))
+    (setq choice (x-popup-menu event
+			       (sgml-split-menu "Entities" menu)))
+    (when choice
+      (insert "&" choice ";"))))
+
+(defun sgml-split-menu (title menu)
+  (let ((menus (list (cons title menu))))
+    (cond ((> (length menu)
+	    sgml-max-menu-size)
+	   (setq menus
+		 (loop for i from 1 while menu
+		 collect
+		 (prog1 (cons
+			 (format "%s %d" title i)
+			 (subseq menu 0 (min (length menu)
+					    sgml-max-menu-size)))
+		   (setq menu (nthcdr sgml-max-menu-size menu)))))))
+    (cons title menus)))
 
 ;;;; SGML mode: attributes
 
