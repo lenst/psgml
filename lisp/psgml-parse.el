@@ -865,12 +865,14 @@ This may change ELTYPES1, ELTYPES2 is unchanged. Returns the new table."
       (mapatoms
        (function (lambda (sym)
 		   (let ((et (intern (symbol-name sym) eltypes1)))
-		     (when (fboundp sym)
-		       (fset et (symbol-function sym)))
-		     (when (boundp sym)
-		       (set et (symbol-value sym)))
+		     (unless (fboundp et) ; not yet defined by <!element
+		       (when (fboundp sym)
+			 (fset et (symbol-function sym)))
+		       (when (boundp sym)
+			 (set et (symbol-value sym))))
 		     (setf (symbol-plist et)
-			   (copy-list (symbol-plist sym))))))
+			   (nconc (symbol-plist et)
+				  (copy-list (symbol-plist sym)))))))
        eltypes2)      
       eltypes1)))
 
