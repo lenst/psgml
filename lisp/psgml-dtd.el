@@ -286,13 +286,13 @@ Syntax: var dfa-expr &body forms"
 
 (defun sgml-parse-nametoken-group ()
   (sgml-skip-ps)
-  (let (names)
+  (let ((name nil))
     (cond
      ((sgml-parse-char ?\()
-      (setq names (list (sgml-check-nametoken)))
-      (while (sgml-parse-connector)
-	(push (sgml-check-nametoken)
-	      names))
+      (while (progn
+	       (sgml-skip-ps)
+	       (push (sgml-check-nametoken) names)
+	       (sgml-parse-connector)))
       (sgml-check-char ?\))
       names)
      (t
@@ -436,8 +436,8 @@ Syntax: var dfa-expr &body forms"
 	  (sgml-start-tag-of (sgml-parse-parameter-literal)))
 	 ((eq token 'endtag)
 	  (sgml-end-tag-of (sgml-parse-parameter-literal)))	
-	 ((eq token 'ms)		; marked section ***
-	  (sgml-parse-parameter-literal))
+	 ((eq token 'ms)		; marked section
+	  (concat "<![" (sgml-parse-parameter-literal) "]]>"))
 	 ((eq token 'md)		; Markup declaration
 	  (concat "<!" (sgml-parse-parameter-literal) ">")))))
      ((sgml-parse-parameter-literal)))))
@@ -796,4 +796,3 @@ FORMS should produce the binary coding of element in VAR."
 
 
 ;;; psgml-dtd.el ends here
-
