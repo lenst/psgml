@@ -1319,7 +1319,6 @@ Editing is done in a separate window."
 	   (xml-p sgml-xml-p))
       (switch-to-buffer-other-window
        (sgml-attribute-buffer element asl))
-      (sgml-edit-attrib-mode)
       (make-local-variable 'sgml-start-attributes)
       (setq sgml-start-attributes start)
       (make-local-variable 'sgml-always-quote-attributes)
@@ -1362,12 +1361,15 @@ Editing is done in a separate window."
       (setq buf (get-buffer-create bname))
       (set-buffer buf)
       (erase-buffer)
+      (sgml-edit-attrib-mode)
       (make-local-variable 'sgml-attlist)
       (setq sgml-attlist (sgml-effective-attlist
                           (sgml-element-eltype element)))
       (sgml-insert '(read-only t)
-		   "<%s  -- Edit values and finish with C-c C-c --\n"
-		   (sgml-element-name element))
+                   (substitute-command-keys
+                    "<%s  -- Edit values and finish with \
+\\[sgml-edit-attrib-finish], abort with \\[sgml-edit-attrib-abort] --\n")
+                   (sgml-element-name element))
       (loop
        for attr in sgml-attlist do
        ;; Produce text like
@@ -1431,7 +1433,7 @@ Editing is done in a separate window."
 
 (define-key sgml-edit-attrib-mode-map "\C-c\C-c" 'sgml-edit-attrib-finish)
 (define-key sgml-edit-attrib-mode-map "\C-c\C-d" 'sgml-edit-attrib-default)
-(define-key sgml-edit-attrib-mode-map "\C-c\C-k" 'sgml-edit-attrib-clear)
+(define-key sgml-edit-attrib-mode-map "\C-c\C-k" 'sgml-edit-attrib-abort)
 
 (define-key sgml-edit-attrib-mode-map "\C-a"  'sgml-edit-attrib-field-start)
 (define-key sgml-edit-attrib-mode-map "\C-e"  'sgml-edit-attrib-field-end)
@@ -1450,6 +1452,16 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
   (use-local-map sgml-edit-attrib-mode-map)
   (run-hooks 'text-mode-hook 'sgml-edit-attrib-mode-hook))
 
+(defun sgml-edit-attrib-abort ()
+  "Abort the attribute editor, removing the window."
+  (interactive)
+  (let ((cb (current-buffer))
+	(start sgml-start-attributes))
+    (delete-windows-on cb)
+    (kill-buffer cb)
+    (when (markerp start)
+      (switch-to-buffer (marker-buffer start))
+      (goto-char start))))
 
 (defun sgml-edit-attrib-finish ()
   "Finish editing and insert attribute values in original buffer."

@@ -1,9 +1,17 @@
 2002-08-13  Lennart Staflin  <lenst@lysator.liu.se>
 
+	* psgml-edit.el (sgml-edit-attrib-abort): new command
+	(sgml-edit-attrib-mode-map): abort on key C-c C-k
+	(sgml-attribute-buffer): include abort key in header line and use
+	substitute-command-keys.
+	(sgml-edit-attributes): move setting mode to
+	sgml-attribute-buffer.
+
 	* psgml-parse.el (sgml-open-element): add optional net-enabled
 	parameter.
 	(sgml-do-start-tag): use new parameter on sgml-open-element.
-
+	Fixes bug with NET (tc17).
+	
 	* psgml-edit.el (sgml-edit-attrib-field-start,
 	sgml-edit-attrib-clear, sgml-attribute-buffer,
 	sgml-edit-attrib-specification-list): change sgml-category to
