@@ -1196,11 +1196,11 @@ All bindings:
   ;; immediately after a start tag or immediately before an end tag.
 
   (set (make-local-variable 'paragraph-separate)
-	(if sgml-have-re-char-clases
-	    "^[ \t\n]*$\\|\
+       (if sgml-have-re-char-clases
+           "^[ \t\n]*$\\|\
 ^[ \t]*</?\\([_[:alpha:]]\\([-:._[:alnum:]= \t\n]\\|\
 \"[^\"]*\"\\|'[^']*'\\)*\\)?>$"
-	  "^[ \t\n]*$\\|\
+         "^[ \t\n]*$\\|\
 ^[ \t]*</?\\([_A-Za-z]\\([-:._A-Za-z0-9= \t\n]\\|\
 \"[^\"]*\"\\|'[^']*'\\)*\\)?>$"))
   (set (make-local-variable 'paragraph-start)
@@ -1237,9 +1237,10 @@ All bindings:
 ;;; This doesn't DTRT with Emacs 21.1 newcomment -- intermediate lines
 ;;; are prefixed by `!--'.  -- fx
 ;;;   (set (make-local-variable 'comment-style) 'multi-line)
-  (make-local-variable 'text-property-default-nonsticky)
-  ;; see `sgml-set-face-for':
-  (add-to-list 'text-property-default-nonsticky '(face . t))
+  (when sgml-default-nonsticky
+    (make-local-variable 'text-property-default-nonsticky)
+    ;; see `sgml-set-face-for':
+    (add-to-list 'text-property-default-nonsticky '(face . t)))
   (make-local-hook 'post-command-hook)
   (add-hook 'post-command-hook 'sgml-command-post 'append 'local)
   (unless sgml-running-lucid
