@@ -1,3 +1,22 @@
+2001-02-20  Lennart Staflin  <lennarts@infostream.no>
+
+	* psgml-dtd.el (sgml-check-content): check case of declared
+	content name.
+	(sgml-parse-exception): fix misspelled function name
+	(sgml-declare-entity): Fix wrong case on symbols
+	(sgml-parse-entity-type): for consistency, don't downcase entity
+	type name
+	(sgml-parse-entity-type): Remove case check and intern for
+	notation name. Notation name will be stored as a string.
+
+	* psgml-other.el (sgml-without-change-hooks): new macro
+	(sgml-set-face-for): use new macro
+
+e2001-02-20  Lennart Staflin  <lennarts@infostream.no>
+
+	* psgml-parse.el (sgml-push-to-entity): remove debugging code
+	(sgml-set-initial-state): Change to use change hooks
+
 Fri Feb  9 01:06:27 2001  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.2.2 released
