@@ -756,7 +756,8 @@ AVL should be a assoc list mapping symbols to strings."
 	    ;; Supply the default value if a value is needed
 	    (cond ((sgml-default-value-type-p 'REQUIRED def)
 		   (setq val ""))
-		  ((and (not (or sgml-omittag sgml-shorttag))
+		  ((and (or (not (or sgml-xml-p sgml-omittag sgml-shorttag))
+                            sgml-insert-defaulted-attributes)
 			(consp def))
 		   (setq val (sgml-default-value-attval def)))))
           (when val
