@@ -6,6 +6,8 @@
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; 	James Clark <jjc@clark.com>
+;; Maintainer: Lennart Staflin <lenst@lysator.liu.se>
+;; Keywords: languages
 
 ;; 
 ;; This program is free software; you can redistribute it and/or
@@ -50,7 +52,7 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.0a12"
+(defconst psgml-version "1.0"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -1049,12 +1051,10 @@ All bindings:
   (make-local-variable 'indent-line-function)
   (setq indent-line-function 'sgml-indent-line)
   (make-local-variable 'mode-line-format)
+  ;; Modify mode-line-format with susbt (sugested by wing)
   (setq mode-line-format
-	'("" mode-line-modified mode-line-buffer-identification
-	  "   " global-mode-string
-	  "   %[(" mode-name sgml-active-dtd-indicator
-	  minor-mode-alist "%n" mode-line-process ")%]--"
-	  (line-number-mode "L%l--") (-3 . "%p") "-%-"))
+ 	(subst '("" mode-name sgml-active-dtd-indicator) 'mode-name
+ 	       mode-line-format))
   (make-local-variable 'sgml-default-dtd-file)
   (when (setq sgml-default-dtd-file (sgml-default-dtd-file))
     (unless (file-exists-p sgml-default-dtd-file)
@@ -1413,4 +1413,5 @@ If it is something else complete with ispell-complete-word." t)
  (t
   (require 'psgml-other)))
 
-;;; psgml.el ends HERE
+;;; psgml.el ends here
+
