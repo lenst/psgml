@@ -1287,12 +1287,25 @@ remove it if it is showing."
 	(intern (downcase (buffer-substring start (point)))))
     0))
 
+(defun sgml-parse-nametoken-string ()
+  "Parses a name token and returns a string or nil if no nametoken."
+  (and (sgml-name-char (following-char))
+       (let ((start (point)))
+	 (skip-syntax-forward "w_")
+	 (buffer-substring start (point)))))
+
+(defun sgml-gname-symbol (string)
+  "Convert a string to a general name/nametoken/numbertoken."
+  (intern (downcase string)))
+
+(defun sgml-ename-symbol (string)
+  "Convert a string to an entity name."
+  (intern string))
+
 (defun sgml-check-nametoken ()
-  (sgml-skip-ps)
-  (let ((token (sgml-parse-nametoken)))
-    (unless (symbolp token)
-      (sgml-parse-error "Expecting a name token"))
-    token))
+  "Require and return a nametoken as a symbol."
+  (sgml-gname-symbol (or (sgml-parse-nametoken-string)
+			 (sgml-parse-error "Expecting a name token"))))
 
 (defun sgml-check-entity-ref ()
   (prog1 (sgml-check-ename)
@@ -1469,9 +1482,13 @@ a RNI must be followed by NAME."
 ;;;; Parsing attribute values
 
 (defun sgml-parse-attribute-specification-list (&optional element)
+  "Parse an attribute specification list.
+Optional argument ELEMENT, is used to resolve omitted name=.
+Returns a list ((name val) ...).
+Where name is a symbol and val is a string."
   (let (name val asl)
-    (while (symbolp (setq name (progn (sgml-skip-s)
-				      (sgml-parse-nametoken))))
+    (while (setq name (progn (sgml-skip-s)
+			     (sgml-parse-nametoken-string)))
       (sgml-skip-s)
       (cond ((sgml-parse-vi)
 	     (setq val (sgml-parse-attribute-value-specification)))
@@ -1484,15 +1501,19 @@ a RNI must be followed by NAME."
 	      "%s is not in any name group for element %s."
 	      val
 	      (sgml-element-name element))))
-      (push (list name val) asl))
+      (push (list (sgml-gname-symbol name) val) asl))
     asl))
 
 (defun sgml-parse-attribute-value-specification ()
   (or (sgml-parse-string)
-      (sgml-check-nametoken)))
+      (sgml-parse-nametoken-string)
+      (sgml-parse-error "Expecting an attribute value: literal or token")))
 
 (defun sgml-find-name-for-value (value element)
-  "Find the attribute name that has VALUE in its name group."
+  "Find the attribute of ELEMENT that has VALUE in its name group.
+VALUE is a string.  Returns nil or a string."
+  (if (stringp value)
+      (setq value (sgml-gname-symbol value)))
   (let ((al (sgml-element-attlist element))
 	dv)
     (while (and al
@@ -1501,7 +1522,7 @@ a RNI must be followed by NAME."
 		    (not (memq value (cadr dv)))))
       (setq al (cdr al)))
     (if al
-	(sgml-attribute-name (car al)))))
+	(symbol-name (sgml-attribute-name (car al))))))
 
 ;;;; Parser driver
 
@@ -2496,7 +2517,7 @@ after the first tag inserted."
 (defvar sgml-attlist nil)
 
 (defun sgml-edit-attributes ()
-  "Edit attributes of start tag before point.
+  "Edit attributes of current element.
 Editing is done in a separate window."
   (interactive)
   (let* ((element (sgml-find-element-of (point)))
@@ -2634,52 +2655,65 @@ value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
 		      sgml-minimize-attributes
 		      (listp (setq tem (sgml-attribute-declared-value def)))
 		      (eq 'name-token-group (car tem))
-		      (if (memq (intern val) (cadr tem))
+		      (if (memq (sgml-gname-symbol val) (cadr tem))
 			  (progn (insert " " val) t)
 			(sgml-log-warning
 			 "%s is not an allowed value for attribute %s"
 			 val name)
 			nil)))
 		(t
-		 (insert " " (symbol-name name) "=" val))))))))
+		 (insert " " (symbol-name name) "="
+			 (sgml-quote-attribute-value val)))))))))
 
 (defun sgml-attribute-value-list ()
   (goto-char (point-min))
   (forward-line 1)
   (sgml-with-parser-syntax
-   (let ((avl nil))
+   (let ((avl nil)
+	 (al sgml-attlist))
      (while (not (eq ?> (following-char)))
        (sgml-skip-s)
-       (let ((name (sgml-parse-nametoken)))
+       (let ((name (sgml-check-nametoken)))
 	 (forward-char 3)
 	 (unless (memq (get-text-property (point) 'category)
 		       '(sgml-default sgml-fixed))
-	   (setq avl (cons (cons name (sgml-extract-attribute-value))
+	   (setq avl
+		 (cons (cons name
+			     (sgml-extract-attribute-value
+			      (sgml-attribute-declared-value (car al))))
 			   avl)))
 	 (while (progn (beginning-of-line 2)
-		       (not (eq t (get-text-property (point) 'read-only)))))))
+		       (not (eq t (get-text-property (point) 'read-only))))))
+       (setq al (cdr al)))
      (reverse avl))))
 
-(defun sgml-extract-attribute-value ()
+(defun sgml-extract-attribute-value (type)
   (save-excursion
     (save-restriction
       (narrow-to-region (point)
 			(progn (sgml-edit-attrib-field-end)
 			       (point)))
-      (subst-char-in-region (point-min) (point-max) ?\n ? )
-      (delete-horizontal-space)
+      (unless (eq type 'cdata)
+	(subst-char-in-region (point-min) (point-max) ?\n ? )
+	(goto-char (point-min))
+	(delete-horizontal-space))
       (goto-char (point-min))
-      (delete-horizontal-space)
-      (let ((quote ""))
+      (when (search-forward "\"" nil t)	; don't allow both " and '
+	(goto-char (point-min))
+	(while (search-forward "'" nil t) ; replace ' with char ref
+	  (replace-match "&#39;")))
+      (buffer-string))))
+
+(defun sgml-quote-attribute-value (value)
+  (let ((quote ""))
 	(cond ((and (not sgml-always-quote-attributes)
-		    (looking-at "^[.A-Za-z0-9---]+$"))) ; no need to quote
-	      ((not (search-forward "\"" nil t)) ; can use "" quotes
+		    (string-match "^[.A-Za-z0-9---]+$" value))
+	       ) ; no need to quote
+	      ((not (string-match "\"" value)) ; can use "" quotes
 	       (setq quote "\""))
 	      (t			; use '' quotes
-	       (while (search-forward "'" nil t) ; replace ' with char ref
-		 (replace-match "&#39;"))
 	       (setq quote "'")))
-	(concat quote (buffer-string) quote)))))
+	(concat quote value quote)))
 
 (defun sgml-edit-attrib-default ()
   "Set current attribute value to default."
