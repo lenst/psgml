@@ -2639,12 +2639,15 @@ Editing is done in a separate window."
 	 (cond				; attribute value
 	  ((and (consp def-value)
 		(eq (car def-value) 'fixed))
-	   (sgml-insert '(read-only t category sgml-fixed)
+	   (sgml-insert '(read-only t
+				    category sgml-fixed
+				    rear-nonsticky (category))
 			"#FIXED %s" (cadr def-value)))
 	  ((and (null cur-value)
 		(or (memq def-value '(implied conref current))
 		    (consp def-value)))
-	   (sgml-insert '(category sgml-default) "#DEFAULT"))
+	   (sgml-insert '(category sgml-default rear-nonsticky (category))
+			"#DEFAULT"))
 	  ((not (null cur-value))
 	   (sgml-insert nil "%s" (cadr cur-value))))
 	 (sgml-insert
