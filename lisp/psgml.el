@@ -62,7 +62,7 @@
 
 ;;;; Code:
 
-(defconst psgml-version "0.4a2"
+(defconst psgml-version "0.4a3"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
@@ -104,6 +104,7 @@ will be slower.")
 
 (defvar sgml-set-face nil
   "*If non-nil, psgml will set the face of parsed markup.")
+(put 'sgml-set-face 'sgml-desc "Set face of parsed markup")
 
 (defvar sgml-live-element-indicator nil
   "*If non-nil, indicate current element in mode line.
@@ -121,6 +122,7 @@ containing a DOCTYPE declaration to use with the modification that the
 document type name is DOCTYPENAME.
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-parent-document)
+(put 'sgml-parent-document 'sgml-type 'string)
 
 (defvar sgml-tag-region-if-active nil
   "*If non-nil, the Tags menu will tag a region if the region is 
@@ -181,6 +183,7 @@ If nil, the point will be placed before the inserted tag(s).")
 If nil, no indentation.
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-indent-step)
+(put 'sgml-indent-step 'sgml-type '(("None" . nil) 0 1 2 3 4 5 6 7 8))
 
 (defvar sgml-indent-data nil
   "*If non-nil, indent in data/mixed context also.
@@ -218,6 +221,7 @@ identifier are used to construct a file name.")
   "*This is the default file name for saved DTD.
 This is set by sgml-mode from the buffer file name.
 Can be changed in the Local variables section of the file.")
+(put 'sgml-default-dtd-file 'sgml-type 'string)
 
 (defvar sgml-custom-markup nil
   "*Menu entries to be added to the Markup menu.
@@ -281,6 +285,31 @@ running the sgml-validate-command.")
 
 (defvar sgml-mode-hook nil
   "A hook or list of hooks to be run when entering sgml-mode")
+
+(defconst sgml-user-options
+  '(sgml-indent-data
+    sgml-indent-step
+    sgml-leave-point-after-insert
+    sgml-auto-insert-required-elements
+    sgml-balanced-tag-edit
+    sgml-omittag-transparent
+    sgml-warn-about-undefined-elements
+    sgml-always-quote-attributes
+    sgml-normalize-trims
+    sgml-omittag
+    sgml-shorttag
+    sgml-minimize-attributes
+    sgml-live-element-indicator
+    sgml-set-face
+    sgml-parent-document
+    sgml-system-path
+    sgml-public-map
+    sgml-default-dtd-file
+    sgml-validate-command
+    sgml-declaration
+    )
+  "User options that can be saved or set from menu."
+  )
 
 ;;; Internal variables
 
@@ -295,7 +324,21 @@ running the sgml-validate-command.")
   "Displayed in the mode line")
 
 
-;;;; Local variables editing
+;;;; User options handling
+
+(defun sgml-variable-description (var)
+  (or (get var 'sgml-desc)
+      (let ((desc (symbol-name var)))
+	(if (string= "sgml-" (substring desc 0 5))
+	    (setq desc (substring desc 5)))
+	(loop for c across-ref desc
+	      do (if (eq c ?-) (setf c ? )))
+	(capitalize desc))))
+
+(defun sgml-variable-type (var)
+  (or (get var 'sgml-type)
+      (if (memq (symbol-value var) '(t nil))
+	  'toggle)))
 
 (defun sgml-set-local-variable (var val)
   "Set the value of variable VAR to VAL in buffer and local variables list."
@@ -338,29 +381,16 @@ running the sgml-validate-command.")
 	       (insert prefix (format "%s:%S" var val) suffix ?\n)))))))
 
 (defun sgml-save-options ()
+  "Save user options for sgml-mode that have buffer local values."
   (interactive)
-  (let ((l '(sgml-indent-data
-	     sgml-indent-step
-	     sgml-leave-point-after-insert
-	     sgml-auto-insert-required-elements
-	     sgml-balanced-tag-edit
-	     sgml-omittag-transparent
-	     sgml-warn-about-undefined-elements
-	     sgml-always-quote-attributes
-	     sgml-normalize-trims
-	     sgml-omittag
-	     sgml-shorttag
-	     sgml-minimize-attributes
-	     sgml-live-element-indicator
-	     sgml-set-face))
+  (let ((l sgml-user-options)
 	(bv (buffer-local-variables)))
-    (while l
-      (when (assq (car l) bv)
-	(sgml-set-local-variable (car l)
-				 (symbol-value (car l))))
-      (setq l (cdr l)))
-    (when sgml-default-dtd-file
-      (sgml-set-local-variable 'sgml-default-dtd-file sgml-default-dtd-file))))
+    (loop for var in sgml-user-options
+	  do
+	  (when (assq var bv)
+	    (sgml-set-local-variable var (symbol-value var))))
+    ;;(when sgml-default-dtd-file (sgml-set-local-variable 'sgml-default-dtd-file sgml-default-dtd-file))
+    ))
 
 
 ;;;; SGML mode: template functions
@@ -420,10 +450,12 @@ running the sgml-validate-command.")
 
 ;;;; Bug reporting
 
+(eval-and-compile
+  (autoload 'reporter-submit-bug-report "reporter"))
+
 (defun sgml-submit-bug-report ()
   "Submit via mail a bug report on PSGML."
   (interactive)
-  (require 'reporter)
   (and (y-or-n-p "Do you really want to submit a report on PSGML? ")
        (reporter-submit-bug-report
 	psgml-maintainer-address
@@ -453,14 +485,15 @@ running the sgml-validate-command.")
 
 ;;; Key commands
 
-(define-key sgml-mode-map "\t" 'sgml-indent-or-tab)
-;(define-key sgml-mode-map "<" 'sgml-insert-tag)
-(define-key sgml-mode-map ">" 'sgml-close-angle)
-(define-key sgml-mode-map "/" 'sgml-slash)
+(define-key sgml-mode-map "\t"    'sgml-indent-or-tab)
+;(define-key sgml-mode-map "<" 	  'sgml-insert-tag)
+(define-key sgml-mode-map ">"     'sgml-close-angle)
+(define-key sgml-mode-map "/"     'sgml-slash)
+(define-key sgml-mode-map "\C-c#"    'sgml-make-character-reference)
+(define-key sgml-mode-map "\C-c-"    'sgml-untag-element)
 (define-key sgml-mode-map "\C-c/"    'sgml-insert-end-tag)
 (define-key sgml-mode-map "\C-c<"    'sgml-insert-tag)
 (define-key sgml-mode-map "\C-c="    'sgml-change-element-name)
-(define-key sgml-mode-map "\C-c-"    'sgml-untag-element)
 (define-key sgml-mode-map "\C-c\C-a" 'sgml-edit-attributes)
 (define-key sgml-mode-map "\C-c\C-c" 'sgml-show-context)
 (define-key sgml-mode-map "\C-c\C-d" 'sgml-next-data-field)
@@ -476,12 +509,11 @@ running the sgml-validate-command.")
 (define-key sgml-mode-map "\C-c\C-t" 'sgml-list-valid-tags)
 (define-key sgml-mode-map "\C-c\C-v" 'sgml-validate)
 (define-key sgml-mode-map "\C-c\C-w" 'sgml-what-element)
-
 (define-key sgml-mode-map "\C-c\C-f\C-e" 'sgml-fold-element)
 (define-key sgml-mode-map "\C-c\C-f\C-r" 'sgml-fold-region)
 (define-key sgml-mode-map "\C-c\C-f\C-s" 'sgml-fold-subelement)
 (define-key sgml-mode-map "\C-c\C-f\C-x" 'sgml-expand-element)
-
+(define-key sgml-mode-map "\C-c\r"   'sgml-split-element)
 (define-key sgml-mode-map "\C-c\C-u\C-e" 'sgml-unfold-element)
 (define-key sgml-mode-map "\C-c\C-u\C-a" 'sgml-unfold-all)
 (define-key sgml-mode-map "\C-c\C-u\C-l" 'sgml-unfold-line)
@@ -586,17 +618,18 @@ All bindings:
   (use-local-map sgml-mode-map)
   (setq mode-name "SGML")
   (setq major-mode 'sgml-mode)
-  (make-local-variable 'paragraph-start)
+
   ;; A start or end tag by itself on a line separates a paragraph.
   ;; This is desirable because SGML discards a newline that appears
   ;; immediately after a start tag or immediately before an end tag.
-  (setq paragraph-start
+
+  (set (make-local-variable 'paragraph-separate)
 	"^[ \t\n]*$\\|\
-\\(</?\\([A-Za-z]\\([-.A-Za-z0-9= \t\n]\\|\"[^\"]*\"\\|'[^']*'\\)*\\)?>$\\)")
-  (make-local-variable 'paragraph-separate)
-  (setq paragraph-separate
-	"^[ \t\n]*$\\|\
-^</?\\([A-Za-z]\\([-.A-Za-z0-9= \t\n]\\|\"[^\"]*\"\\|'[^']*'\\)*\\)?>$")
+^[ \t]*</?\\([A-Za-z]\\([-.A-Za-z0-9= \t\n]\\|\
+\"[^\"]*\"\\|'[^']*'\\)*\\)?>$")
+  (set (make-local-variable 'paragraph-start)
+       paragraph-separate)
+
   (make-local-variable 'sgml-saved-validate-command)
   (set-syntax-table text-mode-syntax-table)
   (make-local-variable 'comment-start)
@@ -833,166 +866,100 @@ ELEMENT is given it should be a parse tree node, from which the level
 is determined."
 	  nil nil)
 
-(autoload 'sgml-load-dtd "psgml-parse"
-	  "Load a saved DTD from FILE."
-	  t nil)
-(autoload 'sgml-show-or-clear-log "psgml-parse"
-	  "Show the *SGML LOG* buffer if it is not showing, or clear and
-remove it if it is showing."
-	  t nil)
-(autoload 'sgml-beginning-of-element "psgml-parse"
-	  "Move to after the start-tag of the current element.
-If the start-tag is implied, move to the start of the element."
-	  t nil)
-(autoload 'sgml-end-of-element "psgml-parse"
-	  "Move to before the end-tag of the current element."
-	  t nil)
-(autoload 'sgml-backward-up-element "psgml-parse"
-	  "Move backward out of this element level.
-That is move to before the start-tag or where a start-tag is implied."
-	  t nil)
-(autoload 'sgml-up-element "psgml-parse"
-	  "Move forward out of this element level.
-That is move to after the end-tag or where an end-tag is implied."
-	  t nil)
-(autoload 'sgml-forward-element "psgml-parse"
-	  "Move forward over next element."
-	  t nil)
-(autoload 'sgml-backward-element "psgml-parse"
-	  "Move backward over previous element at this level.
-With implied tags this is ambigous."
-	  t nil)
-(autoload 'sgml-down-element "psgml-parse"
-	  "Move forward and down one level in the element structure."
-	  t nil)
-(autoload 'sgml-kill-element "psgml-parse"
-	  "Kill the element following the cursor."
-	  t nil)
-(autoload 'sgml-transpose-element "psgml-parse"
-	  "Interchange element before point with element after point, leave point after."
-	  t nil)
-(autoload 'sgml-mark-element "psgml-parse"
-	  "Set mark at end of current element, and leave point before current element."
-	  t nil)
-(autoload 'sgml-change-element-name "psgml-parse"
-	  "Replace the name (generic identifyer) of the current element with a new name."
-	  t nil)
-(autoload 'sgml-fold-region "psgml-parse"
-	  "Hide (or if prefixarg unhide) region.
+;;; Generated by sgml-build-autoloads
+
+(autoload 'sgml-load-dtd "psgml-parse" "Load a saved DTD from FILE." t)
+(autoload 'sgml-show-or-clear-log "psgml-parse" "Show the *SGML LOG* buffer if it is not showing, or clear and
+remove it if it is showing." t)
+(autoload 'sgml-beginning-of-element "psgml-parse" "Move to after the start-tag of the current element.
+If the start-tag is implied, move to the start of the element." t)
+(autoload 'sgml-end-of-element "psgml-parse" "Move to before the end-tag of the current element." t)
+(autoload 'sgml-backward-up-element "psgml-parse" "Move backward out of this element level.
+That is move to before the start-tag or where a start-tag is implied." t)
+(autoload 'sgml-up-element "psgml-parse" "Move forward out of this element level.
+That is move to after the end-tag or where an end-tag is implied." t)
+(autoload 'sgml-forward-element "psgml-parse" "Move forward over next element." t)
+(autoload 'sgml-backward-element "psgml-parse" "Move backward over previous element at this level.
+With implied tags this is ambigous." t)
+(autoload 'sgml-down-element "psgml-parse" "Move forward and down one level in the element structure." t)
+(autoload 'sgml-kill-element "psgml-parse" "Kill the element following the cursor." t)
+(autoload 'sgml-transpose-element "psgml-parse" "Interchange element before point with element after point, leave point after." t)
+(autoload 'sgml-mark-element "psgml-parse" "Set mark after next element." t)
+(autoload 'sgml-mark-current-element "psgml-parse" "Set mark at end of current element, and leave point before current element." t)
+(autoload 'sgml-change-element-name "psgml-parse" "Replace the name of the current element with a new name.
+Eventual attributes of the current element will be translated if 
+possible." t)
+(autoload 'sgml-untag-element "psgml-parse" "Remove tags from current element." t)
+(autoload 'sgml-kill-markup "psgml-parse" "Kill next tag, markup declaration or process instruction." t)
+(autoload 'sgml-fold-region "psgml-parse" "Hide (or if prefixarg unhide) region.
 If called from a program first two arguments are start and end of
-region. And optional third argument true unhides."
-	  t nil)
-(autoload 'sgml-fold-element "psgml-parse"
-	  "Fold the lines comprising the current element, leaving the first line visible.
-This uses the selective display feature."
-	  t nil)
-(autoload 'sgml-fold-subelement "psgml-parse"
-	  "Fold all elements current elements content, leaving the first lines visible.
-This uses the selective display feature."
-	  t nil)
-(autoload 'sgml-unfold-line "psgml-parse"
-	  "Show hidden lines in current line."
-	  t nil)
-(autoload 'sgml-unfold-element "psgml-parse"
-	  "Show all hidden lines in current element."
-	  t nil)
-(autoload 'sgml-expand-element "psgml-parse"
-	  "As sgml-fold-subelement, but unfold first."
-	  t nil)
-(autoload 'sgml-unfold-all "psgml-parse"
-	  "Show all hidden lines in buffer."
-	  t nil)
-(autoload 'sgml-next-data-field "psgml-parse"
-	  "Move forward to next point where data is allowed."
-	  t nil)
-(autoload 'sgml-next-trouble-spot "psgml-parse"
-	  "Move forward to next point where something is amiss with the structure."
-	  t nil)
-(autoload 'sgml-list-valid-tags "psgml-parse"
-	  "Display a list of the contextually valid tags."
-	  t nil)
-(autoload 'sgml-show-context "psgml-parse"
-	  "Display where the cursor is in the element hierarchy."
-	  t nil)
-(autoload 'sgml-what-element "psgml-parse"
-	  "Display what element is under the cursor."
-	  t nil)
-(autoload 'sgml-insert-tag "psgml-parse"
-	  "Insert a tag, reading tag name in minibuffer with completion.
+region. And optional third argument true unhides." t)
+(autoload 'sgml-fold-element "psgml-parse" "Fold the lines comprising the current element, leaving the first line visible.
+This uses the selective display feature." t)
+(autoload 'sgml-fold-subelement "psgml-parse" "Fold all elements current elements content, leaving the first lines visible.
+This uses the selective display feature." t)
+(autoload 'sgml-unfold-line "psgml-parse" "Show hidden lines in current line." t)
+(autoload 'sgml-unfold-element "psgml-parse" "Show all hidden lines in current element." t)
+(autoload 'sgml-expand-element "psgml-parse" "As sgml-fold-subelement, but unfold first." t)
+(autoload 'sgml-unfold-all "psgml-parse" "Show all hidden lines in buffer." t)
+(autoload 'sgml-next-data-field "psgml-parse" "Move forward to next point where data is allowed." t)
+(autoload 'sgml-next-trouble-spot "psgml-parse" "Move forward to next point where something is amiss with the structure." t)
+(autoload 'sgml-list-valid-tags "psgml-parse" "Display a list of the contextually valid tags." t)
+(autoload 'sgml-show-context "psgml-parse" "Display where the cursor is in the element hierarchy." t)
+(autoload 'sgml-what-element "psgml-parse" "Display what element is under the cursor." t)
+(autoload 'sgml-insert-tag "psgml-parse" "Insert a tag, reading tag name in minibuffer with completion.
 If the variable sgml-balanced-tag-edit is t, also inserts the
 corresponding end tag. If sgml-leave-point-after-insert is t, the point
 is left after the inserted tag(s), unless the element has som required
 content.  If sgml-leave-point-after-insert is nil the point is left
-after the first tag inserted."
-	  t nil)
-(autoload 'sgml-insert-element "psgml-parse"
-	  "Reads element name from minibuffer and inserts start and end tags."
-	  t nil)
-(autoload 'sgml-tag-region "psgml-parse"
-	  "Reads element name from minibuffer and inserts start and end tags."
-	  t nil)
-(autoload 'sgml-insert-end-tag "psgml-parse"
-	  "Insert end-tag for the current open element."
-	  t nil)
-(autoload 'sgml-tags-menu "psgml-parse"
-	  "Pop up a menu with valid tags and insert the choosen tag.
+after the first tag inserted." t)
+(autoload 'sgml-insert-element "psgml-parse" "Reads element name from minibuffer and inserts start and end tags." t)
+(autoload 'sgml-tag-region "psgml-parse" "Reads element name from minibuffer and inserts start and end tags." t)
+(autoload 'sgml-insert-end-tag "psgml-parse" "Insert end-tag for the current open element." t)
+(autoload 'sgml-insert-attribute "psgml-parse" "Read attribute name and value from minibuffer and insert attribute spec." t)
+(autoload 'sgml-split-element "psgml-parse" "Split the current element at point.
+If repeated, the containing element will be split before the beginning
+of then current element." t)
+(autoload 'sgml-tags-menu "psgml-parse" "Pop up a menu with valid tags and insert the choosen tag.
 If the variable sgml-balanced-tag-edit is t, also inserts the
 corresponding end tag. If sgml-leave-point-after-insert is t, the point
 is left after the inserted tag(s), unless the element has som required
 content.  If sgml-leave-point-after-insert is nil the point is left
-after the first tag inserted."
-	  t nil)
-(autoload 'sgml-element-menu "psgml-parse"
-	  "Pop up a menu with valid elements and insert choice.
+after the first tag inserted." t)
+(autoload 'sgml-element-menu "psgml-parse" "Pop up a menu with valid elements and insert choice.
 If sgml-leave-point-after-insert is nil the point is left after the first 
-tag inserted."
-	  t nil)
-(autoload 'sgml-start-tag-menu "psgml-parse"
-	  "Pop up a menu with valid start-tags and insert choice."
-	  t nil)
-(autoload 'sgml-end-tag-menu "psgml-parse"
-	  "Pop up a menu with valid end-tags and insert choice."
-	  t nil)
-(autoload 'sgml-tag-region-menu "psgml-parse"
-	  "Pop up a menu with valid elements and tag current region with the choice."
-	  t nil)
-(autoload 'sgml-entities-menu "psgml-parse"
-	  nil
-	  t nil)
-(autoload 'sgml-fill-element "psgml-parse"
-	  "Fill bigest enclosing element with mixed content.
+tag inserted." t)
+(autoload 'sgml-start-tag-menu "psgml-parse" "Pop up a menu with valid start-tags and insert choice." t)
+(autoload 'sgml-end-tag-menu "psgml-parse" "Pop up a menu with valid end-tags and insert choice." t)
+(autoload 'sgml-tag-region-menu "psgml-parse" "Pop up a menu with valid elements and tag current region with the choice." t)
+(autoload 'sgml-entities-menu "psgml-parse" nil t)
+(autoload 'sgml-attrib-menu "psgml-parse" "Pop up a menu of the attributes of the current element
+\(or the element whith start-tag before point)." t)
+(autoload 'sgml-fill-element "psgml-parse" "Fill bigest enclosing element with mixed content.
 If current element has pure element content, recursively fill the
-subelements."
-	  t nil)
-(autoload 'sgml-edit-attributes "psgml-parse"
-	  "Edit attributes of current element.
-Editing is done in a separate window."
-	  t nil)
-
-(autoload 'sgml-hide-attributes "psgml-parse"
-	  nil
-	  t nil)
-(autoload 'sgml-show-attributes "psgml-parse"
-	  nil
-	  t nil)
-(autoload 'sgml-normalize "psgml-parse"
-	  "Normalize buffer by filling in omitted tags and expanding empty tags.
+subelements." t)
+(autoload 'sgml-edit-attributes "psgml-parse" "Edit attributes of current element.
+Editing is done in a separate window." t)
+(autoload 'sgml-hide-tags "psgml-parse" nil t)
+(autoload 'sgml-show-tags "psgml-parse" nil t)
+(autoload 'sgml-hide-attributes "psgml-parse" nil t)
+(autoload 'sgml-show-attributes "psgml-parse" nil t)
+(autoload 'sgml-normalize "psgml-parse" "Normalize buffer by filling in omitted tags and expanding empty tags.
 A  optional argument ELEMENT can be the element to normalize
-insted of the whole buffer."
-	  t nil)
-
-(autoload 'sgml-complete "psgml-parse"
-	  "Complete the word/tag/entity before point.
+insted of the whole buffer." t)
+(autoload 'sgml-normalize-element "psgml-parse" nil t)
+(autoload 'sgml-make-character-reference "psgml-parse" "Convert character after point into a character reference.
+If called with a numeric argument, convert a charactyer reference back
+to a normal character.  If called from a program, set optional
+argument INVERT to non-nil." t)
+(autoload 'sgml-complete "psgml-parse" "Complete the word/tag/entity before point.
 If it is a tag (starts with < or </) complete with valid tags.
-If it is a entity (starts with &) complete with declared entities.
-If it is something else complete with ispell-complete-word."
-	  t nil)
-(autoload 'sgml-options-menu "psgml-parse"
-	  nil
-	  t nil)
-(autoload 'sgml-untag-element "psgml-parse" "" t)
-(autoload 'sgml-kill-markup "psgml-parse" "" t)
-(autoload 'sgml-mark-current-element "psgml-parse" "" t)
+If it is an entity (starts with &) complete with declared entities.
+If it is a markup declaration (starts with <!) complete with markup 
+declaration names.
+If it is something else complete with ispell-complete-word." t)
+(autoload 'sgml-options-menu "psgml-parse" nil t)
+
 
 
 ;;;; Last provisions
