@@ -3892,10 +3892,14 @@ VALUE is a string.  Returns nil or an attdecl."
     (when (consp (cdr modifier))	; There are "seen" elements
       (sgml-open-element et nil (point-min) (point-min))
       (loop for seenel in (cadr modifier)
-	    do (setq sgml-current-state
-		     (sgml-get-move sgml-current-state
+	    do (let ((new-state (sgml-get-move sgml-current-state
 				    (sgml-lookup-eltype
-                                     (sgml-general-case seenel)))))))
+                                     (sgml-general-case seenel)))))
+                 (unless new-state
+                   (error
+                    "Illegal has-seen-element in sgml-parent-document: %s"
+                    seenel))
+                 (setq sgml-current-state new-state)))))
   
   (let ((top (sgml-pstate-top-tree sgml-buffer-parse-state)))
     (setf (sgml-tree-includes top) (sgml-tree-includes sgml-current-tree))
