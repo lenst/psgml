@@ -1793,6 +1793,8 @@ If it is something else complete with ispell-complete-word."
 	 nil)
         (ignore-case                    ; If ignore case in matching completion
          sgml-namecase-general)
+        (insert-case
+         'sgml-general-insert-case)
 	(pattern nil)
 	(c nil)
 	(here (point)))
@@ -1803,6 +1805,7 @@ If it is something else complete with ispell-complete-word."
      ;; entitiy
      ((eq c ?&)
       (sgml-need-dtd)
+      (setq insert-case 'sgml-entity-insert-case)
       (setq tab
 	    (sgml-entity-completion-table
 	     (sgml-dtd-entities (sgml-pstate-dtd sgml-buffer-parse-state)))))
@@ -1844,7 +1847,7 @@ If it is something else complete with ispell-complete-word."
 	       (message "[Complete]"))
 	      ((not (string= pattern completion))
 	       (delete-char (length pattern))
-	       (insert completion))
+	       (insert (funcall insert-case completion)))
 	      (t
 	       (goto-char here)
 	       (message "Making completion list...")
