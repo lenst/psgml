@@ -3895,6 +3895,9 @@ VALUE is a string.  Returns nil or an attdecl."
 
 
 (defun sgml-load-doctype ()
+  "Load the documents DTD.
+Either from parent document or by parsing the document prolog."
+  (interactive)
   (cond
    ;; Case of doctype in another file
    ((or sgml-parent-document sgml-doctype)
