@@ -2645,14 +2645,14 @@ entity hierarchy as possible."
     (when (sgml-element-empty sgml-current-tree)
       (sgml-close-element after-tag after-tag))))
 
-(defun sgml-fake-open-element (tree el)
+(defun sgml-fake-open-element (tree el &optional state)
   (sgml-make-tree
    el 0 0 
    tree
    0
    (append (sgml-eltype-excludes el) (sgml-tree-excludes tree))
    (append (sgml-eltype-includes el) (sgml-tree-includes tree))
-   nil 
+   state
    nil
    nil))
 
@@ -2753,7 +2753,8 @@ Where the latter represents end-tags."
 	 ((and (setq temp (sgml-required-tokens state))
 	       (null (cdr temp)))
 	  (setq temp (car temp)
-		tree (sgml-fake-open-element tree temp)
+		tree (sgml-fake-open-element tree temp
+					     (sgml-get-move state temp))
 		state (sgml-element-model tree))
 	  (push temp imps)
 	  t)
