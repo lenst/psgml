@@ -38,6 +38,11 @@
 
 ;;;; Variables
 
+(defvar sgml-ecat-files '("ECAT" "~/sgml/ECAT" "/usr/local/lib/sgml/ECAT"))
+
+(defvar sgml-local-ecat-files nil)
+(make-variable-buffer-local 'sgml-local-ecat-files)
+
 ;;; Hooks
 
 (defvar sgml-open-element-hook nil
@@ -94,6 +99,12 @@ commands.")
 (defvar sgml-parser-syntax nil
   "Syntax table used during parsing.")
 
+(defvar sgml-ecat-assoc nil
+  "Assoc list caching parsed ecats.")
+
+(defvar sgml-catalog-assoc nil
+  "Assoc list caching parsed catalogs.")
+
 
 ;;; Variables dynamically bound to affect parsing
 
@@ -139,16 +150,17 @@ e.g. a data entity reference.")
 (defvar sgml-dtd-info nil
   "Holds the `sgml-dtd' structure describing the current DTD.")
 
-(defvar sgml-current-entity-map (make-vector 5 nil)
-  "The current values of `sgml-local-catalogs', `sgml-catalog-files',
-`sgml-system-path', `sgml-public-map', and `default-directory' as a
-vector.")
-
 (defvar sgml-current-omittag nil
   "Value of `sgml-omittag' in main buffer. Valid during parsing.")
 
 (defvar sgml-current-shorttag nil
   "Value of `sgml-shorttag' in main buffer. Valid during parsing.")
+
+(defvar sgml-current-localcat nil
+  "Value of `sgml-local-catalogs' in main buffer. Valid during parsing.")
+
+(defvar sgml-current-local-ecat nil
+  "Value of `sgml-local-ecat-files' in main buffer. Valid during parsing.")
 
 (defvar sgml-current-state nil
   "Current state in content model or model type if CDATA, RCDATA or ANY.")
@@ -1477,6 +1489,10 @@ a RNI must be followed by NAME."
 		     spaced ""))))
       value))))
 
+(defun sgml-check-minimum-literal ()
+  (or (sgml-parse-minimum-literal)
+      (sgml-parse-error "A minimum literal expected")))
+
 (defun sgml-skip-tag ()
   (when (sgml-parse-char ?<)
     (sgml-parse-char ?/)
@@ -1550,161 +1566,103 @@ PTYPE can be 'param if this is a parameter entity."
 
 ;;;; External identifyer resolve
 
+(defun sgml-cache-catalog (file cache-var parser-fun)
+  "Return parsed catalog.  
+FILE is the file containing the catalog.  Maintains a cache of parsed
+catalog files in variable CACHE-VAR. The parsing is done by function
+PARSER-FUN that should parse the current buffer and return the parsed
+repreaentation of the catalog."
+  (setq file (expand-file-name file))
+  (and
+   (file-readable-p file)
+   (let ((c (assoc file (symbol-value cache-var)))
+	 (modtime (elt (file-attributes file) 5)))
+     (if (and c (equal (second c) modtime))
+	 (cddr c)
+       (when c (set cache-var (delq c (symbol-value cache-var))))
+       (let (new)
+	 (sgml-push-to-entity file)
+	 (setq default-directory (file-name-directory file))
+	 (setq new (funcall parser-fun))
+	 (sgml-pop-entity)
+	 (push (cons file (cons modtime new)) (symbol-value cache-var))
+	 new)))))
+
+(defun sgml-catalog-lookup (files pubid type name)
+  "Look up the public identifier/entity name in catalogs.
+FILES is a list of catalogs to use. PUBID is the public identifier
+\(if any). TYPE is the entity type and NAME is the entity name."
+  (loop for f in files thereis
+	(loop for (key from to)
+	      in (sgml-cache-catalog f 'sgml-catalog-assoc
+				     (function sgml-parse-catalog-buffer))
+	      thereis
+	      (and (or (and (eq 'entity key)
+			    name (not (eq type 'dtd))
+			    (string= name from))
+		       (and (eq 'public key)
+			    pubid
+			    (string= pubid from))
+		       (and (eq 'doctype key)
+			    (eq type 'dtd)
+			    (string= name from)))
+		   (file-readable-p to)
+		   to))))
+
+(defun sgml-path-lookup (extid type name)
+  (let* ((pubid (car extid))
+	 (sysid (cdr extid))
+	 (subst (list '(?% ?%)))
+	 res)
+    (when pubid
+      (nconc subst (list (cons ?p (sgml-transliterate-file pubid)))
+	     (sgml-pubid-parts pubid))
+      (setq pubid (sgml-canonize-pubid pubid)))
+    (when sysid (nconc subst (list (cons ?s sysid))))
+    (when name  (nconc subst (list (cons ?n name))))
+    (when type  (nconc subst (list (cons ?y (cond ((eq type 'dtd) "dtd")
+						  ((eq type 'text) "text")
+						  ((eq type 'param) "parm")
+						  (t "sgml"))))))
+    (sgml-debug "Ext. file subst. = %S" subst)
+    (loop for cand in sgml-public-map
+	  thereis
+	  (and (setq cand (sgml-subst-expand cand subst))
+	       (file-readable-p
+		(setq res (substitute-in-file-name cand)))
+	       (not (file-directory-p cand))
+	       cand))))
+
 (defun sgml-external-file (extid &optional type name)
   "Return file name for entity with external identifier EXTID.
 Optional argument TYPE should be the type of entity and NAME should be
 the entity name."
   ;; extid is (pubid . sysid)
-  (sgml-compute-map)
-  (let* ((pubid (car extid))
-	 (sysid (cdr extid))
-	 (subst (list '(?% ?%)))
-	 res)
-    (when pubid
-      (nconc subst (list (cons ?p (sgml-transliterate-file pubid)))
-	     (sgml-pubid-parts pubid))
-      (setq pubid (sgml-canonize-pubid pubid)))
-    (when sysid (nconc subst (list (cons ?s sysid))))
-    (when name  (nconc subst (list (cons ?n name))))
-    (when type  (nconc subst (list (cons ?y (cond ((eq type 'dtd) "dtd")
-						  ((eq type 'text) "text")
-						  ((eq type 'param) "parm")
-						  (t "sgml"))))))
-    (sgml-debug "Ext. file subst. = %S" subst)
-;;;    (when sysid
-;;;      (loop for fn in sgml-sysid-resolve-functions
-;;;	    until res do (setq res (funcall fn sysid))))
-    (unless res
-      (loop
-       for entry in sgml-computed-map until res do
-       (cond
-	((stringp entry)
-	 (setq res (sgml-pub-expand entry subst)))
-	;; Catalog entry
-	((or (and (eq 'entity (first entry))
-		  name (not (eq type 'dtd))
-		  (string= name (second entry)))
-	     (and (eq 'public (first entry))
-		  pubid
-		  (string= pubid (second entry)))
-	     (and (eq 'doctype (first entry))
-		  (eq type 'dtd)
-		  (string= name (second entry))))
-	 (setq res (third entry)))
-	;; Predicated entry
-	((and (stringp (first entry))
-	      (string-match (first entry) pubid))
-	 (setq res (sgml-pub-expand (second entry) subst))))
-       (when res
-	 (sgml-debug "file-readable-p? %S" res)
-	 (unless (and (file-readable-p
-		       (setq res (substitute-in-file-name res)))
-		      (not (file-directory-p res)))
-	   (setq res nil))))
-;;;      (cond
-;;;       (t
-;;;	(sgml-log-warning "External entity %s not found" name)
-;;;	(when pubid
-;;;	  (sgml-log-warning "  Public identifier %s" pubid))
-;;;	(when sysid
-;;;	  (sgml-log-warning "  System identfier %s" sysid))))
-      res)))
-
-
-(defun sgml-compute-map ()
-  (unless (and sgml-computed-map
-	       (equal sgml-used-entity-map sgml-current-entity-map))
-    (setq sgml-computed-map
-	  (nconc (loop for file in (append (elt sgml-current-entity-map 0)
-					   (elt sgml-current-entity-map 1))
-		       nconc
-		       (if (file-readable-p
-			    (setq file (expand-file-name
-					file
-					(elt sgml-current-entity-map 4))))
-			   (sgml-load-catalog file)))
-		 (mapcar (function (lambda (s) (concat s "/%s")))
-			 (elt sgml-current-entity-map 2))
-		 (elt sgml-current-entity-map 3))
-	  sgml-used-entity-map (copy-sequence sgml-current-entity-map))))
-
-(defun sgml-update-catalog ()
-  "Reload catalog files."
-  (interactive)
-  (sgml-set-global)
-  (setq sgml-computed-map nil)
-  (sgml-compute-map))
+  (let ((pubid (car extid)))
+    (when pubid (setq pubid (sgml-canonize-pubid pubid)))
+    (or (sgml-catalog-lookup sgml-current-localcat pubid type name)
+	(sgml-catalog-lookup sgml-catalog-files pubid type name)
+	(sgml-path-lookup extid type name))))
 
 (defun sgml-insert-external-entity (extid &optional type name)
+  "Insert the contents of an external entity at point.
+EXTID is the external identifier of the entity. Optional arguments TYPE
+is the entity type and NAME is the entity name, used to find the entity."
   ;; extid is (pubid . sysid)
-  (sgml-compute-map)
   (let* ((pubid (car extid))
-	 (sysid (cdr extid))
-	 (subst (list '(?% ?%)))
-	 res)
-    (when pubid
-      (nconc subst (list (cons ?p (sgml-transliterate-file pubid)))
-	     (sgml-pubid-parts pubid))
-      (setq pubid (sgml-canonize-pubid pubid)))
-    (when sysid (nconc subst (list (cons ?s sysid))))
-    (when name  (nconc subst (list (cons ?n name))))
-    (when type  (nconc subst (list (cons ?y (cond ((eq type 'dtd) "dtd")
-						  ((eq type 'text) "text")
-						  ((eq type 'param) "parm")
-						  (t "sgml"))))))
-    (sgml-debug "Ext. file subst. = %S" subst)
-    (when sysid
-      (loop for fn in sgml-sysid-resolve-functions
-	    until res do (setq res (funcall fn sysid))))
-    (unless res
-      (loop
-       for entry in sgml-computed-map until res do
-       (cond
-	((stringp entry)
-	 (setq res (sgml-pub-expand entry subst)))
-	;; Catalog entry
-	((or (and (eq 'entity (first entry))
-		  name (not (eq type 'dtd))
-		  (string= name (second entry)))
-	     (and (eq 'public (first entry))
-		  pubid
-		  (string= pubid (second entry)))
-	     (and (eq 'doctype (first entry))
-		  (eq type 'dtd)
-		  (string= name (second entry))))
-	 (setq res (third entry)))
-	;; Predicated entry
-	((and (stringp (first entry))
-	      (string-match (first entry) pubid))
-	 (setq res (sgml-pub-expand (second entry) subst))))
-       (when res
-	 (sgml-debug "file-readable-p? %S" res)
-	 (unless (and (file-readable-p
-		       (setq res (substitute-in-file-name res)))
-		      (not (file-directory-p res)))
-	   (setq res nil))))
-      (cond
-       (res (insert-file-contents res))
-       (t
-	(sgml-log-warning "External entity %s not found" name)
-	(when pubid
-	  (sgml-log-warning "  Public identifier %s" pubid))
-	(when sysid
-	  (sgml-log-warning "  System identfier %s" sysid)))))))
+	 (sysid (cdr extid)))
+    (or (if sysid
+	    (loop for fn in sgml-sysid-resolve-functions
+		  thereis (funcall fn sysid)))
+	(let ((file (sgml-external-file extid type name)))
+	  (and file (insert-file-contents file)))
+	(progn
+	  (sgml-log-warning "External entity %s not found" name)
+	  (when pubid
+	    (sgml-log-warning "  Public identifier %s" pubid))
+	  (when sysid
+	    (sgml-log-warning "  System identfier %s" sysid))))))
 
-
-(defun sgml-load-catalog (file)
-  "Load a catalog file."
-  (let (map)
-    (setq file (expand-file-name file))
-    (message "Parsing SGML catalog file %s ..." file)
-    (sgml-debug "Parsing SGML catalog file %s ..." file)
-    (sgml-push-to-entity file)
-    (setq default-directory (file-name-directory file))
-    (setq map (sgml-parse-catalog-buffer))
-    (sgml-pop-entity)
-    (message "Parsing SGML catalog file %s ... done." file)    
-    map))
 
 ;; Parse a buffer full of catalogue entries.
 (defun sgml-parse-catalog-buffer ()
@@ -1741,10 +1699,6 @@ the entity name."
 			(progn (skip-chars-forward "^ \r\n\t")
 			       (point)))))
 
-(defun sgml-check-minimum-literal ()
-  (or (sgml-parse-minimum-literal)
-      (sgml-parse-error "A minimum literal expected")))
-
 (defconst sgml-formal-pubid-regexp
   (concat
    "^\\(+//\\|-//\\|\\)"		; Registered indicator  [1]
@@ -1774,7 +1728,6 @@ the entity name."
 	    (list (cons ?v (sgml-transliterate-file
 			    (sgml-matched-string pubid 10)))))))))
 
-
 (defun sgml-canonize-pubid (pubid)
   (if (string-match sgml-formal-pubid-regexp pubid)
       (concat
@@ -1797,14 +1750,14 @@ the entity name."
 			      c))))
 	     string ""))
 
-(defun sgml-pub-expand-char (c parts)
+(defun sgml-subst-expand-char (c parts)
   (cdr-safe (assq (downcase c) parts)))
 
-(defun sgml-pub-expand (s parts)
+(defun sgml-subst-expand (s parts)
   (loop for i from 0 to (1- (length s))
 	as c = (aref s i)
 	concat (if (eq c ?%)
-		   (or (sgml-pub-expand-char (aref s (incf i)) parts)
+		   (or (sgml-subst-expand-char (aref s (incf i)) parts)
 		       (return nil)) 
 		 (char-to-string (aref s i)))))
 
@@ -1882,62 +1835,45 @@ the entity name."
 ;;  pub-entry ::= ("FILE.CDTD", literal, ent-spec?, cat literal)
 ;;  ent-spec ::= ("[", (name, literal)*, "]")
 
-(defvar sgml-ecat-files '("ECAT" "~/sgml/ECAT" "/usr/local/lib/sgml/ECAT"))
-(defvar sgml-local-ecat-files nil)
-(make-variable-buffer-local 'sgml-local-ecat-files)
-
 ;; Parsed ecat = (eent*)
 ;; eent = (type ...)
 ;;      = ('public.cdtd pubid cfile . ents)
 ;;      = ('file.cdtd file cfile . ents)
 
-(defvar sgml-ecat-assoc nil
-  "Assoc list of files and parsed ecats.")
-
 (defun sgml-load-ecat (file)
   "Return ecat for FILE."
-  (setq file (expand-file-name file))
-  (and
-   (file-readable-p file)
-   (let ((c (assoc file sgml-ecat-assoc))
-	 (modtime (elt (file-attributes file) 5)))
-     (if (and c (equal (second c) modtime))
-	 (cddr c)
-       (let (type from ents to name val new)
-	 (when c (setq sgml-ecat-assoc
-		       (delq c sgml-ecat-assoc)))
-	 (sgml-push-to-entity file)
-	 (setq default-directory (file-name-directory file))
-	 (while (progn (sgml-skip-cs)
-		       (setq type (sgml-parse-name)))
-	   (setq type (intern (downcase type)))
-	   (setq ents nil from nil)
-	   (sgml-skip-cs)
-	   (cond
-	    ((eq type 'public.cdtd)
-	     (setq from (sgml-canonize-pubid (sgml-check-minimum-literal))))
-	    ((eq type 'file.cdtd)
-	     (setq from (expand-file-name (sgml-check-cat-literal)))))
-	   (cond
-	    ((null from)
-	     (error "Syntax error in ECAT: %s" file))
-	    (t
-	     (sgml-skip-cs)
-	     (when (sgml-parse-char ?\[)
-	       (while (progn (sgml-skip-cs)
-			     (setq name (sgml-parse-name t)))
-		 (sgml-skip-cs)
-		 (setq val (sgml-check-literal))
-		 (push (cons name val) ents))
-	       (sgml-check-char ?\])
-	       (sgml-skip-cs))
-	     (setq to (expand-file-name (sgml-check-cat-literal)))
-	     (push (cons type (cons from (cons to ents)))
-		   new))))
-	 (setq new (nreverse new))
-	 (sgml-pop-entity)
-	 (push (cons file (cons modtime new)) sgml-ecat-assoc)
-	 new)))))
+  (sgml-cache-catalog
+   file 'sgml-ecat-assoc
+   (function
+    (lambda ()
+      (let (new type ents from to name val)
+	(while (progn (sgml-skip-cs)
+		      (setq type (sgml-parse-name)))
+	  (setq type (intern (downcase type)))
+	  (setq ents nil from nil)
+	  (sgml-skip-cs)
+	  (cond
+	   ((eq type 'public.cdtd)
+	    (setq from (sgml-canonize-pubid (sgml-check-minimum-literal))))
+	   ((eq type 'file.cdtd)
+	    (setq from (expand-file-name (sgml-check-cat-literal)))))
+	  (cond
+	   ((null from)
+	    (error "Syntax error in ECAT: %s" file))
+	   (t
+	    (sgml-skip-cs)
+	    (when (sgml-parse-char ?\[)
+	      (while (progn (sgml-skip-cs)
+			    (setq name (sgml-parse-name t)))
+		(sgml-skip-cs)
+		(setq val (sgml-check-literal))
+		(push (cons name val) ents))
+	      (sgml-check-char ?\])
+	      (sgml-skip-cs))
+	    (setq to (expand-file-name (sgml-check-cat-literal)))
+	    (push (cons type (cons from (cons to ents)))
+		  new))))
+	(nreverse new))))))
 
 (defun sgml-ecat-lookup (files pubid file)
   "Return (file . ents) or nil."
@@ -1965,7 +1901,7 @@ the entity name."
   "Return the complied DTD for extid or nil."
   (when pubid (setq pubid (sgml-canonize-pubid pubid)))
   (when file (setq file (expand-file-name file)))
-  (let ((ce (or (sgml-ecat-lookup sgml-local-ecat-files pubid file)
+  (let ((ce (or (sgml-ecat-lookup sgml-current-local-ecat pubid file)
 		(sgml-ecat-lookup sgml-ecat-files pubid file)))
 	cfile dtd)
     (when ce
@@ -1974,10 +1910,9 @@ the entity name."
 	(condition-case nil
 	    (progn
 	      (sgml-push-to-entity cfile)
-	      (message "Loading DTD from %s..." cfile)
+	      (message "Loading compiled DTD from %s..." cfile)
 	      (setq dtd (sgml-read-dtd))
-	      (sgml-pop-entity)
-	      (message "Loading DTD from %s...done" cfile))
+	      (sgml-pop-entity))
 	  (error nil)))
       (when (and (not (and dtd (sgml-up-to-date-p
 				cfile
@@ -3177,12 +3112,9 @@ VALUE is a string.  Returns nil or an attdecl."
 
 (defun sgml-set-global ()
   (setq sgml-current-omittag sgml-omittag
-	sgml-current-shorttag sgml-shorttag)
-  (aset sgml-current-entity-map 0 sgml-local-catalogs)
-  (aset sgml-current-entity-map 1 sgml-catalog-files)
-  (aset sgml-current-entity-map 2 sgml-system-path)
-  (aset sgml-current-entity-map 3 sgml-public-map)
-  (aset sgml-current-entity-map 4 default-directory))
+	sgml-current-shorttag sgml-shorttag
+	sgml-current-localcat sgml-local-catalogs
+	sgml-current-local-ecat sgml-local-ecat-files))
 
 (defun sgml-parse-until-end-of (sgml-close-element-trap &optional extra-cond)
   "Parse until the SGML-CLOSE-ELEMENT-TRAP has ended,
