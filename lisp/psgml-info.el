@@ -102,10 +102,11 @@
 	   (loop for dfa in (sgml-and-node-dfas (car agenda)) do
 		 (sgml-add-last-unique dfa states))))
 	 (setq agenda (cdr agenda)))
-       (setq res (sort (copy-seq (set-difference
-                                  (union res (sgml-eltype-includes eltype))
-                                  (sgml-eltype-excludes eltype)))
-		       (function string-lessp)))
+       (setq res
+             (sort (copy-sequence (set-difference
+                                   (union res (sgml-eltype-includes eltype))
+                                   (sgml-eltype-excludes eltype)))
+                   (function string-lessp)))
        (setf (sgml-eltype-appdata eltype 're-cache) res)
        res)))))
 
