@@ -1234,7 +1234,7 @@ buffer is assumend to be empty to start with."
 		   (unless (or (null other)
 			       (equal entity other))
 		     (sgml-log-message
-		      "Parameter %s in complied DTD has wrong value;\
+		      "Parameter %s in compiled DTD has wrong value;\
  is '%s' should be '%s'"
 		      (sgml-entity-name entity)
 		      (sgml-entity-text other)
@@ -2521,7 +2521,7 @@ overrides the entity type in entity look up."
 	  (goto-char (point-max)))
 	 (file
 	  ;; fifth arg not available in early v19
-	  ;;(erase-buffer) already erase the buffer
+	  (erase-buffer)
 	  (insert-file-contents file nil nil nil)
           (setq sgml-current-file file)
 	  (setq default-directory (file-name-directory file))
