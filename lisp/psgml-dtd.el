@@ -1,7 +1,7 @@
 ;;;; psgml-dtd.el --- DTD parser for SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1993 Lennart Staflin
+;; Copyright (C) 1994 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 
@@ -28,6 +28,7 @@
 ;;;; Code:
 
 (require 'psgml)
+(require 'psgml-parse)
 
 ;;;; Constructing basic
 
@@ -278,13 +279,6 @@ Syntax: var dfa-expr &body forms"
       names)
      (t
       (list (sgml-check-name))))))
-
-(defun sgml-check-nametoken ()
-  (sgml-skip-ps)
-  (let ((token (sgml-parse-nametoken)))
-    (unless (symbolp token)
-      (sgml-parse-error "Expecting a name token"))
-    token))
 
 (defun sgml-parse-nametoken-group ()
   (sgml-skip-ps)
@@ -775,5 +769,5 @@ FORMS should produce the binary coding of element in VAR."
       (kill-buffer tem))))
 
 
-;;; psgml-dtd.el end here
+;;; psgml-dtd.el ends here
 
