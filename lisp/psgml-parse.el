@@ -3874,6 +3874,7 @@ VALUE is a string.  Returns nil or an attdecl."
   "Parse until the SGML-CLOSE-ELEMENT-TRAP has ended,
 or if it is t, any additional element has ended,
 or if nil, until end of buffer."
+  (sgml-debug "-> sgml-parse-until-end-of")
   (cond
    (cont (sgml-parse-continue (point-max)))
    (t    (sgml-parse-to (point-max) extra-cond quiet)))
@@ -3883,7 +3884,8 @@ or if nil, until end of buffer."
 		   (or (eq sgml-close-element-trap t)
 		       (eq sgml-close-element-trap sgml-current-tree)
 		       (eq sgml-current-tree sgml-top-tree)))
-	     (sgml-implied-end-tag "buffer end" (point) (point))))))
+	     (sgml-implied-end-tag "buffer end" (point) (point)))))
+  (sgml-debug "<- sgml-parse-until-end-of"))
 
 (defun sgml-parse-to (sgml-goal &optional extra-cond quiet)
   "Parse until (at least) SGML-GOAL.
@@ -4328,6 +4330,9 @@ Returns parse tree; error if no element after POS."
   (unless (sgml-tree-etag-epos element)
     (save-excursion
       (sgml-parse-until-end-of element)))
+  (unless (sgml-tree-etag-epos element)
+    (sgml-debug "Failed to define end of element %s"
+                (sgml-element-gi element)))
   (assert (sgml-tree-etag-epos element))
   (sgml-epos-promote (sgml-tree-etag-epos element)))
 
