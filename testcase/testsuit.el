@@ -20,6 +20,7 @@
     ("tc16.el")
     ("tc17.html")
     ("tc18.el")
+    ("tc19.sgml" (warning "B end-tag implied by B start-tag"))
     ))
 
 (defun testsuit-run-test-case (case-description)
