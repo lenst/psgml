@@ -1,7 +1,7 @@
 ;;; psgml.el --- SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1993, 1994, 1995, 1996, 1997 Lennart Staflin
+;; Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998 Lennart Staflin
 ;; Copyright (C) 1992 Free Software Foundation, Inc.
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
@@ -139,7 +139,8 @@ shortref- short reference")
 (defvar sgml-buggy-subst-char-in-region 
   (or (not (boundp 'emacs-minor-version))
       (not (natnump emacs-minor-version))
-      (< emacs-minor-version 23))
+      (and (eq emacs-major-version 19)
+           (< emacs-minor-version 23)))
   "*If non-nil, work around a bug in subst-char-in-region.
 The bug sets the buffer modified.  If this is set, folding commands
 will be slower.")
@@ -222,6 +223,14 @@ Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-namecase-general)
 (put 'sgml-namecase-general 'sgml-desc "NAMECASE GENERAL")
 
+
+
+;;[lenst/1998-03-09 19:51:55]
+(defconst sgml-namecase-entity nil)
+(defvar sgml-general-insert-case 'upper)
+(defvar sgml-entity-insert-case nil)
+
+
 (defvar sgml-minimize-attributes nil
   "*Determines minimization of attributes inserted by edit-attributes.
 Actually two things are done
@@ -293,33 +302,34 @@ Setting this variable automatically makes it local to the current buffer.")
 Setting this variable automatically makes it local to the current buffer.")
 (make-variable-buffer-local 'sgml-indent-data)
 
-(defvar sgml-system-path nil
-  "*Not used any more.
-Used to be list of directories used to look for system identifiers.
-Currently only used by `sgml-load-dtd'.")
-(put 'sgml-system-path 'sgml-type 'list)
 
 (defun sgml-parse-colon-path (cd-path)
   "Explode a colon-separated list of paths into a string list."
-  (let ((cd-sep ":")
-	cd-list (cd-start 0) cd-colon)
-    (if (boundp 'path-separator)
-	(setq cd-sep path-separator))
-    (setq cd-path (concat cd-path cd-sep))
-    (while (setq cd-colon (string-match cd-sep cd-path cd-start))
-      (setq cd-list
-	    (nconc cd-list
-		   (list (if (= cd-start cd-colon)
-			     nil
-			   (substitute-in-file-name
-			    (substring cd-path cd-start cd-colon))))))
-      (setq cd-start (+ cd-colon 1)))
-    cd-list))
+  (if (null cd-path)
+      nil
+    (let ((cd-sep ":")
+	  cd-list (cd-start 0) cd-colon)
+      (if (boundp 'path-separator)
+	  (setq cd-sep path-separator))
+      (setq cd-path (concat cd-path cd-sep))
+      (while (setq cd-colon (string-match cd-sep cd-path cd-start))
+	(setq cd-list
+	      (nconc cd-list
+		     (list (if (= cd-start cd-colon)
+			       nil
+			     (substitute-in-file-name
+			      (substring cd-path cd-start cd-colon))))))
+	(setq cd-start (+ cd-colon 1)))
+      cd-list)))
 
-(defvar sgml-public-map (sgml-parse-colon-path
-			 (or (getenv "SGML_PATH")
-			     "%S:/usr/local/lib/sgml/%o/%c/%d"))
-  
+(defvar sgml-system-path (sgml-parse-colon-path
+			  (or (getenv "SGML_SEARCH_PATH")
+			      "."))
+  "*List of directories used to look for system identifiers.")
+(put 'sgml-system-path 'sgml-type 'list)
+
+(defvar sgml-public-map (or (sgml-parse-colon-path (getenv "SGML_PATH"))
+			    '("%S" "/usr/local/lib/sgml/%o/%c/%d" ))
   "*Mapping from public identifiers to file names.
 This is a list of possible file names.  To find the file for a public
 identifier the elements of the list are used one at the time from the
@@ -342,9 +352,9 @@ This variable is automatically local to the buffer.")
 (make-variable-buffer-local 'sgml-local-catalogs)
 (put 'sgml-local-catalogs 'sgml-type 'list)
 
-(defvar sgml-catalog-files (sgml-parse-colon-path
-			    (or (getenv "SGML_CATALOG_FILES")
-				"CATALOG:/usr/local/lib/sgml/CATALOG"))
+(defvar sgml-catalog-files (or (sgml-parse-colon-path
+				(getenv "SGML_CATALOG_FILES"))
+			       '("catalog" "/usr/local/lib/sgml/catalog"))
   "*List of catalog entry files.
 The files are in the format defined in the SGML Open Draft Technical
 Resolution on Entity Management.")
@@ -1106,6 +1116,19 @@ All bindings:
 ;;;###autoload
 (define-derived-mode xml-mode sgml-mode "XML"
   (setq sgml-xml-p t)
+					; Variant XML syntax
+  (require 'psgml-parse)
+  (let ((old-parser-syntax sgml-parser-syntax))
+    (make-local-variable 'sgml-parser-syntax)
+    (setq sgml-parser-syntax (copy-syntax-table old-parser-syntax)))
+  (modify-syntax-entry ?_ "w" sgml-parser-syntax)
+  (modify-syntax-entry ?: "w" sgml-parser-syntax)
+  (let ((i 128))
+    (while (< i (length sgml-parser-syntax))
+      (if (= (char-syntax i) ?w)
+	  (modify-syntax-entry i "w" sgml-parser-syntax))
+      (setq i (1+ i))))
+					; XML-friendly settings
   (setq sgml-omittag nil)
   (setq sgml-shorttag nil)
   (setq sgml-namecase-general nil)

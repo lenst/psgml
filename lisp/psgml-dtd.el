@@ -474,8 +474,7 @@ Case transformed for general names."
 	(setq el (if con1
 		     (funcall con1 subs)
 		   (car subs)))))
-     ((sgml-parse-rni (eval-when-compile
-			(sgml-general-case "PCDATA"))) ; #PCDATA
+     ((sgml-parse-rni "pcdata")         ; #PCDATA (FIXME: when changing case)
       (setq sgml-used-pcdata t)
       (setq el (sgml-make-pcdata)))
      ((sgml-parse-delim "DTGO")			; data tag group
@@ -686,10 +685,11 @@ Case transformed for general names."
 		   attlist))))))
 
 (defun sgml-merge-attlists (old new)
+  (setq old (nreverse (copy-list old)))
   (loop for att in new do
 	(unless (assoc (car att) old)
 	  (setq old (cons att old))))
-  old)
+  (nreverse old))
 
 (defun sgml-parse-attribute-definition ()
   (sgml-skip-ps)
@@ -990,7 +990,7 @@ Construct the binary coded DTD (bdtd) in the current buffer."
    ";;; This file was created by psgml on " (current-time-string) "\n"
    "(sgml-saved-dtd-version 6)\n")
   (sgml-code-dtd dtd)
-  (setq file-type 1)
+  (set 'file-type 1)
   (write-region (point-min) (point-max) file))
 
 

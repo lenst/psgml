@@ -1,12 +1,12 @@
 ;;;; psgml-parse.el --- Parser for SGML-editing mode with parsing support
 ;; $Id$
 
-;; Copyright (C) 1994, 1995, 1996, 1997 Lennart Staflin
+;; Copyright (C) 1994, 1995, 1996, 1997, 1998 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Acknowledgment:
-;;   The catalog parsing code was contributed by
-;;      David Megginson <dmeggins@microstar.com>
+;;   The catalog and XML parsing code was contributed by
+;;      David Megginson <dmeggins@??>
 
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License
@@ -80,6 +80,7 @@ Each function should take one argument, the system identifier of an entity.
 If the function can handle that identifier, it should insert the text
 of the entity into the current buffer at point and return t.  If the
 system identifier is not handled the function should return nil.")
+
 
 ;;; Internal variables
 
@@ -169,6 +170,9 @@ e.g. a data entity reference.")
 
 (defvar sgml-dtd-info nil
   "Holds the `sgml-dtd' structure describing the current DTD.")
+
+(defvar sgml-current-namecase-general t
+  "Value of `sgml-namecase-general' in main buffer. Valid during parsing.")
 
 (defvar sgml-current-omittag nil
   "Value of `sgml-omittag' in main buffer. Valid during parsing.")
@@ -272,7 +276,7 @@ to point to the next scratch buffer.")
 
 (defvar sgml-current-element-name nil
   "Name of current element for mode line display.")
-
+(make-variable-buffer-local 'sgml-current-element-name)
 
 ;;;; Build parser syntax table
 
@@ -753,7 +757,20 @@ If ATTSPEC is nil, nil is returned."
 
 (defun sgml-extid-expand (file extid)
   "Expand file name FILE in the context of EXTID."
-  (expand-file-name file (sgml-extid-dir extid)))
+  (let ((sgml-system-path (cons (sgml-extid-dir extid)
+				sgml-system-path)))
+    (or (sgml-extid-expand-2 file sgml-system-path)
+	(expand-file-name file (sgml-extid-dir extid)))))
+
+(defun sgml-extid-expand-2 (file directories)
+  (cond ((null directories) nil)
+	(t
+	 (let ((f (expand-file-name file (car directories))))
+	   (if (file-exists-p f)
+	       f
+	     (sgml-extid-expand-2 file (cdr directories)))))))
+	       
+
 
 ;;;; DTD 
 
@@ -1142,7 +1159,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
       (setq sgml-default-dtd-file file)
       (setq sgml-loaded-dtd real-file))))
 
-;;;; Biniary coded DTD module
+;;;; Binary coded DTD module
 ;;; Works on the binary coded compiled DTD (bdtd)
 
 ;;; bdtd-load: cfile dtdfile ents -> bdtd
@@ -1303,6 +1320,7 @@ ends at point."
       "MDO"   "<!"
       "MINUS" "-"
       "MSC"   "]]"
+      "NESTC" "/"
       "NET"   "/"
       "OPT"   "?"
       "OR"    "|"
@@ -1328,6 +1346,9 @@ ends at point."
       ;; Pseudo
       "NULL"  ""
       )))
+
+(defun sgml-delim (drole)
+  (car (cdr (member drole sgml-delimiters))))
 
 
 (defmacro sgml-is-delim (delim &optional context move offset)
@@ -1508,8 +1529,9 @@ in any of them."
     (/= 0 (skip-chars-forward " \t\n\r"))))
 
 (defsubst sgml-parse-processing-instruction ()
-  (if (sgml-parse-delim "PIO")
-      (sgml-do-processing-instruction)))
+  (let ((sgml-markup-start (point)))
+    (if (sgml-parse-delim "PIO")
+	(sgml-do-processing-instruction))))
 
 (defun sgml-do-processing-instruction ()
   (let ((start (point)))
@@ -1526,13 +1548,31 @@ in any of them."
   t)
 
 
-(defmacro sgml-general-case (string)
-  (`(let ((sgml-general-case (, string)))
-      (if sgml-namecase-general
-	  (downcase sgml-general-case)
-	sgml-general-case))))
+(defun sgml-general-case (string)
+  (if sgml-current-namecase-general
+      (downcase string)
+    string))
 
 (defmacro sgml-entity-case (string)   string)
+
+
+;;[lenst/1998-03-09 19:52:08]  Perhaps not the right place
+(defun sgml-general-insert-case (text)
+  (if sgml-namecase-general
+      (case sgml-general-insert-case
+        (upper (upcase text))
+        (lower (downcase text))
+        (t text))
+    text))
+
+(defun sgml-entity-insert-case  (text)
+  (if sgml-namecase-entity
+      (case sgml-entity-insert-case
+        (upper (upcase text))
+        (lower (downcase text))
+        (t text))
+    text))
+
 
 (defun sgml-parse-name (&optional entity-name)
   (if (sgml-startnm-char-next)
@@ -1555,14 +1595,13 @@ in any of them."
    (t
     form)))
 
+
 (defun sgml-check-name (&optional entity-name)
   (or (sgml-parse-name entity-name)
       (sgml-parse-error "Name expected")))
 
 (define-compiler-macro sgml-check-name (&optional entity-name)
-  (`(or (, (if entity-name
-	       (`(sgml-parse-name (, entity-name)))
-	     '(sgml-parse-name)))
+  (`(or (sgml-parse-name (, entity-name))
 	(sgml-parse-error "Name expected"))))
 
 
@@ -1580,14 +1619,6 @@ in any of them."
 (defun sgml-check-nametoken ()
   (or (sgml-parse-nametoken)
       (sgml-parse-error "Name token expected")))
-
-;;(defun sgml-gname-symbol (string)
-;;  "Convert a string to a general name/nametoken/numbertoken."
-;;  (intern (sgml-general-case string)))
-
-;;(defun sgml-ename-symbol (string)
-;;  "Convert a string to an entity name."
-;;  (intern (sgml-entity-case string)))
 
 (defsubst sgml-parse-general-entity-ref ()
   (if (sgml-parse-delim "ERO" nmstart)
@@ -1706,7 +1737,7 @@ a RNI must be followed by NAME."
   "Convert the argument to lower case.
 If sgml-namecase-general is nil, then signal an error if the argument
 is not in upper case."
-  (or sgml-namecase-general
+  (or sgml-current-namecase-general
       (equal name (upcase name))
       (sgml-parse-error "Uppercase keyword expected."))
   (downcase name))
@@ -2391,7 +2422,7 @@ overrides the entity type in entity look up."
     (set-buffer sgml-scratch-buffer)
     ;; For MULE to not misinterpret binary data set the mc-flag
     ;; (reported by Jeffrey Friedl <jfriedl@nff.ncl.omron.co.jp>)
-    (setq mc-flag nil)			
+    (set 'mc-flag nil)			
     (when (eq sgml-scratch-buffer (default-value 'sgml-scratch-buffer))
       (make-local-variable 'sgml-scratch-buffer)
       (setq sgml-scratch-buffer nil))
@@ -2637,8 +2668,9 @@ overrides the entity type in entity look up."
 
 (defun sgml-element-empty (element)
   "True if ELEMENT is empty."
-  (or (eq sgml-empty (sgml-element-model element))
-      (sgml-tree-conref element)))
+  (or (sgml-tree-conref element)
+      (and (not sgml-xml-p)
+           (eq sgml-empty (sgml-element-model element)))))
 
 (defun sgml-check-empty (name)
   "True if element with NAME is empty."
@@ -2656,8 +2688,9 @@ overrides the entity type in entity look up."
   (if (eq element sgml-top-tree)
       ""
     (format "in %s %s"
-	    (sgml-element-gi element)
-	    (sgml-element-context-string (sgml-tree-parent element)))))
+            (sgml-element-gi element)
+            (sgml-element-context-string (sgml-tree-parent element)))))
+
 
 ;;;; Display and Mode-line
 
@@ -3589,12 +3622,15 @@ Returns a list of attspec (attribute specification)."
 	      val
 	      (sgml-eltype-name eltype))))
       ;; *** What happens when eltype is nil ??
-      (when attdecl
+      (cond
+       (attdecl
 	(push (sgml-make-attspec (sgml-attdecl-name attdecl) val)
 	      asl)
 	(when (sgml-default-value-type-p 'conref
 					 (sgml-attdecl-default-value attdecl))
-	  (setq sgml-conref-flag t))))
+	  (setq sgml-conref-flag t)))
+       (t                               ; No attdecl, record attribute any way
+        (push (sgml-make-attspec name val) asl))))
     asl))
 
 (defun sgml-check-attribute-value-specification ()
@@ -3727,7 +3763,8 @@ VALUE is a string.  Returns nil or an attdecl."
 
 
 (defun sgml-set-global ()
-  (setq sgml-current-omittag sgml-omittag
+  (setq sgml-current-namecase-general sgml-namecase-general
+        sgml-current-omittag sgml-omittag
 	sgml-current-shorttag sgml-shorttag
 	sgml-current-localcat sgml-local-catalogs
 	sgml-current-local-ecat sgml-local-ecat-files
@@ -3922,6 +3959,8 @@ pointing to start of short ref and point pointing to the end."
   ;; Assume point after STAGO
   (when sgml-throw-on-element-change
     (throw sgml-throw-on-element-change 'start))
+  ;; Ugly? Let conref flag mean an empty element tag in XML mode,
+  ;; then the node will be marked for special handling.
   (setq sgml-conref-flag nil)
   (let (net-enabled et asl)
     (setq et (if (sgml-is-delim "TAGC")	; empty start-tag
@@ -3935,6 +3974,8 @@ pointing to start of short ref and point pointing to the end."
 	     (or sgml-current-shorttag
 		 (sgml-log-warning
 		  "NET enabling start-tag is not allowed with SHORTTAG NO"))))
+       (if (and sgml-xml-p (sgml-parse-delim "XML-TAGCE"))
+           (setq sgml-conref-flag t))
        (sgml-check-tag-close)))
     (sgml-set-markup-type 'start-tag)
     (cond ((and sgml-ignore-undefined-elements
@@ -3948,9 +3989,8 @@ pointing to start of short ref and point pointing to the end."
 			 (format "%s start-tag" (sgml-eltype-name et)))
 	   (sgml-open-element et sgml-conref-flag
 			      sgml-markup-start (point) asl)
-	   (when net-enabled
+	   (when net-enabled            ;FIXME: why not argument to sgml-open-el?
 	     (setf (sgml-tree-net-enabled sgml-current-tree) t))))))
-
 
 (defun sgml-do-empty-start-tag ()
   "Return eltype to use if empty start tag"
@@ -4060,7 +4100,6 @@ pointing to start of short ref and point pointing to the end."
 (defun sgml-check-tag-close ()
   (or
    (sgml-parse-delim "TAGC")
-   (and sgml-xml-p (sgml-parse-delim "XML-TAGCE"))
    (if (or (sgml-is-delim "STAGO" gi)
 	   (sgml-is-delim "ETAGO" gi))
        (or sgml-current-shorttag
@@ -4226,6 +4265,11 @@ Returns parse tree; error if no element after POS."
   (sgml-parse-to-here)
   (cond (sgml-markup-type
 	 (error "No elements allowed in markup"))
+        ((eq sgml-current-state sgml-any)
+         ;; FIXME: should perhaps allow nondefined elements if here is
+         ;; no DTD
+         (sgml-read-element-type prompt
+                                 sgml-dtd-info))
 	((and ;;sgml-buffer-eltype-map
 	      (not (eq sgml-current-state sgml-any)))
 	 (let ((tab
@@ -4283,12 +4327,12 @@ This is a list of (attname value) lists."
 (defun sgml-start-tag-of (element)
   "Return the start-tag for ELEMENT."
   (if (and sgml-xml-p (sgml-check-empty (sgml-cohere-name element)))
-      (format "<%s/>" (sgml-cohere-name element))
-    (format "<%s>" (sgml-cohere-name element))))
+      (format "<%s/>" (sgml-general-insert-case (sgml-cohere-name element)))
+    (format "<%s>" (sgml-general-insert-case (sgml-cohere-name element)))))
 
 (defun sgml-end-tag-of (element)
   "Return the end-tag for ELEMENT (token or element)."
-  (format "</%s>" (sgml-cohere-name element)))
+  (format "</%s>" (sgml-general-insert-case (sgml-cohere-name element))))
 
 (defun sgml-top-element ()
   "Return the document element."

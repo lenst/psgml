@@ -669,6 +669,7 @@ AVL should be a assoc list mapping symbols to strings."
 		val (cdr-safe (sgml-lookup-attspec name avl))
 		dcl (sgml-attdecl-declared-value attspec)
 		def (sgml-attdecl-default-value attspec))
+          (setq name (sgml-general-insert-case name))
 	  (unless val			; no value given
 	    ;; Supply the default value if a value is needed
 	    (cond ((sgml-default-value-type-p 'required def)
@@ -676,6 +677,10 @@ AVL should be a assoc list mapping symbols to strings."
 		  ((and (not (or sgml-omittag sgml-shorttag))
 			(consp def))
 		   (setq val (sgml-default-value-attval def)))))
+          (when val
+            (cond ((eq dcl 'cdata))
+                  ((eq dcl 'entity) (setq val (sgml-entity-insert-case val)))
+                  (t (setq val (sgml-general-insert-case val)))))
 	  (cond 
 	   ((null val))			; Ignore
 	   ;; Ignore attributes with default value
@@ -749,11 +754,18 @@ AVL should be a assoc list mapping symbols to strings."
       (sgml-indent-line)))))
 
 (defun sgml-insert-start-tag (name asl attlist &optional net)
-  (insert "<" name)
+  ;; Insert a start-tag with attributes
+  ;; if NET is true end with NESTC unless XML then end with NESTC NET
+  ;; (aka XML-TAGCE).
+  (insert (sgml-delim "STAGO") (sgml-general-insert-case name))
   (sgml-insert-attributes asl attlist)
-  (if (and sgml-xml-p (sgml-check-empty name))
-      (insert "/>")
-    (insert (if net "/" ">"))))
+  ;; In XML, force net if element is always empty
+  (when (and sgml-xml-p (sgml-check-empty name))
+    (setq net t))
+  (insert (if net (if sgml-xml-p
+                      (sgml-delim "XML-TAGCE")
+                    (sgml-delim "NESTC"))
+            (sgml-delim "TAGC"))))
 
 (defun sgml-change-start-tag (element asl)
   (let ((name (sgml-element-gi element))
@@ -762,7 +774,9 @@ AVL should be a assoc list mapping symbols to strings."
     (goto-char (sgml-element-start element))
     (delete-char (sgml-element-stag-len element))
     (sgml-insert-start-tag name asl attlist
-			   (eq t (sgml-element-net-enabled element)))))
+                           (if sgml-xml-p
+                               (sgml-element-empty element)
+                             (eq t (sgml-element-net-enabled element))))))
 
 (defun sgml-read-attribute-value (attdecl curvalue)
   "Return the attribute value read from user.
@@ -1769,5 +1783,18 @@ If it is something else complete with ispell-complete-word."
     (delete-char 1))
   (sgml-up-element))
 
+(defun sgml-position ()
+  (interactive)
+  (let ((el (sgml-find-context-of (point)))
+        (gis nil)
+        (pstr ""))
+    (while (not (sgml-off-top-p el))
+      (push (sgml-element-gi el) gis)
+      (setq el (sgml-element-parent el)))
+    
+    (message "%s" (mapconcat #'sgml-general-insert-case
+                             gis "\\"))))
+
+(define-key sgml-mode-map "\C-c\C-y" 'sgml-position)
 
 ;;; psgml-edit.el ends here
