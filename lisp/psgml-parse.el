@@ -97,6 +97,9 @@ Tested by sgml-close-element to see if the parse should be ended.")
 (defvar sgml-top-tree nil)
 (make-variable-buffer-local 'sgml-top-tree)
 
+(defvar sgml-document-element nil)
+(make-variable-buffer-local 'sgml-document-element)
+
 
 ;;;; Build parser syntax table
 
@@ -739,11 +742,17 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-set-doctype (model)
   (make-local-variable 'before-change-function)
   (setq before-change-function 'sgml-note-change-at)
+  (setq sgml-document-element (and (sgml-model-group-p model)
+				   (sgml-move-token
+				    (car (sgml-state-reqs model)))))
   (setq sgml-top-tree
 	(sgml-make-tree
 	 (make-element :name "Document (no element)"
 		       :model model)
 	 0 0 nil 0 nil nil nil nil)))
+
+(defun sgml-document-element ()
+  ())
 
 (defun sgml-reset-parse-state ()
   (setf (sgml-tree-content sgml-top-tree) nil) ; do I need this?
@@ -1241,7 +1250,8 @@ remove it if it is showing."
 
 (defsubst sgml-is-start-tag ()
   (and (eq ?< (following-char))
-       (sgml-startnm-char (char-after (1+ (point))))))
+       (or (sgml-startnm-char (char-after (1+ (point))))
+	   (eq ?> (char-after (1+ (point)))))))
 
 (defsubst sgml-skip-s ()
   (/= 0 (skip-chars-forward " \t\n\r")))
@@ -1578,10 +1588,9 @@ or if nil, until end of buffer."
 	     (or (sgml-startnm-char-next)
 		 (eq ?> (following-char)))) ; empty end tag
 	(sgml-parse-end-tag))
-       ((sgml-startnm-char-next)
+       ((or (sgml-startnm-char-next)
+	    (eq ?> (following-char)))	; empty start tag
 	(sgml-parse-start-tag))
-       ((sgml-parse-char ?>)		; empty start tag
-	(sgml-log-warning "Empty start tag not handled"))
        ((memq (following-char) '(?! ??))
 	(forward-char -1)
 	(or (and (eq sgml-current-tree sgml-top-tree)
@@ -1621,9 +1630,18 @@ or if nil, until end of buffer."
 	  nil)))))
 
 (defun sgml-parse-start-tag ()    
-  "Assume point after <"
+  ;; Assume point after <
   (setq sgml-markup-type 'start-tag)
-  (let* ((gi (sgml-check-name))
+  (let* ((gi
+	  (if (eq ?> (following-char))	; empty start tag
+	      (if t ;sgml-omittag ; if omittag use current open element
+		  ;; *** if not omittag how does it work??
+		  (if (eq sgml-current-tree sgml-top-tree)
+		      sgml-document-element ; or document element if
+					; no element is open
+		    (sgml-element-name sgml-current-tree))
+		(sgml-last-closed-element))
+	    (sgml-check-name)))
 	 temp net-enabled)
     (unless (sgml-parse-char ?>)	; optimize common case
       (unless (search-forward-regexp
@@ -1650,6 +1668,10 @@ or if nil, until end of buffer."
     (sgml-open-element gi sgml-markup-start (point))
     (when net-enabled
       (setf (sgml-tree-net-enabled sgml-current-tree) t))))
+
+;(defun sgml-last-closed-element ()
+;  "Return the GI of the last closed element."
+;  (let ((u sgml-current-tree))))
 
 (defun sgml-parse-end-tag ()
   "Assume point after </ or at / in a NET"
@@ -1728,18 +1750,20 @@ or if nil, until end of buffer."
       ;;(message "%d" at)
       (while
 	  (cond
-	   ((and (sgml-tree-next u)
+	   ((and (sgml-tree-next u)	; Change clearly in next element
 		 (> at (sgml-element-stag-end (sgml-tree-next u))))
 	    (setq u (sgml-tree-next u)))
-	   (t
-	    (setf (sgml-tree-next u) nil)
-	    (cond
-	     ((and (sgml-tree-end u)
+	   (t				; 
+	    (setf (sgml-tree-next u) nil) ; Forget next element
+	    (cond 
+	     ;; If change after this element and it is ended by an end
+	     ;; tag pruning is done.  If the end of the element is
+	     ;; implied changing the tag that implied it may change
+	     ;; the extent of the element.
+	     ((and (sgml-tree-end u)	
 		   (> at (sgml-tree-end u))
-		   ;;(>= at (sgml-tree-end u))
-		   ;;(> (sgml-tree-etag-len u) 0)
-		   )
-	      nil)
+		   (> (sgml-tree-etag-len u) 0))
+	      nil) 
 	     (t
 	      (setf (sgml-tree-end u) nil)
 	      (cond ((and (sgml-tree-content u)
