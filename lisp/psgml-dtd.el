@@ -599,7 +599,6 @@ Syntax: var dfa-expr &body forms"
   (sgml-clear-log)
   (message "Parsing prolog...")
   (setq	sgml-element-map nil		; Remove old element dcl
-	sgml-doctype-state nil
 	sgml-param-entities nil
 	sgml-entities nil)
   (goto-char (point-min))
@@ -740,7 +739,7 @@ FORMS should produce the binary coding of element in VAR."
   (let ((elems sgml-buffer-element-map)
 	(params sgml-buffer-param-entities)
 	(entities sgml-buffer-entities)
-	(doctype (element-model (sgml-tree-element sgml-top-tree)))
+	(doctype sgml-buffer-doctype)
 	(cb (current-buffer)))
     (set-buffer target)
     (erase-buffer)
@@ -786,12 +785,15 @@ FORMS should produce the binary coding of element in VAR."
 	 (setq sgml-default-dtd-file (file-name-nondirectory file)))
 	(t
 	 (setq sgml-default-dtd-file file)))
-  (let ((tem (generate-new-buffer " *savedtd*")))
+  (let ((tem (generate-new-buffer " *savedtd*"))
+	(cb (current-buffer)))
     (unwind-protect
 	(progn
 	  (sgml-code-dtd tem)
 	  (set-buffer tem)
-	  (write-region (point-min) (point-max) file))
+	  (write-region (point-min) (point-max) file)
+	  (set-buffer cb)
+	  (setq sgml-loaded-dtd file))
       (kill-buffer tem))))
 
 
