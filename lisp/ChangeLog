@@ -1,3 +1,22 @@
+1999-10-14  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-parse.el (sgml-log-entity-stack): don't use
+	sgml-pop-entity, just loop thru the entity stack and print out the
+	files. 
+	(sgml-load-ecat): bind sgml-xml-p while parsing catalog
+
+1999-10-13  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-parse.el (sgml-current-file): New variable, holds the name
+	of file name (if any) of the entity beeing parsed in the buffer.
+	(sgml-parse-warning): New func. Log a parser warning, a warning
+	including information about where the error occured. Mostly for
+	DTD parsing.
+	(sgml-log-entity-stack): new factored function.
+	(*) Replaces some sgml-parse-error and sgml-log-warning with
+	sgml-parse-warning.
+	(sgml-parse-catalog-buffer): bind sgml-xml-p while parsing catalog 
+	
 Sun Oct 10 15:53:12 1999  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* Version 1.2 released

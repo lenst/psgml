@@ -249,6 +249,9 @@ if a CONREF attribute is parsed.")
   "This is the entity reference used to enter current entity.
 If this is nil, then current entity is main buffer.")
 
+(defvar sgml-current-file nil
+  "This is the file name of the current entity")
+
 (defvar sgml-scratch-buffer nil
   "The global value of this variable is the first scratch buffer for 
 entities. The entity buffers can have a buffer local value for this variable
@@ -1698,17 +1701,18 @@ in any of them."
 	(cond (ent
 	       (sgml-push-to-entity ent sgml-markup-start 'param))
 	      (t
-	       (sgml-log-warning
+	       (sgml-parse-warning
 		"Undefined parameter entity %s" name)))
 	t))
 
 (defun sgml-parse-comment ()
   (if (sgml-parse-delim "COM")
-      (if sgml-xml-p
-	  (sgml-parse-error "XML forbids nested comments.")
-	(progn (sgml-skip-upto "COM")
-	       (sgml-check-delim "COM")
-	       t))))
+      (progn
+        (if sgml-xml-p
+            (sgml-parse-warning "XML forbids nested comments."))
+        (sgml-skip-upto "COM")
+        (sgml-check-delim "COM")
+        t)))
 
 (defun sgml-parse-xml-comment ()
   (if (sgml-parse-delim "XML-SCOM")
@@ -1953,10 +1957,10 @@ repreaentation of the catalog."
        (when c (set cache-var (delq c (symbol-value cache-var))))
        (let (new)
 	 (message "Loading %s ..." file)
-	 (sgml-push-to-entity file)
-	 (setq default-directory (file-name-directory file))
-	 (setq new (funcall parser-fun))
-	 (sgml-pop-entity)
+         (save-excursion
+           (sgml-push-to-entity file)
+           (setq default-directory (file-name-directory file))
+           (setq new (funcall parser-fun)))
 	 (push (cons file (cons modtime new)) (symbol-value cache-var))
 	 (message "Loading %s ... done" file)
 	 new)))))
@@ -2102,28 +2106,29 @@ Returns nil if entity is not found."
 ;; Parse a buffer full of catalogue entries.
 (defun sgml-parse-catalog-buffer ()
   "Parse all entries in a catalogue."
-  (sgml-trace-lookup "  (Parsing catalog)")
-  (loop
-   while (sgml-skip-cs)
-   for type = (downcase (sgml-check-cat-literal))
-   for class = (cdr (assoc type '(("public" . public) ("dtddecl" . public)
-				  ("entity" . name)   ("linktype" . name)
-				  ("doctype" . name)  ("sgmldecl" . noname)
-				  ("document" . noname)
-				  ("catalog"  . noname))))
-   when (not (null class))
-   collect
-   (let* ((name
-	   (cond ((eq class 'public)
-		  (sgml-skip-cs)
-		  (sgml-canonize-pubid (sgml-check-minimum-literal)))
-		 ((string= type "doctype")
-		  (sgml-general-case (sgml-check-cat-literal)))
-		 ((eq class 'name)
-		  (sgml-entity-case (sgml-check-cat-literal)))))
-	  (file
-	   (expand-file-name (sgml-check-cat-literal))))
-     (list (intern type) name file))))
+  (let ((sgml-xml-p nil))
+    (sgml-trace-lookup "  (Parsing catalog)")
+    (loop
+     while (sgml-skip-cs)
+     for type = (downcase (sgml-check-cat-literal))
+     for class = (cdr (assoc type '(("public" . public) ("dtddecl" . public)
+                                    ("entity" . name)   ("linktype" . name)
+                                    ("doctype" . name)  ("sgmldecl" . noname)
+                                    ("document" . noname)
+                                    ("catalog"  . noname))))
+     when (not (null class))
+     collect
+     (let* ((name
+             (cond ((eq class 'public)
+                    (sgml-skip-cs)
+                    (sgml-canonize-pubid (sgml-check-minimum-literal)))
+                   ((string= type "doctype")
+                    (sgml-general-case (sgml-check-cat-literal)))
+                   ((eq class 'name)
+                    (sgml-entity-case (sgml-check-cat-literal)))))
+            (file
+             (expand-file-name (sgml-check-cat-literal))))
+       (list (intern type) name file)))))
 
 
 (defun sgml-check-cat-literal ()
@@ -2318,7 +2323,8 @@ text. Otherwise buffer position will be after entity reference."
    file 'sgml-ecat-assoc
    (function
     (lambda ()
-      (let (new type ents from to name val)
+      (let ((sgml-xml-p nil)
+            new type ents from to name val)
 	(while (progn (sgml-skip-cs)
 		      (setq type (sgml-parse-name)))
 	  (setq type (intern (downcase type)))
@@ -2475,6 +2481,7 @@ overrides the entity type in entity look up."
     (setq sgml-last-entity-buffer (current-buffer))
     (erase-buffer)
     (setq default-directory dd)
+    (make-local-variable 'sgml-current-file)
     (make-local-variable 'sgml-current-eref)
     (setq sgml-current-eref eref)
     (set-syntax-table syntax-table)
@@ -2494,6 +2501,7 @@ overrides the entity type in entity look up."
      ((stringp entity)			; a file name
       ;;(save-excursion ) test remove [lenst/1998-06-19 12:49:47]
       (insert-file-contents entity)
+      (setq sgml-current-file entity)
       ;; (goto-char (point-min)) ??
       (setq default-directory (file-name-directory entity)))
      ((consp (sgml-entity-text entity)) ; external id?
@@ -2515,6 +2523,7 @@ overrides the entity type in entity look up."
 	  ;; fifth arg not available in early v19
 	  ;;(erase-buffer) already erase the buffer
 	  (insert-file-contents file nil nil nil)
+          (setq sgml-current-file file)
 	  (setq default-directory (file-name-directory file))
 	  (goto-char (point-min)))
 	 (t ;; No file for entity
@@ -3206,15 +3215,29 @@ Where the latter represents end-tags."
 (defun sgml-error (format &rest things)
   (when sgml-throw-on-error
     (throw sgml-throw-on-error nil))
-  (while (and (boundp 'sgml-previous-buffer) sgml-previous-buffer)
-    (when sgml-current-eref
-      (sgml-log-message
-       "Line %s in %S "
-       (count-lines (point-min) (point))
-       (sgml-entity-name (sgml-eref-entity sgml-current-eref))))
-    (sgml-pop-entity))
+  (sgml-log-entity-stack)
   (apply 'sgml-log-warning format things)
   (apply 'error format things))
+
+(defun sgml-log-entity-stack ()
+  (save-excursion
+    (loop
+     do (sgml-log-message
+         "%s line %s col %s %s"
+         (or sgml-current-file (buffer-file-name) "-")
+         (count-lines (point-min) (point))
+         (current-column)
+         (let ((entity (if sgml-current-eref
+                           (sgml-eref-entity sgml-current-eref))))
+           (if (and entity (sgml-entity-type entity))
+               (format "entity %s" (sgml-entity-name entity))
+             "")))
+     while (and (boundp 'sgml-previous-buffer) sgml-previous-buffer)
+     do (set-buffer sgml-previous-buffer))))
+
+(defun sgml-parse-warning (format &rest things)
+  (sgml-log-entity-stack)
+  (apply 'sgml-log-warning format things))
 
 (defun sgml-parse-error (format &rest things)
   (apply 'sgml-error
@@ -3677,7 +3700,7 @@ Returns a list of attspec (attribute specification)."
   (or (sgml-parse-literal)
       (prog1 (sgml-parse-nametoken t)	; Not really a nametoken, but an
 	(when sgml-xml-p		; undelimited literal
-	  (sgml-parse-error "XML forbids undelimited literals.")))
+	  (sgml-parse-warning "XML forbids undelimited literals.")))
       (sgml-parse-error "Expecting an attribute value: literal or token")))
 
 (defun sgml-parse-attribute-value-specification (&optional warn)
