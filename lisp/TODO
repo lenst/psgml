@@ -1,4 +1,32 @@
-TODO      [Time-stamp: "2000-03-21 16:29:31 lennarts"]           -*- outline -*- 
+TODO      [Time-stamp: "2000-04-16 21:12:29 lenst"]           -*- outline -*- 
+
+* Indent and fill
+
+Should probably not indent in NOFILL elements.
+
+Perhaps indentation in a fillable element should be the same for all
+lines. That would speed up fill. Exception for non-fillable elements
+inside fillable elements (like list in paragraphs), these sould be
+indented independently.
+
+Make indentation algorithm pluggable.
+
+sgml-compute-indent ELEMENT PART  =>  COLUMN
+
+PART in stag, etag, content, attribute ?
+
+Help func: sgml-current-indent-of ELEMENT => COLUMN
+
+(sgml-compute-indent e 'content) ->
+        (sgml-current-indent-of e) + sgml-ident-step
+
+(sgml-compute-indent e 'stag) ->
+        (sgml-current-indent-of (sgml-element-parent e)) + sgml-ident-step
+or is this always =
+   (sgml-compute-indent (sgml-element-parent e) 'content)
+
+
+
 
 * sgml-kill-element
 

@@ -1,3 +1,17 @@
+Sun Apr 16 16:07:55 2000  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-indent-line): compute indentation from
+ 	context, not element under point. Did this change once before but
+ 	had to back it out. This time take care of omitted end-tags by
+ 	choosing parent element as context, if point is at the very end of
+ 	the element. Don't do special attribute indenting for elements
+ 	that occur in data context.
+	(sgml-fill-region): Fix giving up to early.
+	(sgml-do-fill): indent tags of subelements in element context
+
+	* psgml-info.el (sgml-describe-element-type): Use sgml-princ-names
+	for occurs in section.
+
 2000-03-22  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml-edit.el (sgml-change-element-name): Add end-tag event if
