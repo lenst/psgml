@@ -2790,7 +2790,7 @@ overrides the entity type in entity look up."
 		       eol-pos (function input-pending-p) quiet)
 		    (error nil)))))))
 	;; Set face in rest of buffer
-	(sgml-fontify-buffer 6)		;*** make option for delay
+	(sgml-fontify-buffer 6)		;FIXME: make option for delay
 	))))
 
 (defun sgml-fontify-buffer (delay)
@@ -3149,7 +3149,7 @@ Where the latter represents end-tags."
 	(loop for e in (sgml-eltypes-in-state tree state) do
 	      (when (not (memq e elems))
 		(setq elems (nconc elems (list e)))))))
-    ;; *** Filter out elements that are undefined?
+    ;; FIXME: Filter out elements that are undefined?
     (sort elems (function string-lessp))))
 
 (defun sgml-current-list-of-endable-eltypes ()

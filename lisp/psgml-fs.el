@@ -4,7 +4,7 @@
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
 ;; Version: $Id$
 ;; Keywords: 
-;; Last edited: 1998-12-07 00:09:57 lenst
+;; Last edited: 1999-05-02 21:34:59 lenst
 
 ;;; This program is free software; you can redistribute it and/or modify
 ;;; it under the terms of the GNU General Public License as published by
@@ -62,6 +62,7 @@
 ;;; Dynamic variables
 
 (defvar fs-current-element nil)
+(defvar fs-buffer)
 
 
 ;;;; Formatting engine
@@ -86,9 +87,18 @@
 (defvar fs-vspace 0
   "Vertical space after last paragraph")
 
+(defun fs-add-output (str &optional just)
+  (save-excursion
+    (set-buffer fs-buffer)
+    (let ((start (point)))
+      (insert str)
+      (when just
+        (set-justification start (point) just)))))
+
+
 (defun fs-addvspace (n)
   (when (> n fs-vspace)
-    (princ (make-string (- n fs-vspace) ?\n))
+    (fs-add-output (make-string (- n fs-vspace) ?\n))
     (setq fs-vspace n)))
 	   
 
@@ -110,7 +120,13 @@
   (unless fs-left-indent
     (setq fs-left-indent (fs-char 'left)
 	  fs-first-indent (fs-char 'first)))
-  (setq fs-para-acc (concat fs-para-acc data)))
+  (let ((face (fs-char 'face)))
+    (when face
+      (setq data (copy-sequence data))
+      (put-text-property 0 (length data)
+                         'face face data))
+    (setq fs-para-acc (concat fs-para-acc data))))
+
 
 (defun fs-output-para (text first-indent indent hang-from literal)
   (sgml-push-to-string text)
@@ -136,8 +152,9 @@
 	 (make-string (or first-indent indent) ? )))
       (fill-region-as-paragraph (point-min) (point-max))
       ))
-    (princ (buffer-string)))
-  (sgml-pop-entity))
+    (fs-add-output (buffer-string) (fs-char 'justification)))
+  (sgml-pop-entity)
+  (sit-for 0))
 
 (defun fs-element-content (e)
   (let ((fs-para-acc "") fs-first-indent fs-left-indent)
@@ -243,11 +260,17 @@ The value can be the style-sheet list, or it can be a file name
         fs-first-indent nil
         fs-left-indent nil
         fs-vspace 0)
-  (let ((fs-style (fs-get-style fs-style)))
-    (with-output-to-temp-buffer "*Formatted*"
-      (fs-engine (sgml-top-element))
-      (fs-para))))
-		 
+  (let ((fs-style (fs-get-style fs-style))
+        (fs-buffer (get-buffer-create "*Formatted*")))
+    (save-excursion
+      (set-buffer fs-buffer)
+      (erase-buffer))
+    (display-buffer fs-buffer)
+    (fs-engine (sgml-top-element))
+    (fs-para)
+    (save-excursion
+      (set-buffer fs-buffer)
+      (goto-char (point-min)))))
 
 
 ;;;; Helper functions for use in style sheet

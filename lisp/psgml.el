@@ -759,6 +759,7 @@ as that may change."
 	 'sgml-shorttag
 	 'sgml-namecase-general
 	 'sgml-tag-region-if-active
+         'sgml-use-text-properties
 	 ))))
 
 
