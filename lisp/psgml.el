@@ -50,12 +50,13 @@
 
 ;;; Code:
 
-(defconst psgml-version "1.0a9"
+(defconst psgml-version "1.0a10"
   "Version of psgml package.")
 
 (defconst psgml-maintainer-address "lenst@lysator.liu.se")
 
 (require 'cl)
+(require 'easymenu)
 
 (defvar sgml-debug nil)
 
@@ -262,6 +263,10 @@ date, thus in such case it can be useful to set this variable to
 						   ("Yes" . t)
 						   ("Ask" . ask)))
 
+(defvar sgml-trace-entity-lookup nil
+  "*If non-nil, log messages about catalog files used to look for
+external entities.") 
+
 (defvar sgml-indent-step 2
   "*How much to increment indent for every element level.
 If nil, no indentation.
@@ -280,7 +285,7 @@ Setting this variable automatically makes it local to the current buffer.")
 
 (defun sgml-parse-colon-path (cd-path)
   "Explode a colon-separated list of paths into a string list."
-  (let (cd-prefix cd-list (cd-start 0) cd-colon)
+  (let (cd-list (cd-start 0) cd-colon)
     (setq cd-path (concat cd-path ":"))
     (while (setq cd-colon (string-match ":" cd-path cd-start))
       (setq cd-list
@@ -481,6 +486,8 @@ See `compilation-error-regexp-alist'.")
     sgml-balanced-tag-edit
     sgml-omittag-transparent
     sgml-leave-point-after-insert
+    sgml-insert-missing-element-comment
+    sgml-insert-end-tag-on-new-line
     sgml-warn-about-undefined-elements
     sgml-warn-about-undefined-entities
     sgml-ignore-undefined-elements
@@ -490,6 +497,7 @@ See `compilation-error-regexp-alist'.")
     sgml-validate-command
     sgml-markup-faces
     sgml-system-identifiers-are-preferred
+    sgml-trace-entity-lookup
     sgml-system-path
     sgml-public-map
     sgml-catalog-files
@@ -579,10 +587,9 @@ See `compilation-error-regexp-alist'.")
 (defun sgml-save-options ()
   "Save user options for sgml-mode that have buffer local values."
   (interactive)
-  (let ((l sgml-file-options))
-    (loop for var in sgml-file-options do
-	  (when (sgml-valid-option var)
-	    (sgml-set-local-variable var (symbol-value var))))))
+  (loop for var in sgml-file-options do
+	(when (sgml-valid-option var)
+	  (sgml-set-local-variable var (symbol-value var)))))
 
 
 ;;;; Run hook with args
@@ -764,12 +771,134 @@ as that may change."
 (define-key sgml-mode-map "\e\C-t"   'sgml-transpose-element)
 (define-key sgml-mode-map "\M-\t"    'sgml-complete)
 
-;;; Menu bar
+;;;; Menu bar
 
-(eval-when-compile
-  (autoload 'sgml-build-custom-menus "psgml-other")) ; Avoid compiler warnings
+(easy-menu-define
+ sgml-dtd-menu sgml-mode-map "DTD menu"
+ '("DTD"))
 
-;; load menu file at the end
+(defconst sgml-dtd-root-menu
+  '("DTD"
+    ["Parse DTD"  sgml-parse-prolog t]
+    ("Info"
+     ["General DTD info"	sgml-general-dtd-info           t]
+     ["Describe element type"	sgml-describe-element-type	t]
+     ["Describe entity"		sgml-describe-entity		t]
+     ["List elements" 		sgml-list-elements 		t]
+     ["List attributes" 	sgml-list-attributes 		t]
+     ["List terminals" 		sgml-list-terminals 		t]
+     ["List content elements" 	sgml-list-content-elements 	t]
+     ["List occur in elements" 	sgml-list-occur-in-elements 	t]
+     )
+    "--"
+    ["Load Parsed DTD"  sgml-load-dtd t]
+    ["Save Parsed DTD"  sgml-save-dtd t]
+    ))
+
+(easy-menu-define
+ sgml-view-menu sgml-mode-map "View menu"
+ '("View"
+   ["Fold Element"	sgml-fold-element	t]
+   ["Fold Subelement"	sgml-fold-subelement	t]
+   ["Unfold Line"	sgml-unfold-line	t]
+   ["Unfold Element"	sgml-unfold-element	t]
+   ["Expand"		sgml-expand-element	t]
+   ["Fold Region"	sgml-fold-region	t]
+   ["Unfold All"	sgml-unfold-all		t]
+   ["Hide Tags"		sgml-hide-tags		t]
+   ["Hide Attributes"	sgml-hide-attributes	t]
+   ["Show All Tags"	sgml-show-tags		t]
+   )
+ )
+
+
+(defconst sgml-markup-root-menu
+  '("Markup"
+    ["Insert Element"	sgml-element-menu	t]
+    ["Insert Start-Tag" sgml-start-tag-menu	t]
+    ["Insert End-Tag"	sgml-end-tag-menu	t]
+    ["Tag Region"	sgml-tag-region-menu	t]
+    ["Insert Attribute" sgml-attrib-menu	t]
+    ["Insert Entity"	sgml-entities-menu	t]
+    ))
+
+(easy-menu-define
+ sgml-markup-menu sgml-mode-map "Markup menu"
+ sgml-markup-root-menu)
+
+(easy-menu-define
+ sgml-move-menu sgml-mode-map "Menu of move commands"
+ '("Move"
+   ["Next trouble spot" sgml-next-trouble-spot t]
+   ["Next data field"   sgml-next-data-field   t]
+   ["Forward element"	sgml-forward-element t]
+   ["Backward element"  sgml-backward-element t]
+   ["Up element"	sgml-up-element t]
+   ["Down element"	sgml-down-element t]
+   ["Backward up element" sgml-backward-up-element t]
+   ["Beginning of element" sgml-beginning-of-element t]
+   ["End of element"	sgml-end-of-element t]
+   ))
+
+(easy-menu-define
+ sgml-modify-menu sgml-mode-map "Menu of modification commands"
+ '("Modify"
+   ["Normalize"			sgml-normalize	t]
+   ["Expand All Short References"	sgml-expand-all-shortrefs t]
+   ["Expand Entity Reference"	sgml-expand-entity-reference t]
+   ["Normalize Element"		sgml-normalize-element t]
+   ["Make Character Reference"	sgml-make-character-reference t]
+   ["Unmake Character Reference"	(sgml-make-character-reference t) t]
+   ["Fill Element"		sgml-fill-element t]
+   ["Change Element Name..."	sgml-change-element-name t]
+   ["Edit Attributes..."	sgml-edit-attributes t]
+   ["Kill Markup"		sgml-kill-markup t]
+   ["Kill Element"		sgml-kill-element t]
+   ["Untag Element"		sgml-untag-element t]
+   ["Trim and leave element"	sgml-trim-and-leave-element t]
+   ["Decode Character Entities"  sgml-charent-to-display-char t]
+   ["Encode Characters"		sgml-display-char-to-charent t]
+   )
+ )
+
+(easy-menu-define
+ sgml-main-menu sgml-mode-map "Main menu"
+ '("SGML"
+   ["Reset Buffer"	normal-mode t]
+   ["End Element"	sgml-insert-end-tag t]
+   ["Show Context"	sgml-show-context t]
+   ["What Element"	sgml-what-element t]
+   ["List Valid Tags"	sgml-list-valid-tags t]
+   ["Show/Hide Warning Log"  sgml-show-or-clear-log t]
+   ["Validate"		sgml-validate t]
+   ["File Options >"	sgml-file-options-menu t]
+   ["User Options >"	sgml-user-options-menu t]
+   ["Save File Options"  sgml-save-options t]
+   ["Submit Bug Report"  sgml-submit-bug-report t]
+   )
+ )
+
+
+(defun sgml-build-custom-menus ()
+  "Build custom parts of Markup and DTD menus."
+  (easy-menu-define
+   sgml-markup-menu sgml-mode-map "Markup menu"
+   (append sgml-markup-root-menu
+	   (list "----")
+	   (loop for e in sgml-custom-markup collect
+		 (vector (first e)
+			 (` (sgml-insert-markup  (, (cadr e))))
+			 t))))
+  (easy-menu-define
+   sgml-dtd-menu sgml-mode-map "DTD menu"
+   (append sgml-dtd-root-menu
+	   (list "----")
+	   (loop for e in sgml-custom-dtd collect
+		 (vector (first e)
+			 (` (sgml-doctype-insert (, (cadr e))
+						 '(, (cddr e))))
+			 t)))))
+
 
 ;;;; Post command hook 
 
@@ -784,7 +913,9 @@ actually only the state that persists between commands.")
 (make-variable-buffer-local 'sgml-buffer-parse-state)
 
 (eval-and-compile			; Interface to psgml-parse
-  (loop for fun in '(sgml-need-dtd sgml-update-display sgml-subst-expand
+  (loop for fun in '(sgml-need-dtd sgml-update-display
+				   sgml-fontify-buffer
+				   sgml-subst-expand
 				   sgml-declaration)
 	do (autoload fun "psgml-parse")))
 
@@ -797,7 +928,8 @@ actually only the state that persists between commands.")
 	       (not (zerop (buffer-size)))
 	       (looking-at ".*<"))
       (setq sgml-auto-activate-dtd-tried t)
-      (sgml-need-dtd))
+      (sgml-need-dtd)
+      (sgml-fontify-buffer 0))
     (when sgml-buffer-parse-state
       (sgml-update-display))))
 
@@ -923,7 +1055,13 @@ All bindings:
       (setq sgml-default-dtd-file nil)))
   (add-hook 'post-command-hook 'sgml-command-post 'append)
   (run-hooks 'text-mode-hook 'sgml-mode-hook)
-  (sgml-build-custom-menus))
+  (sgml-build-custom-menus)
+  (easy-menu-add sgml-main-menu)
+  (easy-menu-add sgml-modify-menu)
+  (easy-menu-add sgml-move-menu)
+  (easy-menu-add sgml-markup-menu)
+  (easy-menu-add sgml-view-menu)
+  (easy-menu-add sgml-dtd-menu))
 
 (defun sgml-default-dtd-file ()
   (and (buffer-file-name)
@@ -1132,6 +1270,7 @@ and move to the line in the SGML document that caused it."
 	  nil
 	  nil nil)
 (autoload 'sgml-indent-line "psgml-edit" nil)
+(autoload 'sgml-element-endable-p "psgml-edit" nil)
 
 ;;; Generated by sgml-build-autoloads
 
@@ -1264,8 +1403,7 @@ If it is something else complete with ispell-complete-word." t)
 
 (cond
  (sgml-running-lucid
-  (require 'psgml-lucid)
-  (add-hook 'sgml-mode-hook 'sgml-install-lucid-menus))
+  (require 'psgml-lucid))
  (t
   (require 'psgml-other)))
 
