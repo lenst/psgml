@@ -213,7 +213,7 @@ if the item is selected."
 	   (list "----")
 	   (loop for e in sgml-custom-markup collect
 		 (vector (first e)
-			 (` (sgml-markup '(,@(cdr e))))
+			 (` (sgml-insert-markup  (, (cadr e))))
 			 t))))
   (easy-menu-define
    sgml-dtd-menu sgml-mode-map "DTD menu"
