@@ -1,3 +1,8 @@
+2000-10-11  Lennart Staflin  <lennarts@infotek.no>
+
+	* psgml-edit.el (sgml-indent-line): new strategy for identifying
+	elements
+
 2000-09-06  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml-api.el (sgml-map-content): Use sgml-with-parser-syntax-ro

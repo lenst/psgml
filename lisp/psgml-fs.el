@@ -199,6 +199,9 @@ The value can be the style-sheet list, or it can be a file name
 \(string) of a file containing the style sheet or it can be the name
 \(symbol) of a variable containing the style sheet." )
 
+(put 'fs-style 'variable-interactive
+     "fStyle file: ")
+
 (defvar fs-cached-styles nil)
 
 (defun fs-get-style (style)
