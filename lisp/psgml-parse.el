@@ -74,11 +74,10 @@ Tested by sgml-close-element to see if the parse should be ended.")
 					; a finite automaton.
 
 ;; Variables used during doctype parsing and loading
-(defvar sgml-doctype-state nil)
-(defvar sgml-element-map nil)
-(defvar sgml-param-entities nil)
+(defvar sgml-element-map nil)		; assoc list of element types
+(defvar sgml-param-entities nil)	; assoc list of parameter entities
 (defvar sgml-used-pcdata nil)		; True if model group built is mixed
-(defvar sgml-entities nil)
+(defvar sgml-entities nil)		; List of general entity names
 
 ;; Buffer local variables 
 
@@ -91,14 +90,18 @@ Tested by sgml-close-element to see if the parse should be ended.")
 (defvar sgml-buffer-element-map nil)
 (make-variable-buffer-local 'sgml-buffer-element-map)
 
-(defvar sgml-buffer-doctype-state nil)
-(make-variable-buffer-local 'sgml-buffer-doctype-state)
+(defvar sgml-buffer-doctype nil)
+(make-variable-buffer-local 'sgml-buffer-doctype)
 
 (defvar sgml-top-tree nil)
 (make-variable-buffer-local 'sgml-top-tree)
 
 (defvar sgml-document-element nil)
 (make-variable-buffer-local 'sgml-document-element)
+
+(defvar sgml-loaded-dtd nil
+  "File name corresponding to current DTD.")
+(make-variable-buffer-local 'sgml-loaded-dtd)
 
 
 ;;;; Build parser syntax table
@@ -606,22 +609,46 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 (defun sgml-load-dtd (file)
   "Load a saved DTD from FILE."
   (interactive
-   (let ((tem (or sgml-default-dtd-file
-		  (sgml-default-dtd-file))))
+   (let ((tem (expand-file-name
+	       (or sgml-default-dtd-file
+		   (sgml-default-dtd-file)))))
      (list (read-file-name "Load DTD from: " nil tem t tem))))
   (let ((cb (current-buffer))
-	(tem (generate-new-buffer " *saveddtd*")))
-    (unwind-protect
-	(progn
-	  (message "Loading DTD from %s..." file)
-	  (set-buffer tem)
-	  (insert-file-contents (expand-file-name file))
-	  (set-buffer cb)
-	  (sgml-read-dtd tem)
-	  (setq sgml-default-dtd-file file)
-	  (message "Loading DTD from %s...done" file))
+	(tem nil)
+	(doctype nil)
+	(l (buffer-list)))
+    ;; Search loaded buffer for a already loaded DTD
+    (while (and l (null tem))
+      (set-buffer (car l))
+      (if (equal sgml-loaded-dtd file)
+	  (setq tem (current-buffer)))
+      (setq l (cdr l)))
+    (cond
+     (tem				; loaded DTD found
+      (setq sgml-element-map sgml-buffer-element-map
+	    sgml-entities sgml-buffer-entities
+	    sgml-param-entities sgml-buffer-param-entities
+	    doctype sgml-buffer-doctype)
       (set-buffer cb)
-      (kill-buffer tem))))
+      (setq sgml-buffer-element-map sgml-element-map
+	    sgml-buffer-entities sgml-entities
+	    sgml-buffer-param-entities sgml-param-entities)
+      (sgml-set-doctype doctype))
+     
+     (t					; load DTD from file
+      (setq tem (generate-new-buffer " *saveddtd*"))
+      (unwind-protect
+	  (progn
+	    (message "Loading DTD from %s..." file)
+	    (set-buffer tem)
+	    (insert-file-contents (expand-file-name file))
+	    (set-buffer cb)
+	    (sgml-read-dtd tem)
+	    (message "Loading DTD from %s...done" file))
+	(kill-buffer tem))))
+    (set-buffer cb)
+    (setq sgml-default-dtd-file file)
+    (setq sgml-loaded-dtd file)))
 
 ;;;; Parse tree
 
@@ -740,6 +767,7 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
   (sgml-tree-mixed sgml-current-tree))
 
 (defun sgml-set-doctype (model)
+  (setq sgml-buffer-doctype model)
   (make-local-variable 'before-change-function)
   (setq before-change-function 'sgml-note-change-at)
   (setq sgml-document-element (and (sgml-model-group-p model)
@@ -750,9 +778,6 @@ or 2: two octets (n,m) interpreted as  (n-t-1)*256+m+t."
 	 (make-element :name "Document (no element)"
 		       :model model)
 	 0 0 nil 0 nil nil nil nil)))
-
-(defun sgml-document-element ()
-  ())
 
 (defun sgml-reset-parse-state ()
   (setf (sgml-tree-content sgml-top-tree) nil) ; do I need this?
@@ -1391,16 +1416,11 @@ a RNI must be followed by NAME."
 
 (defun sgml-skip-doctype ()
   (cond ((sgml-parse-mdo 'doctype)
-	 (cond ((null sgml-buffer-element-map) ; no doctype defined
-		(sgml-parse-prolog)
-		(setq sgml-current-tree sgml-top-tree
-		      sgml-current-state (sgml-element-model sgml-top-tree)))
-	       (t
-		(skip-chars-forward "^>[")
-		(cond ((eq ?\[ (following-char))
-		       (sgml-skip-braces)))
-		(sgml-skip-ps)
-		(sgml-check-mdc)))
+	 (skip-chars-forward "^>[")
+	 (cond ((eq ?\[ (following-char))
+		(sgml-skip-braces)))
+	 (sgml-skip-ps)
+	 (sgml-check-mdc)
 	 (setq sgml-markup-type 'doctype)
 	 t)))
 
@@ -1546,6 +1566,10 @@ VALUE is a string.  Returns nil or a string."
 ;; trap is used the parser is usually called with the end of the
 ;; buffer as the goal point.
 
+(defun sgml-need-dtd ()
+  "Make sure that an eventual DTD is parsed or loaded."
+  (save-excursion (sgml-parse-to (point-min))))
+
 (defun sgml-parse-until-end-of (sgml-close-element-trap)
   "Parse until the SGML-CLOSE-ELEMENT-TRAP has ended,
 or if it is t, any additional element has ended,
@@ -1572,15 +1596,15 @@ or if nil, until end of buffer."
 
 (defun sgml-parse-to (sgml-goal)
   (when (null sgml-top-tree)		; first parse in this buffer
-    (sgml-set-doctype sgml-any))
+    (if (and sgml-default-dtd-file
+	     (file-exists-p sgml-default-dtd-file))
+	(sgml-load-dtd sgml-default-dtd-file)
+      (sgml-set-doctype sgml-any)
+      (sgml-parse-prolog)))
   (unless (and (boundp 'pre-command-hook)
 	       (not (null pre-command-hook)))
     (make-local-variable 'pre-command-hook)
     (setq pre-command-hook '(sgml-reset-log)))
-  (when (and (null sgml-buffer-element-map)
-	     sgml-default-dtd-file
-	     (file-exists-p sgml-default-dtd-file))
-    (sgml-load-dtd sgml-default-dtd-file))
   (sgml-find-start-point (min sgml-goal (point-max)))
   (assert sgml-current-tree)
   (let ((bigparse (> (- sgml-goal (point)) 10000))
@@ -2150,7 +2174,7 @@ This uses the selective display feature."
   (interactive)
   (if (null sgml-indent-step)
       (insert-tab)
-    (funcall indent-line-function))))
+    (funcall indent-line-function)))
 
 (defun sgml-indent-line (&optional col element)
   "Indent line, calling parser to determine level unless COL or ELEMENT
@@ -2424,6 +2448,7 @@ after the first tag inserted."
 
 (defun sgml-entities-menu (event)
   (interactive "e")
+  (sgml-need-dtd)
   (let ((menu (mapcar (lambda (x)
 			(cons x x))
 		      sgml-buffer-entities))
@@ -2851,8 +2876,10 @@ elements with omitted end tags."
       (sgml-normalize-content (sgml-tree-content element) nil)
       ;; Fix the start tag
       (goto-char (min (point) (sgml-tree-start element)))
-      (cond ((zerop (sgml-tree-stag-len element))
+      (cond ((or (zerop (sgml-tree-stag-len element))
+		 (= 2 (sgml-tree-stag-len element)))
 	     (save-excursion
+	       (delete-char (sgml-tree-stag-len element))
 	       (insert (sgml-start-tag-of (sgml-tree-element element)))))
 	    (t
 	     (forward-char (1- (sgml-tree-stag-len element)))
