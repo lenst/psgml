@@ -383,20 +383,20 @@ If this is not possible, but all DFAS are final, move by TOKEN in NEXT."
 ;;; Attribute Declaration Operations
 ;; sgml-make-attdecl: name declared-value default-value -> attdecl
 ;; sgml-attdecl-name: attdecl -> name
-;; sgml-attdecl-declared-value: attdecl -> decl-value
+;; sgml-attdecl-declared-value: attdecl -> declared-value
 ;; sgml-attdecl-default-value: attdecl -> default-value
 
 ;;; Attribute Declaration List Type
 ;; attlist = attdecl*
 
 ;;; Attribute Declaration List Operations
-;; sgml-lookup-attdecl: name x attlist -> attspec
+;; sgml-lookup-attdecl: name x attlist -> attdecl
 
 ;;; Declared Value Type
 ;; declared-value = (token-group | notation | simpel)
 ;; token-group = nametoken+
 ;; notation = nametoken+
-;; simple = symbol		lisp symbol correspoinding to SGML type
+;; simple = symbol		lisp symbol corresponding to SGML type
 
 ;;; Declared Value Operations
 ;; sgml-declared-value-token-group: declared-value -> list of symbols
@@ -1759,12 +1759,23 @@ or if nil, until end of buffer."
 
 (defsubst sgml-do-pcdata ()
   ;; Parse pcdata
-  (while				; Until token accepted
-      (cond
-       ((eq sgml-current-state sgml-any) nil)
-       ((sgml-get-move sgml-current-state sgml-pcdata-token)
-	nil)
-       ((sgml-do-implied "data character"))))
+  (let (new-state)
+    (while				; Until token accepted
+	(cond
+	 ((eq sgml-current-state sgml-any) nil)
+	 ((setq new-state
+		(sgml-get-move sgml-current-state sgml-pcdata-token))
+	  (setq sgml-current-state new-state)
+	  ;; #PCDATA is coded as a token in the state machine.
+	  ;; Unfortunately it is coded as #PCDATA? not as #PCDATA*
+	  ;; and the parser may break a string of data characters into
+	  ;; several.  Therefore the following will modify the DFA to
+	  ;; have #PCDATA*.  Doing it here means that old saved dtds still
+	  ;; will work.
+	  (sgml-add-opt-move sgml-current-state
+			     sgml-pcdata-token sgml-current-state)
+	  nil)
+	 ((sgml-do-implied "data character")))))
   (forward-char 1)
   (skip-chars-forward "^<]/"))
 
@@ -1896,15 +1907,14 @@ or if nil, until end of buffer."
        (sgml-check-tag-close)))
     (while				; Until token accepted
 	(cond
-	 ((memq gi (sgml-excludes))	;*** can excluded tags imply
-					;start-tags?
-	  (sgml-log-warning "Excluded element %s" gi)
-	  nil)
 	 ((eq sgml-current-state sgml-any) nil)
-	 ((setq temp (sgml-get-move sgml-current-state gi))
+	 ((and (not (memq gi (sgml-excludes)))
+	       (setq temp (sgml-get-move sgml-current-state gi)))
 	  (setq sgml-current-state temp)
 	  nil)
-	 ((memq gi (sgml-includes)) nil)
+	 ((and (memq gi (sgml-includes))
+	       (not (memq gi (sgml-excludes))))
+	  nil)
 	 ((sgml-do-implied (format "%s start-tag" gi)))))
     (sgml-open-element gi sgml-markup-start (point))
     (when net-enabled
@@ -2672,7 +2682,7 @@ AVL should be a assoc list mapping symbols to strings."
 	  (unless val			; no value given
 	    ;; Supply the default value if a value is needed
 	    (cond ((sgml-default-value-type-p 'required def)
-		   (setq val "#REQUIRED"))
+		   (setq val ""))
 		  ((and (not (or sgml-omittag sgml-shorttag))
 			(consp def))
 		   (setq val (cadr def)))))
@@ -3419,7 +3429,7 @@ If it is something else complete with ispell-complete-word."
     (sgml-dump-rec sgml-top-tree)))
 
 (defun sgml-dump-rec (u)
-  (when u
+  (while u
     (princ
      (format
       "%s%s start:%s(%s) end:%s(%s)\n"
@@ -3428,7 +3438,7 @@ If it is something else complete with ispell-complete-word."
       (sgml-tree-start u) (sgml-tree-stag-len u)
       (sgml-tree-end u) (sgml-tree-etag-len u)))
     (sgml-dump-rec (sgml-tree-content u))
-    (sgml-dump-rec (sgml-tree-next u))))
+    (setq u (sgml-tree-next u))))
 
 ;;;; For edebug
 
