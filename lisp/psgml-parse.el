@@ -1802,21 +1802,23 @@ repreaentation of the catalog."
 FILES is a list of catalogs to use. PUBID is the public identifier
 \(if any). TYPE is the entity type and NAME is the entity name."
   (loop for f in files thereis
-	(loop for (key from to)
-	      in (sgml-cache-catalog f 'sgml-catalog-assoc
-				     (function sgml-parse-catalog-buffer))
-	      thereis
-	      (and (or (and (eq 'entity key)
-			    name (not (eq type 'dtd))
-			    (string= name from))
-		       (and (eq 'public key)
-			    pubid
-			    (string= pubid from))
-		       (and (eq 'doctype key)
-			    (eq type 'dtd)
-			    (string= name from)))
-		   (file-readable-p to)
-		   to))))
+	(let ((cat (sgml-cache-catalog f 'sgml-catalog-assoc
+				       (function sgml-parse-catalog-buffer))))
+	  (or
+	   ;; Giv PUBLIC entries priority over ENTITY and DOCTYPE
+	   (loop for (key from to) in cat
+		 thereis (and (eq 'public key)       pubid
+			      (string= pubid from)  (file-readable-p to)
+			      to))
+	   (loop for (key from to) in cat thereis
+		 (and (or (and (eq 'entity key)
+			       name (not (eq type 'dtd))
+			       (string= name from))
+			  (and (eq 'doctype key)
+			       (eq type 'dtd)
+			       (string= name from)))
+		      (file-readable-p to)
+		      to))))))
 
 (defun sgml-path-lookup (extid type name)
   (let* ((pubid (car extid))
