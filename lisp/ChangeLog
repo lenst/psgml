@@ -1,3 +1,8 @@
+2002-03-17  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-api.el (sgml-map-content): don't try to map empty
+	elements, no point and the code doesn't work for that case.
+
 2002-02-13  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml.el (sgml-auto-insert-required-elements): doc fix.
