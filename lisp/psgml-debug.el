@@ -142,7 +142,6 @@
   (with-output-to-temp-buffer "*Element dump*"
     (sgml-dp-element (sgml-lookup-eltype el-name))))
 
-
 (defun sgml-dp-element (el)
   (cond
    ((sgml-eltype-defined el)
@@ -189,6 +188,29 @@
   (loop for m in moves
 	collect (list (sgml-move-token m)
 		      (sgml-code-xlate (sgml-move-dest m)))))
+
+
+;;;; Dump state
+
+(defun sgml-dump-state ()
+  (interactive)
+  (with-output-to-temp-buffer "*State dump*"
+    (sgml-dp-state sgml-current-state)))
+
+(defun sgml-dp-state (state &optional indent)
+  (or indent (setq indent 0))
+  (cond
+   ((sgml-normal-state-p state)
+    (sgml-dp-model state indent))
+   (t
+    (princ (format "%sand-state\n" (make-string indent ? )))
+    (sgml-dp-state (sgml-and-state-substate state) (+ 2 indent))
+    (princ (format "%s--next\n" (make-string indent ? )))    
+    (sgml-dp-state (sgml-and-state-next state)     (+ 2 indent))
+    (princ (format "%s--dfas\n" (make-string indent ? )))        
+    (loop for m in (sgml-and-state-dfas state)
+	  do (sgml-dp-model m (+ indent 2))
+	  (princ (format "%s--\n" (make-string indent ? )))))))
 
 
 ;;;; Build autoloads for all interactive functions in psgml-parse
