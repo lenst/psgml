@@ -1,5 +1,5 @@
 ;;;; psgml-info.el
-;;; Last edited: 1999-11-08 22:09:49 lenst
+;;; Last edited: 1999-11-09 16:42:29 lenst
 ;;; $Id$
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
@@ -20,7 +20,6 @@
 ;; along with this program; if not, write to the Free Software
 ;; Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-Next page...
 
 ;;;; Commentary:
 
