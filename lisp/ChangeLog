@@ -1,3 +1,11 @@
+
+Sun Oct 22 17:29:53 2000  Marc-Antoine Parent
+	* patch from Marc-Antoine Parent
+	
+	* psgml-edit.el (sgml-read-attribute-value): include the element name, thus:
+	Value for {attribute name} in {element name} ({type} {Default}):
+
+
 2000-10-11  Lennart Staflin  <lennarts@infotek.no>
 
 	* psgml-edit.el (sgml-indent-line): new strategy for identifying
