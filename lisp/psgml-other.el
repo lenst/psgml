@@ -329,14 +329,14 @@ into several panes.")
    (mapcar (function (lambda (e)
 		       (sgml-markup (car e) (cadr e))))
 	   sgml-custom-markup))
-  (easy-menu-change ()
-		  "DTD"
-		  (append (cdr sgml-dtd-root-menu)
-			  (list "----")
-			  (loop for e in sgml-custom-dtd collect
-				(vector (first e)
-					(` (sgml-doctype-insert '(,@(cdr e))))
-					t))))
+  (easy-menu-define
+   sgml-dtd-menu sgml-mode-map "DTD menu"
+   (append sgml-dtd-root-menu
+	   (list "----")
+	   (loop for e in sgml-custom-dtd collect
+		 (vector (first e)
+			 (` (sgml-doctype-insert '(,@(cdr e))))
+			 t))))
 ;;;  (sgml-add-custom-entries
 ;;;   (lookup-key sgml-mode-map [menu-bar sgml-dtd])
 ;;;   (mapcar (function
