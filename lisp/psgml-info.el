@@ -1,5 +1,5 @@
 ;;;; psgml-info.el
-;;; Last edited: 2000-04-16 16:50:01 lenst
+;;; Last edited: 2000-11-09 19:23:50 lenst
 ;;; $Id$
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
@@ -46,6 +46,7 @@
 
 ;;;; Code:
 
+(provide 'psgml-info)
 (require 'psgml)
 (require 'psgml-parse)
 
