@@ -41,10 +41,12 @@
   (cons (car menudesc)			; title
 	(mapcar (function
 		 (lambda (item)
-		   ;; item is (string . value)
-		   (vector (car item)
-			   (list 'quote (cdr item))
-			   t)))
+		   ;; item is (string . value) or string
+		   (if (stringp item)
+		       item
+		     (vector (car item)
+			     (list 'quote (cdr item))
+			     t))))
 		(cdr menudesc))))
 
 
@@ -206,7 +208,7 @@
 
 (defun sgml-insert (props format &rest args)
   (let ((start (point))
-	tem face)
+	tem)
     (insert (apply (function format)
 		   format
 		   args))
