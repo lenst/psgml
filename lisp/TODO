@@ -1,4 +1,4 @@
-TODO      [Time-stamp: "2003-01-24 18:58:48 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2005-02-17 12:15:43 lenst"]           -*- outline -*- 
 
 
 * parse prolog and parent document
@@ -11,6 +11,8 @@ behaviour, it is that obvious commands that use the parsed DTD
 only a dummy DTD available, nor will they update the parse to the
 correct DTD.  Just a suggestion.
 
+OR perhaps sgml-load-doctype does what the interactive command should
+do.
 
 
 * Rewrite sgml-popup-multi-menu
@@ -134,3 +136,12 @@ attributes. The check against the DTD will fill in attribute names for
 attributes specified with a value only. This is also the time to check
 for CONREF and check that all required attributes are given.
 
+* Change buffer local variables to processing instructions
+
+Variables that defined in a local variables section of the document to
+customize the parser like sgml-shorttag and sgml-default-document
+should be processing instructions in the document prolog instead.
+That way sgml-mode could parse the prolog and set everything up.
+
+<?PSGML DECLARE  shorttag yes  namecase general yes ?>
+<?PSGML PARENT "main.sgml" book body sect1          ?>
