@@ -1,9 +1,26 @@
-This is the READ ME file for psgml.el version 1.3.2.       -*- outline -*-
+This is the READ ME file for psgml.el version 1.3.3.       -*- outline -*-
 
 This is an ALPHA release. 
 
 
-* User interface changes
+* User interface changes (1.3.3)
+
+** Catalog files now can contain SYSTEM and OVERRIDE 
+as per OASIS Technical Resolution 9401:1997 
+<http://www.oasis-open.org/specs/a401.htm>
+
+  SYSTEM sysid file
+
+Will map a system identifier sysid to the file. 
+  
+  OVERRIDE {yes|no}
+
+If yes following entries (public, entity, doctype) will override a
+system identifier and if no they will not.  Initiall override is
+decided by variable sgml-system-identifiers-are-preferred.
+
+
+* User interface changes (1.3.2)
 
 ** Rename sgml-general-dtd-info to sgml-describe-dtd. Keep old name as
    alias.
