@@ -145,6 +145,9 @@ short reference is `sgml-markup-start' and point.")
 (defvar sgml-data-function nil
   "Function called with parsed data.")
 
+(defvar sgml-entity-function nil
+  "Function called with entity referenced at current point in parse.")
+
 (defvar sgml-pi-function nil
   "Function called with parsed process instruction.")
 
@@ -1499,7 +1502,8 @@ in any of them."
   (let ((start (point)))
     (sgml-skip-upto "PIC")
     (when sgml-pi-function
-	  (funcall sgml-pi-function (buffer-substring start (point)))))
+	  (funcall sgml-pi-function
+		   (buffer-substring-no-properties start (point)))))
   (sgml-check-delim "PIC")
   (sgml-set-markup-type 'pi)
   t)
@@ -1510,27 +1514,22 @@ in any of them."
 
 (defun sgml-parse-name (&optional entity-name)
   (if (sgml-startnm-char-next)
-      (let ((name (buffer-substring (point)
-				    (progn (skip-syntax-forward "w_")
-					   (point)))))
+      (let ((name (buffer-substring-no-properties
+		   (point)
+		   (progn (skip-syntax-forward "w_")
+			  (point)))))
 	(if entity-name
 	    (sgml-entity-case name)
 	  (sgml-general-case name)))))
 
 (define-compiler-macro sgml-parse-name (&whole form &optional entity-name)
   (cond
-   ((eq entity-name nil)
-    '(if (sgml-startnm-char-next)
-	 (sgml-general-case
-	  (buffer-substring (point)
-			    (progn (skip-syntax-forward "w_")
-				   (point))))))
-   ((eq entity-name t)
-    '(if (sgml-startnm-char-next)
-	 (sgml-entity-case
-	  (buffer-substring (point)
-			    (progn (skip-syntax-forward "w_")
-				   (point))))))
+   ((memq entity-name '(nil t))
+    (` (if (sgml-startnm-char-next)
+	   ((, (if entity-name 'sgml-entity-case 'sgml-general-case))
+	    (buffer-substring-no-properties (point)
+					    (progn (skip-syntax-forward "w_")
+						   (point)))))))
    (t
     form)))
 
@@ -1548,9 +1547,10 @@ in any of them."
 (defun sgml-parse-nametoken (&optional entity-name)
   "Parses a name token and returns a string or nil if no nametoken."
   (if (sgml-name-char (following-char))
-      (let ((name (buffer-substring (point)
-				    (progn (skip-syntax-forward "w_")
-					   (point)))))
+      (let ((name (buffer-substring-no-properties
+		   (point)
+		   (progn (skip-syntax-forward "w_")
+			  (point)))))
 	(if entity-name
 	    (sgml-entity-case name)
 	  (sgml-general-case name)))))
@@ -1590,10 +1590,13 @@ in any of them."
 	  ((sgml-entity-data-p entity)
 	   (when sgml-signal-data-function
 	     (funcall sgml-signal-data-function))
-	   (when sgml-data-function
+	   (cond
+	    (sgml-entity-function
+	     (funcall sgml-entity-function entity))
+	    (sgml-data-function
 	     (sgml-push-to-entity entity sgml-markup-start)
 	     (funcall sgml-data-function (buffer-string))
-	     (sgml-pop-entity)))
+	     (sgml-pop-entity))))
 	  (t
 	   (sgml-push-to-entity entity sgml-markup-start)))))
 
@@ -1674,7 +1677,7 @@ a RNI must be followed by NAME."
 	   (if lita
 	       (sgml-skip-upto "LITA")
 	     (sgml-skip-upto "LIT"))
-	   (setq value (buffer-substring start (point)))
+	   (setq value (buffer-substring-no-properties start (point)))
 	   (if lita
 	       (sgml-check-delim "LITA")
 	     (sgml-check-delim "LIT"))
@@ -1706,7 +1709,7 @@ a RNI must be followed by NAME."
 	      (t
 	       (setq value
 		     (concat value spaced
-			     (buffer-substring
+			     (buffer-substring-no-properties
 			      (point)
 			      (progn (skip-chars-forward qskip)
 				     (point))))
@@ -1995,9 +1998,10 @@ Returns nil if entity is not found."
 Skips any leading spaces/comments."
   (sgml-skip-cs)
   (or (sgml-parse-literal)
-      (buffer-substring (point)
-			(progn (skip-chars-forward "^ \r\n\t")
-			       (point)))))
+      (buffer-substring-no-properties
+       (point)
+       (progn (skip-chars-forward "^ \r\n\t")
+	      (point)))))
 
 (defconst sgml-formal-pubid-regexp
   (concat
@@ -2552,10 +2556,9 @@ overrides the entity type in entity look up."
       (setq sgml-last-element nil)	; May not be valid after point moved
       (if (memq this-command '(backward-char previous-line backward-word))
 	  (goto-char (or (previous-single-property-change (point) 'invisible)
-			 (point-max)))
+			 (point-min)))
 	(goto-char (or (next-single-property-change (point) 'invisible)
 		       (point-max)))))
-    (sit-for 0)
     (when (and (not (input-pending-p))
 	       (or sgml-live-element-indicator
 		   sgml-set-face))
@@ -2568,24 +2571,26 @@ overrides the entity type in entity look up."
 			  sgml-last-element)
 		     (setq sgml-current-element-name
 			   (sgml-element-gi sgml-last-element)))
-		    (t
-		     (sgml-parse-to (point) (function input-pending-p))
+
+		    (sgml-live-element-indicator
+		     (setq sgml-current-element-name "*error*")
+		     (save-excursion
+		       (sgml-parse-to (point) (function input-pending-p)))
 		     (unless (input-pending-p)
 		       (setq sgml-current-element-name
-			     (sgml-element-gi sgml-current-tree))))))
-	  (error (setq sgml-current-element-name "*error*")))
-	(condition-case nil
-	    (progn
+			     (sgml-element-gi sgml-current-tree)))))
 	      (unless (input-pending-p)
 		(force-mode-line-update)
-		(sit-for 0)
-		(save-excursion
-		  (sgml-parse-to (window-end) (function input-pending-p) t)))
-	      (sit-for 1)
-	      (unless (input-pending-p)
-		(save-excursion
-		  (sgml-parse-to (point-max) (function input-pending-p) t))))
+		(when (and sgml-set-face
+			   (null
+			    (sgml-tree-etag-epos
+			     (sgml-pstate-top-tree sgml-buffer-parse-state))))
+		  (sit-for 0)
+		  (sgml-parse-until-end-of nil nil
+					   (function input-pending-p)
+					   t))))
 	  (error nil))))))
+
 
 (defun sgml-set-active-dtd-indicator (name)
   (set (make-local-variable 'sgml-active-dtd-indicator)
@@ -2828,7 +2833,7 @@ entity hierarchy as possible."
 		       (> at (sgml-element-start u)))
 		  ;; restart from to with new position
 		  ;; this can't loop forever as
-		  ;; position allways gets smaler
+		  ;; position allways gets smaller
 		  (setq at (sgml-element-start u)
 			u sgml-top-tree))
 		 (t
@@ -2987,7 +2992,7 @@ Where the latter represents end-tags."
 (defun sgml-parse-error (format &rest things)
   (apply 'sgml-error
 	 (concat format "; at: %s")
-	 (append things (list (buffer-substring
+	 (append things (list (buffer-substring-no-properties
 			       (point)
 			       (min (point-max) (+ (point) 12)))))))
 
@@ -3246,12 +3251,13 @@ Assumes starts with point inside a markup declaration."
       (cond (marked-section
 	     (skip-chars-forward (if (eq type sgml-cdata) "^]" "^&]"))
 	     (when sgml-data-function
-	       (funcall sgml-data-function (buffer-substring start (point))))
+	       (funcall sgml-data-function (buffer-substring-no-properties
+					    start (point))))
 	     (setq done (sgml-parse-delim "MS-END")))
 	    (t
 	     (skip-chars-forward (if (eq type sgml-cdata) "^</" "^</&"))
 	     (when sgml-data-function
-	       (funcall sgml-data-function (buffer-substring start (point))))
+	       (funcall sgml-data-function (buffer-substring-no-properties start (point))))
 	     (setq done (or (sgml-is-delim "ETAGO" gi)
 			    (sgml-is-enabled-net)))))
       (setq start (point))
@@ -3564,13 +3570,14 @@ VALUE is a string.  Returns nil or an attdecl."
     (error "No document type defined by prolog"))
   (sgml-message "Parsing prolog...done"))
 
-(defun sgml-parse-until-end-of (sgml-close-element-trap &optional cont)
+(defun sgml-parse-until-end-of (sgml-close-element-trap &optional
+							cont extra-cond quiet)
   "Parse until the SGML-CLOSE-ELEMENT-TRAP has ended,
 or if it is t, any additional element has ended,
 or if nil, until end of buffer."
   (cond
    (cont (sgml-parse-continue (point-max)))
-   (t   (sgml-parse-to (point-max) nil)))
+   (t    (sgml-parse-to (point-max) extra-cond quiet)))
   (when (eobp)				; End of buffer, can imply
 					; end of any open element.
     (while (prog1 (not
@@ -3655,8 +3662,9 @@ pointing to start of short ref and point pointing to the end."
   (forward-char 1)
   (sgml-parse-pcdata)
   (when sgml-data-function
-	(funcall sgml-data-function (buffer-substring sgml-markup-start
-						      (point))))
+	(funcall sgml-data-function (buffer-substring-no-properties
+				     sgml-markup-start
+				     (point))))
   (sgml-set-markup-type nil))
 
 (defun sgml-parser-loop (extra-cond)
