@@ -78,6 +78,9 @@
   "*Max number of entries in Tags and Entities menus before they are split
 into several panes.")
 
+(defvar sgml-always-quote-attributes nil
+  "*If non-nil, quote all attribute values inserted after finishing edit attributes.")
+
 (defvar sgml-auto-insert-required-elements t
   "*If non-nil, automatically insert required elements in the content
 of an inserted element.")
@@ -135,7 +138,7 @@ This is set by sgml-mode from the buffer file name.
 Can be changed in the Local variables section of the file.")
 
 (defvar sgml-custom-markup nil
-  "*Markup to be added to the Markup menu.
+  "*Menu entries to be added to the Markup menu.
 The value should be a list of lists of two strings.  The first is a
 string is the menu line and the second string is the text inserted
 when the menu item is choosen.  The second string can contain a \\r
@@ -150,9 +153,19 @@ Example:
    (\"New page\"  \"<?NewPage>\"))
 ")
 
-(setq sgml-custom-markup '(("Version1"  "<![%Version1[\r]]>")
-			   ("New page"  "<?NewPage>")))
+(defvar sgml-custom-dtd nil
+  "*Menu entires to be added to the DTD menu.
+The value should be a list of lists of three strings.  The first
+string is the menu entry.  The second string is a doctype declaration
+(this can be nil if no doctype).  The third string is the file name of
+the saved DTD (this may also be nil).
 
+Example:
+
+    ((\"Html\" nil \"~/sgml/html.ced\")
+     (\"docbook\" \"<!doctype docbook system 'docbook.dtd'>\"
+		    \"~/sgml/docbook.ced\"))
+")
 
 ;;; sgmls is a free SGML parser available from
 ;;; ftp.uu.net:pub/text-processing/sgml
@@ -224,7 +237,8 @@ running the sgml-validate-command.")
 	     sgml-auto-insert-required-elements
 	     sgml-balanced-tag-edit
 	     sgml-omittag-transparent
-	     sgml-warn-about-undefined-elements))
+	     sgml-warn-about-undefined-elements
+	     sgml-always-quote-attributes))
 	(bv (buffer-local-variables)))
     (while l
       (when (assq (car l) bv)
@@ -257,6 +271,13 @@ running the sgml-validate-command.")
     (when (search-forward "\r" after t)
       (delete-char -1))
     (when old-text (insert old-text))))
+
+(defun sgml-doctype-insert (doctype saved-dtd)
+  (when doctype
+    (sgml-insert-markup doctype))
+  (when saved-dtd
+    (setq sgml-default-dtd-file saved-dtd)
+    (sgml-set-local-variable 'sgml-default-dtd-file saved-dtd)))
 
 (defun sgml-mouse-region ()
   (let (start end)
@@ -371,8 +392,10 @@ running the sgml-validate-command.")
 (define-key sgml-markup-menu [blank1]
   '("" . nil))
 
+(define-key sgml-markup-menu [lv-comment]
+  (sgml-markup "Local variables comment" "<!--\nLocal variables:\n\rEnd:\n-->\n"))
 (define-key sgml-markup-menu [ comment]
-  (sgml-markup "Comment" "<!-- \r -->"))
+  (sgml-markup "Comment" "<!-- \r -->\n"))
 (define-key sgml-markup-menu [ doctype]
   (sgml-markup "Doctype" "<!doctype \r -- public or system -- [\n]>\n"))
 
@@ -521,17 +544,22 @@ All bindings:
     (setq sgml-default-dtd-file nil))
   
   ;; Build custom menus
-  (let ((l sgml-custom-markup)
-	(m (cons 'keymap (cons "Markup" sgml-markup-menu))))
-    (when l
-      (define-key m [blank-c] '("" . nil)))
-    (while l
-      (define-key m (vector (gensym))
-	(sgml-markup (caar l)
-		     (cadar l)))
-      (setq l (cdr l)))
-    (fset 'sgml-markup-menu m))
-  
+  (when sgml-custom-markup
+    (define-key sgml-mode-map [menu-bar sgml-markup blank-c] '("" . nil)))
+  (loop for e in (reverse sgml-custom-markup)
+	for i from 0
+	do (define-key sgml-mode-map
+	     (vector 'menu-bar 'sgml-markup (intern (concat "custom" i)))
+	     (sgml-markup (car e) (cadr e))))
+  (loop for e in (reverse sgml-custom-dtd)
+	for i from 0
+	do (define-key sgml-mode-map
+	     (vector 'menu-bar 'sgml-dtd (intern (concat "custom" i)))
+	     (cons
+	      (first e)
+	      (` (lambda ()
+		   (interactive)
+		   (sgml-doctype-insert (, (second e)) (, (third e))))))))
   ;;
   (run-hooks 'text-mode-hook 'sgml-mode-hook))
 
@@ -723,6 +751,9 @@ and move to the line in the SGML document that caused it."
 (autoload 'sgml-parse-prolog "psgml-dtd"
 	  "Parse the document prolog to learn the DTD."
 	  t nil)
+(autoload 'sgml-save-dtd "psgml-dtd"
+	  "Save the parsed dtd on FILE."
+	  t nil)
 
 (autoload 'sgml-indent-line "psgml-parse"
 	  nil
@@ -774,7 +805,7 @@ after the first tag inserted."
 	  t nil)
 (autoload 'sgml-edit-attributes "psgml-parse"
 	  "Edit attributes of start tag before point.
-Editing is done in a separte window."
+Editing is done in a separate window."
 	  t nil)
 (autoload 'sgml-hide-attributes "psgml-parse"
 	  nil
@@ -838,10 +869,18 @@ This uses the selective display feature."
 (autoload 'sgml-change-element-name "psgml-parse"
 	  "Replace the name (generic identifyer) of the current element with a new name."
 	  t nil)
-(autoload 'sgml-unfold-element "psgml-parse" "" t)
-(autoload 'sgml-expand-element "psgml-parse" "" t)
-(autoload 'sgml-unfold-all "psgml-parse" "" t)
-(autoload 'sgml-entities-menu "psgml-parse" "" nil)
+(autoload 'sgml-unfold-element "psgml-parse"
+	  "Show all hidden lines in current element."
+	  t nil)
+(autoload 'sgml-expand-element "psgml-parse"
+	  "As sgml-fold-subelement, but unfold first."
+	  t nil)
+(autoload 'sgml-unfold-all "psgml-parse"
+	  "Show all hidden lines in buffer."
+	  t nil)
+(autoload 'sgml-entities-menu "psgml-parse"
+	  nil
+	  t nil)
 
 (provide 'psgml)
 (provide 'sgml-mode)
