@@ -216,14 +216,14 @@ The value can be the style-sheet list, or it can be a file name
 			(assq t fs-style)))))
 
 (defun fs-do-style (fs-current-element style)
-  (let ((hang-from (getf style 'hang-from)))
+  (let ((hang-from (eval (getf style 'hang-from))))
     (when hang-from
       (setq fs-hang-from 
 	    (format "%s%s "
 		    (make-string 
 		     (or (fs-char 'hang-left) (fs-char 'left))
 		     ? )
-		    (eval hang-from)))))
+                    hang-from))))
   (let ((fs-char (nconc
 		  (loop for st on style by 'cddr
 			unless (memq (car st) fs-special-styles)
