@@ -112,81 +112,6 @@ if the item is selected."
 
 ;;;; Lucid menu bar
 
-(defvar sgml-dtd-menu
-  '("DTD"
-    ["Parse DTD" sgml-parse-prolog t]
-    ("Info"
-	 ["Describe element type"	sgml-describe-element-type	t]
-	 ["Describe entity"		sgml-describe-entity		t]
-	 ["List elements" 		sgml-list-elements 		t]
-	 ["List attributes" 		sgml-list-attributes 		t]
-	 ["List terminals" 		sgml-list-terminals 		t]
-	 ["List content elements" 	sgml-list-content-elements 	t]
-	 ["List occur in elements" 	sgml-list-occur-in-elements 	t]
-	 )
-    "---"
-    ["Load Parsed DTD" sgml-load-dtd t]
-    ["Save Parsed DTD" sgml-save-dtd t]
-    ))
-
-(defvar sgml-fold-menu
-  '("Fold"
-    ["Fold Element" sgml-fold-element t]
-    ["Fold Subelement" sgml-fold-subelement t]
-    ["Fold Region" sgml-fold-region t]
-    ["Unfold Line" sgml-unfold-line t]
-    ["Unfold Element" sgml-unfold-element t]
-    ["Unfold All" sgml-unfold-all t]
-    ["Expand" sgml-expand-element t]
-    ))
-
-(defvar sgml-markup-menu
-  '("Markup"
-    ["Insert Element" (sgml-element-menu last-command-event) t]
-    ["Insert Start-Tag" (sgml-start-tag-menu last-command-event) t]
-    ["Insert End-Tag" (sgml-end-tag-menu last-command-event) t]
-    ["Tag Region" (sgml-tag-region-menu last-command-event) t]
-    ["Insert Attribute" (sgml-attrib-menu last-command-event) t]
-    ["Insert Entity" (sgml-entities-menu last-command-event) t]
-    ))
-
-(defvar
- sgml-move-menu
- '("Move"
-   ["Next trouble spot" sgml-next-trouble-spot t]
-   ["Next data field"   sgml-next-data-field   t]
-   ["Forward element"	sgml-forward-element t]
-   ["Backward element"  sgml-backward-element t]
-   ["Up element"	sgml-up-element t]
-   ["Down element"	sgml-down-element t]
-   ["Backward up element" sgml-backward-up-element t]
-   ["Beginning of element" sgml-beginning-of-element t]
-   ["End of element"	sgml-end-of-element t]
-   )
- "Menu of move commands"
- )
-
-(defvar
- sgml-modify-menu
- '("Modify"
-   ["Normalize"			sgml-normalize	t]
-   ["Expand All Short References"	sgml-expand-all-shortrefs t]
-   ["Expand Entity Reference"	sgml-expand-entity-reference t]
-   ["Normalize Element"		sgml-normalize-element t]
-   ["Make Character Reference"	sgml-make-character-reference t]
-   ["Unmake Character Reference"	(sgml-make-character-reference t) t]
-   ["Fill Element"		sgml-fill-element t]
-   ["Change Element Name..."	sgml-change-element-name t]
-   ["Edit Attributes..."	sgml-edit-attributes t]
-   ["Kill Markup"		sgml-kill-markup t]
-   ["Kill Element"		sgml-kill-element t]
-   ["Untag Element"		sgml-untag-element t]
-   ["Decode Character Entities"  sgml-charent-to-display-char t]
-   ["Encode Characters"		sgml-display-char-to-charent t]
-   )
- "Menu of modification commands"
- )
-
 (defun sgml-make-options-menu (vars)
   (loop for var in vars 
 	for type = (sgml-variable-type var)
@@ -214,59 +139,20 @@ if the item is selected."
 		  t)))))
 
 
-(defvar sgml-sgml-menu
-  (append
-   '("SGML"
-     ["Reset Buffer"  normal-mode t]
-     ["Show Context" sgml-show-context t]
-     ["What Element" sgml-what-element t]
-     ["Show Valid Tags" sgml-list-valid-tags t]
-     ["Show/Hide Warning Log" sgml-show-or-clear-log t]
-     ["Validate" sgml-validate t])
-   (if (or (not (boundp 'emacs-major-version))
-	   (and (boundp 'emacs-minor-version)
-		(< emacs-minor-version 10)))
-       '(
-	 ["File Options" sgml-file-options-menu t]
-	 ["User Options" sgml-user-options-menu t]
-	 )
-     (list
-      (cons "File Options" (sgml-make-options-menu sgml-file-options))
-      (cons "User Options" (sgml-make-options-menu sgml-user-options))))
-   '(["Save File Options" sgml-save-options t]
-     ["Submit Bug Report" sgml-submit-bug-report t]
-     )))
-
-(defun sgml-install-lucid-menus ()
-  "Install lucid menus for psgml mode"
-  (set-buffer-menubar (copy-sequence current-menubar))
-  (add-menu nil (car sgml-sgml-menu) (cdr sgml-sgml-menu))
-  (add-menu nil (car sgml-modify-menu) (cdr sgml-modify-menu))
-  (add-menu nil (car sgml-move-menu) (cdr sgml-move-menu))
-  (add-menu nil (car sgml-markup-menu) (cdr sgml-markup-menu))
-  (add-menu nil (car sgml-fold-menu) (cdr sgml-fold-menu))
-  (add-menu nil (car sgml-dtd-menu) (cdr sgml-dtd-menu))
-)
-
-
-;;;; Custom menus
-
-(defun sgml-build-custom-menus ()
-  (and sgml-custom-markup (add-menu-item '("Markup") "------------" nil t))
-  (mapcar (function
-	   (lambda (x)
-	     (add-menu-item '("Markup") (nth 0 x)
-			    (list 'sgml-insert-markup (nth 1 x)) t)))
-	  sgml-custom-markup)
-  (and sgml-custom-dtd (add-menu-item '("DTD") "-------------" nil t))
-  (mapcar (function
-	   (lambda (x)
-	     (add-menu-item '("DTD") (nth 0 x)
-			    (list 'apply ''sgml-doctype-insert
-				  (cadr x)
-				  (list 'quote (cddr x)))
-			    t)))
-	  sgml-custom-dtd))
+(unless (or (not (boundp 'emacs-major-version))
+	    (and (boundp 'emacs-minor-version)
+		 (< emacs-minor-version 10)))
+  (loop for ent on sgml-main-menu
+	if (vectorp (car ent))
+	do (cond
+	    ((equal (aref (car ent) 0) "File Options >")
+	     (setcar ent
+		     (cons "File Options"
+			   (sgml-make-options-menu sgml-file-options))))
+	    ((equal (aref (car ent) 0) "User Options >")
+	     (setcar ent
+		     (cons "User Options"
+			   (sgml-make-options-menu sgml-user-options)))))))
 
 
 ;;;; Key definitions
@@ -306,9 +192,9 @@ if the item is selected."
   (let ((face (cdr (assq type sgml-markup-faces)))
 	o)
     (loop for e being the extents from start to end
-	  do (when (extent-property e 'type)
+	  do (when (extent-property e 'sgml-type)
 	       (cond ((and (null o)
-			   (eq type (extent-property e 'type)))
+			   (eq type (extent-property e 'sgml-type)))
 		      (setq o e))
 		     (t (delete-extent e)))))
 
@@ -316,13 +202,15 @@ if the item is selected."
 	   (set-extent-endpoints o start end))
 	  (face
 	   (setq o (make-extent start end))
-	   (set-extent-property o 'type type)
+	   (set-extent-property o 'sgml-type type)
 	   (set-extent-property o 'face face)
+	   (set-extent-property o 'start-open t)
 	   (set-extent-face o face)))))
 
 (defun sgml-set-face-after-change (start end &optional pre-len)
+  ;; This should not be needed with start-open t
   (when sgml-set-face
-    (let ((o (extent-at start nil 'type)))
+    (let ((o (extent-at start nil 'sgml-type)))
       (cond
        ((null o))
        ((= start (extent-start-position o))
