@@ -1503,7 +1503,7 @@ in any of them."
 (defmacro sgml-startnm-char (c)
   (` (eq ?w (char-syntax (, c)))))
 
-(defun sgml-startnm-char-next ()
+(defsubst sgml-startnm-char-next ()
   (and (not (eobp))
        (sgml-startnm-char (following-char))))
 
@@ -3919,10 +3919,18 @@ pointing to start of short ref and point pointing to the end."
 	     (sgml-eltype-name (sgml-token-eltype token))
 	     type)))))
 
-(defsubst sgml-do-move (token type)
-  (sgml-execute-implied (sgml-list-implications token type) type)
-  (unless (eq sgml-any sgml-current-state)
-    (sgml-move-current-state token)))
+
+(defun sgml-do-move (token type)
+  (cond ((eq sgml-any sgml-current-state))
+        (t
+         (let ((next-state (sgml-get-move sgml-current-state token)))
+           (cond (next-state
+                  (setq sgml-current-state next-state))
+                 (t
+                  (sgml-execute-implied (sgml-list-implications token type) type)
+                  (unless (eq sgml-any sgml-current-state)
+                    (sgml-move-current-state token))))))))
+
 
 (defun sgml-pcdata-move ()
   "Moify parser state to reflect parsed data."
