@@ -1,10 +1,11 @@
 #! /bin/bash
 
-VERSION=1.1.7
+VERSION=1.2.0
 
 PSGML_SRC="ChangeLog psgml.el psgml-parse.el psgml-edit.el psgml-dtd.el \
 	psgml-info.el psgml-charent.el psgml-api.el \
-	psgml-other.el psgml-lucid.el psgml-maint.el psgml-debug.el" 
+	psgml-other.el psgml-lucid.el psgml-maint.el \
+        psgml-debug.el psgml-fs.el" 
 
 PSGML_DOC="psgml-api.texi psgml.texi psgml-api.info psgml.info psgml.ps"
 
