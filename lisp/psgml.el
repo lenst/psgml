@@ -1179,11 +1179,11 @@ If it is something else complete with ispell-complete-word." t)
 (autoload 'sgml-list-terminals "psgml-info" "List the elements that can have data in their content." t)
 (autoload 'sgml-list-content-elements "psgml-info" "List all element types and the element types that can occur in its content." t)
 (autoload 'sgml-list-occur-in-elements "psgml-info" "List all element types and where it can occur." t)
-(autoload 'sgml-describe-entity "psgml-info" nil t)
-(autoload 'sgml-describe-element-type "psgml-info" nil t)
+(autoload 'sgml-describe-entity "psgml-info" "Describe the properties of an entity as declared in the current DTD." t)
+(autoload 'sgml-describe-element-type "psgml-info" "Describe the properties of an element type as declared in the current DTD." t)
+(autoload 'sgml-general-dtd-info "psgml-info" "Display information about the current DTD." t)
 (autoload 'sgml-charent-to-display-char "psgml-charent" "Replace character entities with their display character equivalents" t)
 (autoload 'sgml-display-char-to-charent "psgml-charent" "Replace displayable characters with their character entity equivalents" t)
-
 
 
 ;;;; Last provisions
