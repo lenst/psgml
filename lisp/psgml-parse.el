@@ -354,6 +354,8 @@ Applicable to XML.")
          (sgml-restore-buffer-modified-p buffer-modified)
          (sgml-debug "Restoring buffer mod: %s" buffer-modified)))))
 
+(eval-when-compile (defvar mc-flag))
+
 (defun sgml-set-buffer-multibyte (flag)
   (cond ((featurep 'xemacs)
          flag)
@@ -362,6 +364,7 @@ Applicable to XML.")
           (if (eq flag 'default)
               default-enable-multibyte-characters
             flag)))
+	;; I doubt the current code works in old Mule anyway.  -- fx
 	((boundp 'MULE)
          (set 'mc-flag flag))
         (t
@@ -2835,6 +2838,8 @@ overrides the entity type in entity look up."
 
 ;;;; Display and Mode-line
 
+(eval-when-compile (defvar which-func-mode))
+
 (defun sgml-update-display ()
   (when (not (eq this-command 'keyboard-quit))
     ;; Don't let point be inside an invisible region
@@ -4122,9 +4127,16 @@ pointing to start of short ref and point pointing to the end."
   (sgml-set-markup-type nil))
 
 (defvar sgml-parser-loop-hook nil)
+(defvar sgml-parse-in-loop nil
+  "Non-nil means the body of `sgml-parser-loop' is executing.
+Thus lower-level functions don't need to use `sgml-with-modification-state'.")
 (defun sgml-parser-loop (extra-cond)
   (let (tem
-	(sgml-signal-data-function (function sgml-pcdata-move)))
+	(sgml-signal-data-function (function sgml-pcdata-move))
+	;; Speed up significantly by effectively hoisting
+	;; `sgml-with-modification-state' out of the loop.
+	(sgml-parse-in-loop t))
+    (sgml-with-modification-state
     (while (and (eq sgml-current-tree sgml-top-tree)
 		(or (< (point) sgml-goal) sgml-current-eref)
 		(progn (setq sgml-markup-start (point)
@@ -4169,7 +4181,7 @@ pointing to start of short ref and point pointing to the end."
        ((and sgml-parser-loop-hook
              (run-hook-with-args-until-success 'sgml-parser-loop-hook)))
        (t
-	(sgml-do-pcdata))))))
+	(sgml-do-pcdata)))))))
 
 (defun sgml-handle-shortref (name)
   (sgml-set-markup-type 'shortref)
