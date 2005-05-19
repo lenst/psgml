@@ -185,7 +185,7 @@ possible."
     (goto-char (sgml-element-start element))
     (delete-char (sgml-element-stag-len element))
     (insert (sgml-delim "STAGO")
-            (sgml-general-insert-case gi)
+            (sgml-general-insert-case (sgml-cohere-name gi))
             tagc)
     (let* ((newel (sgml-find-context-of (point)))
 	   (newattlist (sgml-element-attlist newel))

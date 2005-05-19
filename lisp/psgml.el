@@ -518,11 +518,13 @@ string will be replaced according to the list below, if the string contains
 
 %b means the visited file of the current buffer
 %s means the SGML declaration specified in the sgml-declaration variable
-%d means the file containing the DOCTYPE declaration, if not in the buffer 
+%d means the file containing the DOCTYPE declaration, if not in the buffer
 ")
 (make-variable-buffer-local 'sgml-validate-command)
 
-(defvar sgml-xml-validate-command "nsgmls -wxml -s %s %s"
+(defvar sgml-xml-validate-command
+  (concat "/bin/sh -c \"SP_CHARSET_FIXED=YES SP_ENCODING=XML "
+          "nsgmls -wxml -mdeclaration/xml.soc -gues %s %s\"")
   "*The default for `sgml-validate-command' in XML mode.")
 
 (defvar sgml-validate-files nil

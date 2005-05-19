@@ -302,9 +302,10 @@ Applicable to XML.")
     (modify-syntax-entry i " " sgml-parser-syntax)
     (setq i (1+ i))))
 
+;;http://list-archive.xemacs.org/xemacs-beta/200011/msg00117.html
 (mapconcat (function (lambda (c)
 	     (modify-syntax-entry c "w" sgml-parser-syntax)))
-	   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrtsuvwxyz" "")
+	   ":ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrtsuvwxyz" "")
 (mapconcat (function (lambda (c)
 		       (modify-syntax-entry c "_" sgml-parser-syntax)))
 	   "-.0123456789" "")
