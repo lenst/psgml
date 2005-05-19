@@ -2006,7 +2006,9 @@ characters in the current coding system."
 			   (process (start-process 
 				     (format "%s background" handler)
 				     nil handler file)))
-		      (process-kill-without-query process))))
+                      (if (fboundp 'set-process-query-on-exit-flag)
+                          (set-process-query-on-exit-flag process nil)
+                        (process-kill-without-query process)))))
 	      (error "Don't know how to handle notation '%s'." notation)))
 	   (text (progn
        
