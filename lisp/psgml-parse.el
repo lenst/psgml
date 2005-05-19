@@ -2847,45 +2847,29 @@ overrides the entity type in entity look up."
 	(goto-char (or (next-single-property-change (point) 'invisible)
 		       (point-max)))))
     (when (and (not executing-macro)
-	       (or sgml-live-element-indicator
+	       (or (and (boundp 'which-function-mode)
+                        which-function-mode )
 		   sgml-set-face)
 	       (not (null sgml-buffer-parse-state))
 	       (sit-for 0))
       (let ((deactivate-mark nil))
 	(sgml-need-dtd)
+        ;; Find current element
+        (setq sgml-current-element-name
+              (if (and (memq this-command sgml-users-of-last-element)
+                       sgml-last-element)
+                  (sgml-element-gi sgml-last-element)))
 	(let ((eol-pos (save-excursion (end-of-line 1) (point))))
-	  (let ((quiet (< (- (point) (sgml-max-pos-in-tree sgml-top-tree))
-                          500)))
-	    (when (if quiet
-		      t
-		    (setq sgml-current-element-name "?")
-		    (sit-for 1))
-
-	      ;; Find current element
-	      (cond ((and (memq this-command sgml-users-of-last-element)
-			  sgml-last-element)
-		     (setq sgml-current-element-name
-			   (sgml-element-gi sgml-last-element)))
-		    (sgml-live-element-indicator
-		     (save-excursion
-		       (condition-case nil
-			   (sgml-parse-to
-			    (point) (function input-pending-p) quiet)
-			 (error
-			  (setq sgml-current-element-name "*error*")))
-		       (unless (input-pending-p)
-			 (setq sgml-current-element-name
-			       (sgml-element-gi sgml-current-tree))
-			 (force-mode-line-update)))))
-	      ;; Set face on current line
-	      (when (and sgml-set-face (not (input-pending-p)))
-		(save-excursion
-		  (condition-case nil
-		      (sgml-parse-to
-		       eol-pos (function input-pending-p) quiet)
-		    (error nil)))))))
+          ;; Set face on current line
+          (when (and sgml-set-face (not (input-pending-p)))
+            (save-excursion
+              (condition-case nil
+                  (sgml-parse-to
+                   eol-pos (function input-pending-p) quiet)
+                (error nil)))))
 	;; Set face in rest of buffer
 	(sgml-fontify-buffer 6)		;FIXME: make option for delay
+        ;; FIXME: use run-with-idle-timer ?
 	))))
 
 (defun sgml-fontify-buffer (delay)
@@ -2903,15 +2887,22 @@ overrides the entity type in entity look up."
 	 (message "Fontifying...done"))
      (error nil))))
 
-(defun sgml-set-active-dtd-indicator (name)
-  ;; At least when using the which-func machinery, don't show anything
-  ;; unless `sgml-live-element-indicator' is non-nil.
-  (set (make-local-variable 'which-func-mode) sgml-live-element-indicator)
-  (set (make-local-variable 'sgml-active-dtd-indicator)
-       (list (format " [%s" name)
-	     '(sgml-live-element-indicator ("/" sgml-current-element-name))
-	     "]"))
-  (force-mode-line-update))
+
+(defun sgml-current-element-name ()
+  ;; Return the name of the current element for which-function-mode
+  (or sgml-current-element-name 
+      (save-excursion
+        (condition-case nil
+            (progn
+              (sgml-parse-to
+               (point) (function input-pending-p) )
+              (if (input-pending-p)
+                  "?"
+                (setq sgml-current-element-name
+                      (sgml-element-gi sgml-current-tree))))
+          (error
+           (setq sgml-current-element-name "*error*"))))))
+
 
 ;;;; Parser state
 
@@ -2935,7 +2926,6 @@ overrides the entity type in entity look up."
   (make-local-hook 'after-change-functions)
   (add-hook 'before-change-functions 'sgml-note-change-at nil 'local)
   (add-hook 'after-change-functions 'sgml-set-face-after-change nil 'local)
-  (sgml-set-active-dtd-indicator (sgml-dtd-doctype dtd))
   (let ((top-type			; Fake element type for the top
 					; node of the parse tree
 	 (sgml-make-eltype "#DOC")	; was "Document (no element)"
