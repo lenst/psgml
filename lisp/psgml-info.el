@@ -242,62 +242,58 @@
 ;;;; Display table
 
 (defun sgml-display-table (table title col-title1 col-title2
-				 &optional width nosort dual-table
-                                 col1-describe)
+                           &optional width nosort dual-table
+                           col1-describe)
   (or width
       (setq width sgml-attr-col))
-  (let ((buf (get-buffer-create (format "*%s*" title)))
-        (cb  (current-buffer)))
-    (message "Preparing display...")
-    (set-buffer buf)
-    (erase-buffer)
-    (insert col-title1)
-    (indent-to width)
-    (if dual-table
-        (insert-text-button col-title2
-                            'action (lambda (button)
-                                      (let ((func (button-get button 'dual-table)))
-                                        (with-current-buffer (button-get button 'buffer)
-                                          (funcall func))))
-                            'buffer cb
-                            'dual-table dual-table)
-      (insert col-title2))
-    (insert "\n")
-    (insert-char ?= (length col-title1))
-    (indent-to width)
-    (insert-char ?= (length col-title2))
-    (insert "\n")
-    (unless nosort
-      (setq table (sort table (function (lambda (a b)
-					  (string< (car a) (car b)))))))
-    (loop for e in table do
-          (let ((name (format "%s" (car e))))
-            (if col1-describe
-                (insert-button name
-                               'action (lambda (button)
-                                         (let ((name (button-get button 'name))
-                                               (func (button-get button 'func)))
-                                           (with-current-buffer
-                                               (button-get button 'buffer)
-                                             (funcall func name))))
-                               'buffer cb 'func col1-describe 'name name)
-              (insert name)))
-          (insert " ")
-	  (loop for name in (if nosort
-				(cdr e)
-			      (sort (cdr e) (function string-lessp)))
-		do
-		(when (> (+ (length name) (current-column))
-			 fill-column)
-		  (insert "\n"))
-		(when (< (current-column) sgml-attr-col)
-		  (indent-to width))
-		(insert  name " "))
-	  (insert "\n"))
-          
-    (goto-char (point-min))
-    (display-buffer buf)
-    (message nil)))
+  (with-output-to-temp-buffer "*Help*"
+    (let ((cb  (current-buffer)))
+      (message "Preparing display...")
+      (set-buffer standard-output)
+      (insert col-title1)
+      (indent-to width)
+      (if dual-table
+          (insert-text-button col-title2
+                              'action (lambda (button)
+                                        (let ((func (button-get button 'dual-table)))
+                                          (with-current-buffer (button-get button 'buffer)
+                                            (funcall func))))
+                              'buffer cb
+                              'dual-table dual-table)
+          (insert col-title2))
+      (insert "\n")
+      (insert-char ?= (length col-title1))
+      (indent-to width)
+      (insert-char ?= (length col-title2))
+      (insert "\n")
+      (unless nosort
+        (setq table (sort table (function (lambda (a b)
+                                  (string< (car a) (car b)))))))
+      (dolist (e table)
+        (let ((name (format "%s" (car e))))
+          (if col1-describe
+              (insert-button name
+                             'action (lambda (button)
+                                       (let ((name (button-get button 'name))
+                                             (func (button-get button 'func)))
+                                         (with-current-buffer
+                                             (button-get button 'buffer)
+                                           (funcall func name))))
+                             'buffer cb 'func col1-describe 'name name
+                             'follow-link t)
+            (insert name)))
+        (insert " ")
+        (dolist (name (if nosort (cdr e)
+                        (sort (cdr e) (function string-lessp))))
+          (when (> (+ (length name) (current-column))
+                   fill-column)
+            (insert "\n"))
+          (when (< (current-column) sgml-attr-col)
+            (indent-to width))
+          (insert  name " "))
+        (insert "\n"))
+
+      (message nil))))
 
 
 ;;;; Describe entity
@@ -387,8 +383,11 @@
             (when (and (> col 0) (> (+ col (length name)) fill-column))
               (insert "\n ")
               (setq col 1))
-            (insert-text-button name :type 'sgml-eltype
-                                'name name 'buffer orig-buffer)
+            (if (eq et sgml-pcdata-token)
+                (insert name)
+                (insert-text-button name :type 'sgml-eltype
+                                    'name name 'buffer orig-buffer
+                                    'follow-link t))
             (incf col (length name))))))
 
 
@@ -513,15 +512,15 @@
        'action (lambda (button)
                  (with-current-buffer (button-get button 'buffer)
                    (sgml-list-elements)))
-       'buffer (current-buffer))
+       'buffer (current-buffer) 'follow-link t)
       (princ (format fmt "Entities:" (format "%d" entities)))
       (princ (format fmt "Parameter entities:" (format "%d" parameters)))
 
       (setq hdr "Files used:")
-      (loop for x in (sgml-dtd-dependencies sgml-dtd-info)
-	    if (stringp x)
-	    do (princ (format fmt hdr x))
-	    (setq hdr ""))
+      (dolist (x (sgml-dtd-dependencies sgml-dtd-info))
+        (when (stringp x)
+          (princ (format fmt hdr x))
+          (setq hdr "")))
 
       (setq hdr "Undef parameters:")
       (sgml-map-entities
