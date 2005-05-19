@@ -1,3 +1,16 @@
+2005-05-19 Dave Love
+
+	* psgml-parse.el (sgml-parse-in-loop, sgml-parser-loop): 
+	* psgml-other.el (sgml-set-face-for): 
+	Speed patch from debian?
+	
+2005-05-19 Manoj Srivastava
+
+	* psgml.el (sgml-validate-command, sgml-xml-validate-command): 
+	* psgml-parse.el: 
+	* psgml-edit.el (sgml-change-element-name): 
+	Patches from debian package
+
 2005-05-19  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-edit.el (sgml-edit-external-entity): conditional use of
