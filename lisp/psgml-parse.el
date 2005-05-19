@@ -2865,7 +2865,7 @@ overrides the entity type in entity look up."
             (save-excursion
               (condition-case nil
                   (sgml-parse-to
-                   eol-pos (function input-pending-p) quiet)
+                   eol-pos (function input-pending-p) t)
                 (error nil)))))
 	;; Set face in rest of buffer
 	(sgml-fontify-buffer 6)		;FIXME: make option for delay
