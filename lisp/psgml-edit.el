@@ -1272,7 +1272,7 @@ after the first tag inserted."
                         collect `(,gi (sgml-change-element-name ,gi))))))
       (sgml-popup-multi-menu
        event "Start Tag"
-       (list* `("Misc"
+       (list* `("Action"
                 ("Edit attributes" (sgml-edit-attributes))
                 ("Normalize" (sgml-normalize-element))
                 ("Fill" (sgml-fill-element
@@ -1280,7 +1280,7 @@ after the first tag inserted."
                 ("Splice" (sgml-untag-element))
                 ("Fold"   (sgml-fold-element)))
               change-menu
-              ;;`("--" "--")
+              `("--" "--")
               attrib-menu)))))
 
 
@@ -1464,52 +1464,83 @@ Editing is done in a separate window."
                     "<%s  -- Edit values and finish with \
 \\[sgml-edit-attrib-finish], abort with \\[sgml-edit-attrib-abort] --\n")
                    (sgml-element-name element))
-      (loop
-       for attr in sgml-attlist do
-       ;; Produce text like
-       ;;  name = value
-       ;;  -- declaration : default --
-       (let* ((aname (sgml-attdecl-name attr))
-	      (dcl-value (sgml-attdecl-declared-value attr))
-	      (def-value (sgml-attdecl-default-value attr))
-	      (cur-value (sgml-lookup-attspec aname asl)))
-	 (sgml-insert			; atribute name
-	  '(read-only t category sgml-form) " %s =" aname)
-	 (cond				; attribute value
-	  ((sgml-default-value-type-p 'FIXED def-value)
-	   (sgml-insert '(read-only t category sgml-fixed)
-			" #FIXED %s"
-			(sgml-default-value-attval def-value)))
-	  ((and (null cur-value)
-		(or (memq def-value '(IMPLIED CONREF CURRENT))
-		    (sgml-default-value-attval def-value)))
-           (sgml-insert '(read-only t category sgml-form
-                                    rear-nonsticky (read-only category))
-                        " ")
-	   (sgml-insert '(category sgml-default rear-nonsticky (category))
-			"#DEFAULT"))
-	  (t
-           (sgml-insert '(read-only t category sgml-form
-                                    rear-nonsticky (read-only category))
-                        " ")
-           (when (not (null cur-value))
-             (sgml-insert nil "%s" (sgml-attspec-attval cur-value)))))
-	 (sgml-insert
-	  '(read-only 1)
-	  "\n\t-- %s: %s --\n"
-	  (cond ((sgml-declared-value-token-group dcl-value))
-		((sgml-declared-value-notation dcl-value)
-		 (format "NOTATION %s"
-			 (sgml-declared-value-notation dcl-value)))
-		(t
-		 dcl-value))
-	  (cond ((sgml-default-value-attval def-value))
-		(t
-		 (concat "#" (upcase (symbol-name def-value))))))))
-      (sgml-insert '(read-only t) ">")
+      (dolist (attr sgml-attlist)
+        ;; Produce text like
+        ;;  name = value
+        ;;  -- declaration : default --
+        (let* ((aname (sgml-attdecl-name attr))
+               (def-value (sgml-attdecl-default-value attr))
+               (cur-value (sgml-lookup-attspec aname asl)))
+          (sgml-insert			; atribute name
+           '(read-only t category sgml-form) " %s =" aname)
+          (cond				; attribute value
+            ((sgml-default-value-type-p 'FIXED def-value)
+             (sgml-insert '(read-only t category sgml-fixed)
+                          " #FIXED %s"
+                          (sgml-default-value-attval def-value)))
+            ((and (null cur-value)
+                  (or (memq def-value '(IMPLIED CONREF CURRENT))
+                      (sgml-default-value-attval def-value)))
+             (sgml-insert '(read-only t category sgml-form
+                            rear-nonsticky (read-only category))
+                          " ")
+             (sgml-insert '(category sgml-default rear-nonsticky (category))
+                          "#DEFAULT"))
+            (t
+             (sgml-insert '(read-only t category sgml-form
+                            rear-nonsticky (read-only category))
+                          " ")
+             (when (not (null cur-value))
+               (sgml-insert nil "%s" (sgml-attspec-attval cur-value)))))
+          (sgml-insert-attdecl-comment attr)))
+      (sgml-insert '(read-only 1) ">")
       (goto-char (point-min))
       (sgml-edit-attrib-next))
     buf))
+
+(defun sgml-insert-attdecl-comment (attdecl)
+  (let ((dcl-value (sgml-attdecl-declared-value attdecl))
+        (def-value (sgml-attdecl-default-value attdecl))
+        (start (point)))
+    (insert "\n\t-- ")
+    (cond ((sgml-declared-value-token-group dcl-value)
+           (sgml-insert-token-group (sgml-declared-value-token-group dcl-value)))
+          ((sgml-declared-value-notation dcl-value)
+           (insert "NOTATION ")
+           (sgml-insert-token-group (sgml-declared-value-notation dcl-value)))
+          (t
+           (sgml-insert nil "%s" dcl-value)))
+    (insert ": ")
+    (insert-text-button
+     (format "%s"
+             (cond ((sgml-default-value-attval def-value))
+                  (t
+                   (concat "#" (upcase (symbol-name def-value))))))
+     'action 'sgml-insert-selected-default 'follow-link t)
+    (insert " --\n")
+    (add-text-properties start (point) '(read-only 1 rear-nonsticky nil))))
+
+(defun sgml-insert-selected-token (button)
+  (let ((name (button-label button)))
+    (goto-char (button-start button))
+    (sgml-edit-attrib-clear)
+    (insert name)))
+
+(defun sgml-insert-selected-default (button)
+  (goto-char (button-start button))
+  (sgml-edit-attrib-default))
+
+(defun sgml-insert-token-group (list)
+  (insert "(")
+  (let ((first t))
+    (dolist (token list)
+      (unless first (insert " | "))
+      (setq first nil)
+      (let ((name (format "%s" token)))
+        (insert-text-button name
+                            'action 'sgml-insert-selected-token
+                            'follow-link t))))
+  (insert ")"))
 
 
 (defvar sgml-edit-attrib-mode-map (make-sparse-keymap))
@@ -1534,11 +1565,12 @@ Editing is done in a separate window."
 (define-key sgml-edit-attrib-mode-map "\t"  'sgml-edit-attrib-next)
 
 (defun sgml-edit-attrib-mode ()
-  "Major mode to edit attribute specification list.\\<sgml-edit-attrib-mode-map>
-Use \\[sgml-edit-attrib-next] to move between input fields.  Use
-\\[sgml-edit-attrib-default] to make an attribute have its default
-value.  To abort edit kill buffer (\\[kill-buffer]) and remove window
-\(\\[delete-window]).  To finish edit use \\[sgml-edit-attrib-finish].
+  "Major mode to edit attribute specification list.
+\\<sgml-edit-attrib-mode-map> 
+Use \\[sgml-edit-attrib-next] to move between input fields. 
+Use \\[sgml-edit-attrib-default] to make an attribute have its default value.
+To abort edit kill buffer (\\[kill-buffer]) and remove window \(\\[delete-window]). 
+To finish edit use \\[sgml-edit-attrib-finish]. 
 
 \\{sgml-edit-attrib-mode-map}"
   (setq mode-name "SGML edit attributes"
