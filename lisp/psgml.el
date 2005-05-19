@@ -192,7 +192,8 @@ will be slower.")
 (put 'sgml-set-face 'sgml-desc "Set face of parsed markup")
 
 (defvar sgml-live-element-indicator nil
-  "*If non-nil, indicate current element in mode line.
+  "OBSOLETE
+If non-nil, indicate current element in mode line.
 This may be slow.")
 
 (defvar sgml-auto-activate-dtd nil
@@ -579,7 +580,6 @@ Should return a string suitable form printing in the echo area.")
 (defconst sgml-user-options
   '(
     sgml-set-face
-    sgml-live-element-indicator
     sgml-auto-activate-dtd
     sgml-offer-save
     sgml-tag-region-if-active
@@ -800,7 +800,6 @@ as that may change."
 	 'sgml-indent-data
 	 'sgml-indent-step
 	 'sgml-leave-point-after-insert
-	 'sgml-live-element-indicator
 	 'sgml-local-catalogs
 	 'sgml-local-ecat-files
 	 'sgml-markup-faces
@@ -898,7 +897,7 @@ as that may change."
  '("SGML"
    ["Load Doctype"              sgml-load-doctype               t]
    ("DTD Info"
-    ["General DTD info"         sgml-describe-dtd               t]
+    ["Describe DTD"             sgml-describe-dtd               t]
     ["Describe element type"	sgml-describe-element-type	t]
     ["Describe entity"		sgml-describe-entity		t]
     ["List elements" 		sgml-list-elements 		t]
@@ -906,6 +905,7 @@ as that may change."
     ["List terminals" 		sgml-list-terminals 		t]
     ["List content elements" 	sgml-list-content-elements 	t]
     ["List occur in elements" 	sgml-list-occur-in-elements 	t])
+   ("Insert DTD")
    ("Insert Markup"
     ["Insert Element"           sgml-element-menu	t]
     ["Insert Start-Tag"         sgml-start-tag-menu	t]
@@ -914,9 +914,8 @@ as that may change."
     ["Tag Region"               sgml-tag-region-menu	t]
     ["Insert Attribute"         sgml-attrib-menu	t]
     ["Insert Entity"            sgml-entities-menu	t]
-    ["Add Element to Element"	sgml-add-element-menu	t]
-    ("Insert DTD")   
-    ("Custom markup"   "---"))
+    ["Add Element to Element"	sgml-add-element-menu	t])
+   ("Custom markup"   "---")
    "--"
    ["Show Context"              sgml-show-context       t]
    ["What Element"              sgml-what-element       t]
@@ -1057,10 +1056,10 @@ as that may change."
 		(numberp button3))
       (local-set-key [button3] button3))
     (when sgml-custom-dtd
-      (easy-menu-change '("SGML" "Insert Markup") "Insert DTD"
+      (easy-menu-change '("SGML") "Insert DTD"
 			(sgml-compute-insert-dtd-items)))
     (when sgml-custom-markup
-      (easy-menu-change '("SGML" "Insert Markup") "Custom markup"
+      (easy-menu-change '("SGML") "Custom markup"
 			(sgml-compute-custom-markup-items))))
   nil)
 
@@ -1210,15 +1209,6 @@ All bindings:
   ;; Added for psgml:
   (make-local-variable 'indent-line-function)
   (setq indent-line-function 'sgml-indent-line)
-  (make-local-variable 'mode-line-format)
-  (if (featurep 'xemacs)
-      ;; Modify mode-line-format with susbt (sugested by wing)
-      ;; Apart from requiring CL at runtime, this doesn't work in Emacs
-      ;; 21.  It's the sort of thing which-func is supposed to do...
-      (setq mode-line-format
-	    (subst '("" mode-name sgml-active-dtd-indicator) 'mode-name
-		   mode-line-format))
-    (set (make-local-variable 'which-func-format) 'sgml-active-dtd-indicator))
   (make-local-variable 'sgml-default-dtd-file)
   (when (setq sgml-default-dtd-file (sgml-default-dtd-file))
     (unless (file-exists-p sgml-default-dtd-file)
@@ -1238,9 +1228,11 @@ All bindings:
     (make-local-hook 'activate-menubar-hook))
   (add-hook 'activate-menubar-hook 'sgml-update-all-options-menus
 	    nil 'local)
+  (add-hook 'which-func-functions 'sgml-current-element-name nil t)
   (run-hooks 'text-mode-hook 'sgml-mode-hook)
   (easy-menu-add sgml-main-menu)
   (sgml-build-custom-menus))
+
 
 ;; It would be nice to generalize the `auto-mode-interpreter-regexp'
 ;; machinery so that we could select xml-mode on the basis of the
