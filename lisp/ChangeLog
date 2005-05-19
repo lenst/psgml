@@ -1,3 +1,33 @@
+2005-05-19  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-edit.el (sgml-edit-external-entity): conditional use of
+	obsolete function process-kill-without-query
+
+	* psgml.el (sgml-live-element-indicator): obsolete var.
+	(sgml-main-menu): reduce menu depth, move insert dtd and insert
+	custom markup to top-level.
+	(sgml-mode): add the which-func-mode support
+
+	* psgml-parse.el (sgml-update-display): support which-fun-mode
+	with current element name as function name.
+	(sgml-set-active-dtd-indicator): removed
+	(sgml-current-element-name): new func for use in which-function-mode
+	(sgml-update-display): oops. remove unbound var quite, using t instead
+
+	* psgml-info.el (sgml-display-table): use
+	with-output-to-temp-buffer and dolist
+	(sgml-print-eltypes): new button for #PCDATA pseudo token.
+
+	* psgml-edit.el (sgml-right-stag-menu): Change "Misc" to "Action"
+	(sgml-attribute-buffer): use dolist instead of loop, as it is
+	standard in latest emacs, and factor out inserting comment with
+	the attribute type.
+	(sgml-insert-attdecl-comment): new func. Inserts comment
+	describing the attribute type with clickable parts.
+	(sgml-insert-selected-token): new func
+	(sgml-insert-selected-default): new func
+	(sgml-insert-token-group): new func.
+
 2005-03-12  Lennart Staflin  <lenst@lysator.liu.se>
 
 	* psgml-info.el (sgml-display-table): add buttons

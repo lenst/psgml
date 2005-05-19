@@ -1,4 +1,4 @@
-TODO      [Time-stamp: "2005-02-27 15:32:16 lenst"]           -*- outline -*- 
+TODO      [Time-stamp: "2005-05-18 16:58:41 lenst"]           -*- outline -*- 
 
 
 * parse prolog and parent document
@@ -73,10 +73,6 @@ sgml-auto-activate-dtd
 * Fix documentation of sgml-display-char-list-filename
 
 File format is not properly descibed.
-
-* sgml-parse-prolog
-
-Should perhaps respect sgml-parent-document
 
 * Konstigt beteende när DOCTYPE specar en odefinierad elementtyp,
 speciellt om det är nästan samma som topelementet i instansen men

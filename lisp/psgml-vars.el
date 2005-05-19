@@ -84,9 +84,6 @@ will be slower.")
   "*If non-nil, psgml will set the face of parsed markup.")
 (put 'sgml-set-face 'sgml-desc "Set face of parsed markup")
 
-(defvar sgml-live-element-indicator nil
-  "*If non-nil, indicate current element in mode line.")
-
 (defvar sgml-auto-activate-dtd nil
   "*If non-nil, loading a sgml-file will automatically try to activate its DTD.
 Activation means either to parse the document type declaration or to
