@@ -332,5 +332,56 @@ use `setq-default' to set it to a value that is shared among buffers."
 (make-variable-buffer-local 'sgml-exposed-tags)
 (put 'sgml-exposed-tags 'sgml-type 'list)
 
+
+
+(defcustom sgml-custom-dtd nil
+  "Menu entries to be added to the DTD menu.
+The value should be a list of entries to be added to the DTD menu.
+Every entry should be a list.  The first element of the entry is a string
+used as the menu entry.  The second element is a string containing a
+doctype declaration (this can be nil if no doctype).  The rest of the
+list should be a list of variables and values.  For backward
+compatibility a single string instead of a variable is assigned to
+`sgml-default-dtd-file'.  All variables are made buffer local and are also
+added to the buffers local variables list.
+
+Example:
+   ((\"HTML\" nil
+     sgml-default-dtd-file \"~/sgml/html.ced\"
+     sgml-omittag nil sgml-shorttag nil)
+    (\"HTML+\" \"<!doctype htmlplus system 'htmlplus.dtd'>\"
+     \"~/sgml/htmlplus.ced\"
+     sgml-omittag t sgml-shorttag nil)
+    (\"DOCBOOK\" \"<!doctype docbook system 'docbook.dtd'>\"
+     \"~/sgml/docbook.ced\"
+     sgml-omittag nil sgml-shorttag t)))
+"
+  :group 'psgml
+  :type '(repeat (list (string :tag "Menu entry")
+                  (string :tag "Doctype")
+                  (plist :tag "Options" :inline t)))
+)
+
+
+(defcustom sgml-custom-markup nil
+  "*Menu entries to be added to the Markup menu.
+The value should be a list of lists of two strings.  The first
+string is the menu line and the second string is the text inserted
+when the menu item is chosen.  The second string can contain a \\r
+where the cursor should be left.  Also if a selection is made
+according the same rules as for the Tags menu, the selection is
+replaced with the second string and \\r is replaced with the
+selection.
+
+Example:
+
+  ((\"Version1\" \"<![%Version1[\\r]]>\")
+   (\"New page\"  \"<?NewPage>\"))
+"
+  :group 'psgml
+  :type '(repeat (list (string :tag "Menu entry")
+                  (choice string sexp)))
+)
+
 
 (provide 'psgml-vars)
