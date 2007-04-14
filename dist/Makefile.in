@@ -22,6 +22,12 @@ SHELL = /bin/sh
 compile:
 	$(EMACS) $(FLAGS) -f psgml-compile-files
 
+clean:
+	-rm -f core `find . \( -name '*.orig' -o -name '*.rej' -o -name '*~' \
+	       -o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
+	       -o -name '.*.rej' -o -name '.SUMS' -o -size 0 \) -print` TAGS
+	rm -f *.elc ;
+
 all: 
 	rm -f *.elc ; $(EMACS) $(FLAGS) -f psgml-compile-files
 
