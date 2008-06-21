@@ -440,9 +440,9 @@ as that may change."
 
 (defun sgml-markup (entry text)
   (cons entry
-	(` (lambda ()
-	     (interactive)
-	     (sgml-insert-markup (, text))))))
+	`(lambda ()
+           (interactive)
+           (sgml-insert-markup ,text))))
 
 (defun sgml-insert-markup (text)
   (let ((end (sgml-mouse-region))
@@ -758,13 +758,13 @@ as that may change."
 (defun sgml-compute-insert-dtd-items ()
   (loop for e in sgml-custom-dtd collect
         (vector (first e)
-                (` (sgml-doctype-insert (, (cadr e)) '(, (cddr e))))
+                `(sgml-doctype-insert ,(cadr e) ',(cddr e))
                 t)))
 
 (defun sgml-compute-custom-markup-items ()
   (loop for e in sgml-custom-markup collect
         (vector (first e)
-                (` (sgml-insert-markup  (, (cadr e))))
+                `(sgml-insert-markup  ,(cadr e))
                 t)))
 
 (defun sgml-build-custom-menus ()

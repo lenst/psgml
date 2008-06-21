@@ -1,14 +1,37 @@
+2008-06-21  Lennart Staflin  <lenst@lysator.liu.se>
+
+	* psgml-lucid.el (sgml-make-options-menu): change old style backquote
+
+	* psgml-parse.el (sgml-with-parser-syntax)
+	(sgml-with-parser-syntax-ro, sgml-make-move, sgml-move-token)
+	(sgml-move-dest, sgml-moves-lookup, sgml-normal-state-p)
+	(sgml-state-opts, sgml-state-reqs, sgml-and-node-next)
+	(sgml-and-node-dfas, sgml-eltype-flags, sgml-eltype-appdata)
+	(sgml-char-int, sgml-is-delim, sgml-following-char)
+	(sgml-parse-char, sgml-parse-chars, sgml-startnm-char)
+	(sgml-parse-name, sgml-parse-rni, sgml-alias-fields)
+	(sgml-deref-shortmap, sgml-state-final-p, sgml-prop-fields)
+	(sgml-parse-delim, sgml-check-delim, sgml-skip-upto)
+	(sgml-element-stag-optional): change old style backquote
+
+	* psgml-dtd.el (sgml-for-all-final-states, sgml-code-sequence):
+	change old style backquote
+
+	* psgml.el (sgml-markup)
+	(sgml-compute-insert-dtd-items)
+	(sgml-compute-custom-markup-items): change old style backquote
+
 2005-05-19 Dave Love
 
-	* psgml-parse.el (sgml-parse-in-loop, sgml-parser-loop): 
-	* psgml-other.el (sgml-set-face-for): 
+	* psgml-parse.el (sgml-parse-in-loop, sgml-parser-loop):
+	* psgml-other.el (sgml-set-face-for):
 	Speed patch from debian?
-	
+
 2005-05-19 Manoj Srivastava
 
-	* psgml.el (sgml-validate-command, sgml-xml-validate-command): 
-	* psgml-parse.el: 
-	* psgml-edit.el (sgml-change-element-name): 
+	* psgml.el (sgml-validate-command, sgml-xml-validate-command):
+	* psgml-parse.el:
+	* psgml-edit.el (sgml-change-element-name):
 	Patches from debian package
 
 2005-05-19  Lennart Staflin  <lenst@lysator.liu.se>
@@ -64,7 +87,7 @@
 	in catalogs.
 	(sgml-lookup-sysid-as-file): remove
 	(sgml-external-file): simplified and use new sgml-catalog-lookup
-	interface. 
+	interface.
 
 2005-03-05  Lennart Staflin  <lenst@lysator.liu.se>
 
