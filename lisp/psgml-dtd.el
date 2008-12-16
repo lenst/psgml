@@ -279,7 +279,7 @@ Syntax: var dfa-expr &body forms"
 	  (sgml-parse-delim "CRO" (digit nmstart))
 	(sgml-parse-delim "CRO" (digit)))
       (prog1 (if (sgml-is-delim "NULL" digit)
-		 (string-to-int (sgml-check-nametoken))
+		 (string-to-number (sgml-check-nametoken))
 	       (let ((spec (sgml-check-name)))
 		 (or (cdr (assoc spec '(("RE" . 10)
 					("RS" . 1)
