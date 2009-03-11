@@ -1,5 +1,5 @@
 ;;;; psgml-dtd.el --- DTD parser for SGML-editing mode with parsing support
-;; $Id$
+;; $Id: psgml-dtd.el,v 2.32 2008/12/16 13:57:29 lenst Exp $
 
 ;; Copyright (C) 1994 Lennart Staflin
 

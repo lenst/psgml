@@ -1,5 +1,5 @@
 ;;; psgml.el --- SGML-editing mode with parsing support
-;; $Id$
+;; $Id: psgml.el,v 2.76 2008/06/21 16:13:50 lenst Exp $
 
 ;; Copyright (C) 1993-2002 Lennart Staflin
 ;; Copyright (C) 1992 Free Software Foundation, Inc.

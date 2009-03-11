@@ -1,6 +1,6 @@
 ;;;; psgml-info.el
 ;;; Last edited: 2000-11-09 19:23:50 lenst
-;;; $Id$
+;;; $Id: psgml-info.el,v 2.18 2005/05/19 19:06:47 lenst Exp $
 
 ;; Copyright (C) 1994, 1995 Lennart Staflin
 

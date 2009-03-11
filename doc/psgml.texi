@@ -7,7 +7,7 @@
 @syncodeindex vr cp
 @synindex ky cp
 @c %**end of header
-@c $Id$
+@c $Id: psgml.texi,v 1.9 2005/03/11 14:25:33 lenst Exp $
 
 @ifinfo
 @dircategory Emacs

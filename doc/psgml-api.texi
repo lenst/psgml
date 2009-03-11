@@ -4,7 +4,7 @@
 @settitle psgml-api
 @c @setchapternewpage odd
 @c %**end of header
-@c $Id$
+@c $Id: psgml-api.texi,v 1.3 2005/03/11 14:25:23 lenst Exp $
 
 @ifinfo
 @dircategory Emacs

@@ -3,7 +3,7 @@
 ;; Copyright (C) 1996 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
-;; Version: $Id$
+;; Version: $Id: psgml-maint.el,v 1.8 2005/02/09 15:28:58 lenst Exp $
 ;; Keywords:
 
 ;;; This program is free software; you can redistribute it and/or modify

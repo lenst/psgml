@@ -1,6 +1,6 @@
 ;;; psgml-edit.el --- Editing commands for SGML-mode with parsing support
 ;;
-;; $Id$
+;; $Id: psgml-edit.el,v 2.76 2005/05/19 19:35:00 lenst Exp $
 
 ;; Copyright (C) 1994, 1995, 1996 Lennart Staflin
 

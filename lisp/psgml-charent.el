@@ -1,6 +1,6 @@
 ;;;; psgml-charent.el
 ;;; Last edited: 1999-12-18 18:54:53 lenst
-;;; $Id$
+;;; $Id: psgml-charent.el,v 1.7 2002/04/25 20:50:27 lenst Exp $
 
 ;; Copyright (C) 1994 Lennart Staflin
 

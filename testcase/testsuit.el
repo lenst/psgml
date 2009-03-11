@@ -1,6 +1,6 @@
 ;;; testsuit.el -- Test Suit for PSGML
 
-;; $Id$
+;; $Id: testsuit.el,v 1.15 2005/03/08 18:39:30 lenst Exp $
 
 (require 'cl)
 (require 'psgml)

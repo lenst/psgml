@@ -3,7 +3,7 @@
 ;; Copyright (C) 1995 Lennart Staflin
 
 ;; Author: Lennart Staflin <lenst@lysator.liu.se>
-;; Version: $Id$
+;; Version: $Id: fum.el,v 1.1 2000/04/12 16:44:26 lenst Exp $
 ;; Keywords: 
 ;; Last edited: Sat Aug 31 23:35:29 1996 by lenst@triton.lstaflin.pp.se (Lennart Staflin)
 
@@ -26,7 +26,7 @@
 ;; LCD Archive Entry:
 ;; fum|Lennart Staflin|lenst@lysator.liu.se|
 ;; |
-;; 21-May-95|$Revision$||
+;; 21-May-95|$Revision: 1.1 $||
 
 ;;; Commentary:
 

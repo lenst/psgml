@@ -1,0 +1,6 @@
+*.elc
+*.tgz
+.cvsignore
+CVS/
+TAGS
+.#*

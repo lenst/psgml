@@ -1,5 +1,5 @@
 ;;; psgml-xpr.el --- Experimental additions for PSGML
-;; $Id$
+;; $Id: psgml-xpr.el,v 2.3 2005/02/27 17:15:19 lenst Exp $
 
 ;; Copyright (C) 2003 Lennart Staflin
 
