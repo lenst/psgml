@@ -107,18 +107,18 @@ This may be slow.")
 
 
 ;;[lenst/1998-03-09 19:51:55]
+;; sgml-namecase-entity would reflect the NAMECASE ENTITY setting
+;; in the SGML Declaration used. Currently only "NO" (encoded as nil)
+;; is supported.
 (defconst sgml-namecase-entity nil)
 
+;; What letter case to use when inserting entity names when
+;; sgml-namecase-entity is non-nil. It's never non-nil so this is kind
+;; of useless.
 (defvar sgml-entity-insert-case nil)
 
 
 ;;; User settable options:
-
-
-
-
-(defvar sgml-content-indent-function 'sgml-indent-according-to-level)
-(defvar sgml-attribute-indent-function 'sgml-indent-according-to-stag)
 
 
 (defun sgml-parse-colon-path (cd-path)

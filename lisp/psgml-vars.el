@@ -383,5 +383,43 @@ Example:
                   (choice string sexp)))
 )
 
+
+
+;;;; Hooks and functions
+
+
+(defcustom sgml-content-indent-function
+  'sgml-indent-according-to-level
+  "*Function used to compute indentation level for element content.
+Function will be called with one argument, the element.
+Should return an integer."
+  :group 'psgml
+  :type '(choice
+          (const :tag "Indented according to nesting level"
+                 sgml-indent-according-to-level)
+          (const :tag "Indented under start tag"
+                 sgml-indent-according-to-stag)
+          (const :tag "Indented under start tag after name"
+                 sgml-indent-according-to-stag-end)
+          (function)))
+
+
+(defcustom sgml-attribute-indent-function
+  'sgml-indent-according-to-stag
+  "*Function used to compute indetation level for attributes.
+Function will be called with one argument, the element.
+Should return an integer."
+  :group 'psgml
+  :type '(choice
+          (const :tag "Indented according to nesting level"
+                 sgml-indent-according-to-level)
+          (const :tag "Indented under start tag"
+                 sgml-indent-according-to-stag)
+          (const :tag "Indented under start tag after name"
+                 sgml-indent-according-to-stag-end)
+          (function)))
+
+
+
 
 (provide 'psgml-vars)
